@@ -1,0 +1,137 @@
+{
+  "name": "WhatsApp AI Q&A Bot (multi-DB)",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "whatsapp-webhook", "responseMode": "responseNode" },
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract sender + message text from WhatsApp Cloud API payload\nconst body = $input.first().json.body || $input.first().json;\nconst entry = body.entry?.[0]?.changes?.[0]?.value;\nconst msg = entry?.messages?.[0];\nif (!msg) return [];\nreturn [{ json: {\n  from: msg.from,\n  text: msg.text?.body || '',\n  messageId: msg.id,\n  timestamp: msg.timestamp\n}}];"
+      },
+      "name": "Parse WhatsApp payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "combinator": "and" },
+          "conditions": [
+            {
+              "leftValue": "={{ ['85298765432','85291234567'].includes($json.from) }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "name": "IF: authorized phone",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "你係 Perfect Gym 嘅數據助手。老闆會用自然語言問會員、銷售、PT 合約等數據。\n\n## 你可以查嘅 DATABASE（多個！）\n你有 3 個 Postgres read-only tool，每個駁唔同 schema / database：\n\n1. **query_members** — members 資料 (gym_members DB)\n   table: members\n   columns: id, member_code, name, phone, email, gender, dob, join_date,\n            plan_type, plan_start, plan_end, status, pt_sessions_left,\n            last_visit, total_paid, branch, notes\n\n2. **query_sales** — 銷售數據 (gym_sales DB)\n   table: sales\n   columns: id, sale_date, member_code, product, amount, staff, branch, payment_method\n\n3. **query_pt** — PT 合約 (gym_pt DB)\n   table: pt_agreements\n   columns: id, agreement_no, member_code, trainer, sessions_total,\n            sessions_used, start_date, end_date, price, status\n\n## 跨 DB 查詢點做\n因為係唔同 database，唔可以直接 JOIN。要：\n1. 第一個 tool 攞 list of member_code\n2. 用啲 code 作為 filter 第二個 tool\n3. 喺你腦入面 merge 結果再答老闆\n\n例：「今個月到期嘅 member 邊個仲有 PT session？」\n→ step 1: query_members WHERE plan_end BETWEEN ... → 拎 member_code list\n→ step 2: query_pt WHERE member_code IN (...) AND sessions_total - sessions_used > 0\n→ step 3: 整合答案\n\n## 規則\n- 只可以 SELECT，唔可以改 data\n- 回覆用繁體中文，要精簡\n- 結果超過 10 行 → summarise\n- 日期格式 YYYY-MM-DD\n- 金額用 $ + 千分位\n- 今日日期: {{ $now.format('YYYY-MM-DD') }}\n- 含糊嘅問題先問清楚\n- 敏感資料（電話 email）只係老闆問先俾"
+        }
+      },
+      "name": "AI Agent (Claude)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [860, 260]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": { "temperature": 0.2, "maxTokensToSample": 1024 }
+      },
+      "name": "Claude model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [820, 440],
+      "credentials": { "anthropicApi": { "id": "REPLACE_ANTHROPIC_CRED_ID", "name": "Claude" } }
+    },
+    {
+      "parameters": {
+        "name": "query_members",
+        "description": "Run a read-only SELECT SQL query on the members table (gym_members DB). Input: {\"sql\": \"SELECT ...\"}. Only SELECT allowed.",
+        "workflowId": "={{ $workflow.id }}",
+        "fields": {
+          "values": [{ "name": "sql", "type": "stringValue" }]
+        }
+      },
+      "name": "Tool: query_members",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [1080, 440]
+    },
+    {
+      "parameters": {
+        "name": "query_sales",
+        "description": "Run a read-only SELECT SQL query on the sales table (gym_sales DB). Input: {\"sql\": \"SELECT ...\"}. Only SELECT allowed.",
+        "workflowId": "={{ $workflow.id }}",
+        "fields": {
+          "values": [{ "name": "sql", "type": "stringValue" }]
+        }
+      },
+      "name": "Tool: query_sales",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [1280, 440]
+    },
+    {
+      "parameters": {
+        "name": "query_pt",
+        "description": "Run a read-only SELECT SQL query on the pt_agreements table (gym_pt DB). Input: {\"sql\": \"SELECT ...\"}. Only SELECT allowed.",
+        "workflowId": "={{ $workflow.id }}",
+        "fields": {
+          "values": [{ "name": "sql", "type": "stringValue" }]
+        }
+      },
+      "name": "Tool: query_pt",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [1480, 440]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_WA_PHONE_ID",
+        "recipientPhoneNumber": "={{ $('Parse WhatsApp payload').item.json.from }}",
+        "textBody": "={{ $json.output }}"
+      },
+      "name": "WhatsApp: reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1700, 260],
+      "credentials": { "whatsAppApi": { "id": "REPLACE_WA_CRED_ID", "name": "WhatsApp" } }
+    },
+    {
+      "parameters": { "respondWith": "text", "responseBody": "ok" },
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1700, 420]
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": { "main": [[{ "node": "Parse WhatsApp payload", "type": "main", "index": 0 }, { "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Parse WhatsApp payload": { "main": [[{ "node": "IF: authorized phone", "type": "main", "index": 0 }]] },
+    "IF: authorized phone": { "main": [[{ "node": "AI Agent (Claude)", "type": "main", "index": 0 }], []] },
+    "AI Agent (Claude)": { "main": [[{ "node": "WhatsApp: reply", "type": "main", "index": 0 }]] },
+    "Claude model": { "ai_languageModel": [[{ "node": "AI Agent (Claude)", "type": "ai_languageModel", "index": 0 }]] },
+    "Tool: query_members": { "ai_tool": [[{ "node": "AI Agent (Claude)", "type": "ai_tool", "index": 0 }]] },
+    "Tool: query_sales":   { "ai_tool": [[{ "node": "AI Agent (Claude)", "type": "ai_tool", "index": 0 }]] },
+    "Tool: query_pt":      { "ai_tool": [[{ "node": "AI Agent (Claude)", "type": "ai_tool", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

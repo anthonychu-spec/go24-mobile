@@ -1,0 +1,61 @@
+{
+  "name": "Test DB Connection",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  NOW()                                AS server_time,\n  current_database()                   AS db,\n  current_user                         AS user_name,\n  version()                            AS pg_version,\n  (SELECT COUNT(*) FROM pgm.members)   AS member_count,\n  (SELECT COUNT(*) FROM pgm.import_log) AS import_log_count;",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Postgres: test query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [520, 300],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_CRED_ID",
+          "name": "Postgres gym_data (read-only)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "status",
+              "value": "=✅ Connected to {{ $json.db }} as {{ $json.user_name }}\nServer time: {{ $json.server_time }}\nMembers: {{ $json.member_count }}\nImport logs: {{ $json.import_log_count }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Format result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [780, 300]
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [[{ "node": "Postgres: test query", "type": "main", "index": 0 }]]
+    },
+    "Postgres: test query": {
+      "main": [[{ "node": "Format result", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

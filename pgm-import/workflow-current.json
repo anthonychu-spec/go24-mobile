@@ -1,0 +1,1341 @@
+{
+  "updatedAt": "2026-04-24T08:04:27.173Z",
+  "createdAt": "2026-04-24T06:40:46.398Z",
+  "id": "B0jQQCphiw7jSx3W",
+  "name": "GO24 WhatsApp AI Bot",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "go24-bot",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n01",
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        272,
+        304
+      ],
+      "webhookId": "e46d8c19-bb5f-4769-9a51-ab5ea9ba3fa1"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "n02",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        480,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst value = body.entry?.[0]?.changes?.[0]?.value;\nconst messages = value?.messages;\nif (!messages || !messages[0]) return [];\nconst msg = messages[0];\nif (msg.type !== \"text\") return [];\nconst from = msg.from;\nconst rawText = (msg.text?.body || \"\").trim();\nconst PASSWORD = \"6778\";\nlet authenticated = false, question = \"\";\nif (rawText === PASSWORD) { authenticated = true; question = \"__HELP__\"; }\nelse if (rawText.startsWith(PASSWORD + \" \")) { authenticated = true; question = rawText.slice(PASSWORD.length + 1).trim(); }\nelse { authenticated = false; question = rawText; }\nreturn [{ json: { from, messageId: msg.id, rawText, question, authenticated } }];"
+      },
+      "id": "n03",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.from }}",
+              "rightValue": "85261172810",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n04",
+      "name": "IF: From Boss",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        928,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $(\"Extract Message\").first().json.authenticated }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n06",
+      "name": "IF: Password OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $(\"Get WhatsApp Token\").first().json[\"Access Token\"] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $(\"Extract Message\").first().json.from, type: \"text\", text: { body: \"❌ 請先輸入密碼再問問題\\n例如：6778 依家有幾多個 active member?\" } }) }}",
+        "options": {}
+      },
+      "id": "n07",
+      "name": "Reply: Wrong Password",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c3",
+              "leftValue": "={{ $(\"Extract Message\").first().json.question }}",
+              "rightValue": "__HELP__",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n08",
+      "name": "IF: Help Menu",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Google Sheets2').item.json['Access Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $(\"Extract Message\").first().json.from, type: \"text\", text: { body: \"✅ 密碼正確！歡迎使用 GO24 數據查詢\\n\\n用法：6778 + 問題\\n\\n📊 可以問嘅嘢：\\n• 依家有幾多個 active member?\\n• 今個月 POS 收入幾多?\\n• 邊個分店會員最多?\\n• 今日有幾多堂 studio class?\\n• 最近 join 嘅 10 個 member?\" } }) }}",
+        "options": {}
+      },
+      "id": "n09",
+      "name": "Reply: Help Menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1968,
+        -224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const question = $(\"Extract Message\").first().json.question;\nconst today = new Date().toLocaleDateString(\"en-CA\", { timeZone: \"Asia/Hong_Kong\" });\nconst sp = `You are a SQL expert for GO24 Fitness gym chain in Hong Kong. Generate ONE PostgreSQL SELECT query. Return ONLY raw SQL, no markdown, no explanation.\\n\\nToday HKT: ${today}\\n\\npgm.members(member_code,name,phone,email,gender,dob DATE,join_date DATE,plan_type,plan_start DATE,plan_end DATE,status VARCHAR,pt_sessions_left INT,last_visit DATE,total_paid NUMERIC,branch,notes) status:Active,Frozen,Expired,Cancelled\\ncommissions.sold(club,sell_date DATE,user_number,first_name,product_name,net_sold NUMERIC,gross_sold NUMERIC,is_new BOOL,sold_employee,commission_category)\\ncommissions.done(club,done_date DATE,user_number,product_name,done_amount NUMERIC,done_employee,department,commission_category)\\nstudio.classes(club,class_name,category,employee_name,start_date DATE,day_of_week,class_time,users_limit INT,users_assigned INT,users_present INT,rating NUMERIC)\\nstudio.by_member(club,class_date DATE,class_name,first_name,last_name,user_number,has_presence BOOL)\\npos.transactions(club,transaction_date DATE,product_name,category,quantity NUMERIC,net_amount NUMERIC,gross_amount NUMERIC,payment_method,full_name,employee)\\npayments.epayment_log(club,user_number,name,payment_date DATE,amount NUMERIC,net_amount NUMERIC,status,provider,membership_status,payment_plan)\\nRules: LIMIT 20 detail queries; no limit aggregations; name ILIKE; readable English aliases`;\nreturn [{ json: { geminiBody: JSON.stringify({ systemInstruction: { parts: [{ text: sp }] }, contents: [{ role: \"user\", parts: [{ text: question }] }], generationConfig: { maxOutputTokens: 600, temperature: 0.1 } }), question } }];"
+      },
+      "id": "n10",
+      "name": "Build SQL Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBtW9YkhUAEg0-cdCBI2esY9jtf4tTOsOo",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.geminiBody }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "n11",
+      "name": "Gemini: Generate SQL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2032,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nlet sql = r.candidates?.[0]?.content?.parts?.[0]?.text || \"\";\nsql = sql.replace(/```sql/gi, \"\").replace(/```/g, \"\").trim();\nif (!sql.toUpperCase().startsWith(\"SELECT\")) throw new Error(\"Non-SELECT: \" + sql.slice(0, 100));\nreturn [{ json: { sql, question: $(\"Build SQL Request\").first().json.question } }];"
+      },
+      "id": "n12",
+      "name": "Extract SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.sql }}",
+        "options": {}
+      },
+      "id": "n13",
+      "name": "Query Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        2464,
+        304
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "BdWjFTVmkC8DZtSo",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all().map(i => i.json);\nconst question = $(\"Extract SQL\").first().json.question;\nconst sp2 = \"You are a helpful assistant for GO24 Fitness in Hong Kong. Reply in the same language as the question (Cantonese or English). Be brief (1-4 sentences). Use numbers clearly. Add 1-2 relevant emoji. Do NOT mention SQL or database.\";\nconst userContent = `Question: ${question}\\n\\nData (${results.length} rows):\\n${JSON.stringify(results, null, 2)}`;\nreturn [{ json: { geminiBody: JSON.stringify({ systemInstruction: { parts: [{ text: sp2 }] }, contents: [{ role: \"user\", parts: [{ text: userContent }] }], generationConfig: { maxOutputTokens: 400, temperature: 0.7 } }) } }];"
+      },
+      "id": "n14",
+      "name": "Build Answer Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBtW9YkhUAEg0-cdCBI2esY9jtf4tTOsOo",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.geminiBody }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "n15",
+      "name": "Gemini: Format Answer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst answer = r.candidates?.[0]?.content?.parts?.[0]?.text || \"唔好意思，暫時無法回答。\";\nreturn [{ json: { answer, to: $(\"Extract Message\").first().json.from } }];"
+      },
+      "id": "n16",
+      "name": "Extract Answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $(\"Get WhatsApp Token\").first().json[\"Access Token\"] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $json.to, type: \"text\", text: { body: $json.answer } }) }}",
+        "options": {}
+      },
+      "id": "n17",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3344,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2041211722,
+          "mode": "list",
+          "cachedResultName": "FB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit#gid=2041211722"
+        },
+        "options": {}
+      },
+      "id": "f1edb866-3dd0-4682-8679-1f51388bae68",
+      "name": "Google Sheets2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1680,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0XbB4tqamwjFQ6RO",
+          "name": "Google Sheets account 6"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Google Sheets2').item.json['Access Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"85293199887\",\n  \"type\": \"template\",\n  \"template\": {\n    \"name\": \"clubmembership\",\n    \"language\": {\n      \"code\": \"en\"\n    },\n    \"components\": [\n      {\n        \"type\": \"body\",\n        \"parameters\": [\n          { \"type\": \"text\", \"text\": \"{{ $('Get Club').item.json.name }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Edit Fields').item.json['New signUpDate'] }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Webhook').item.json.body.data.user.userNumber }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Webhook').item.json.body.data.user.userFirstName }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Webhook').item.json.body.data.user.userLastName }}\"},\n          { \"type\": \"text\", \"text\": \"{{ $('Get Payment Plan').item.json.name }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Edit Fields').item.json['New startDate'] }}\" },{ \"type\": \"text\", \"text\": \"Evis\" }\n        ]\n      }\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "id": "93f934c8-60c1-4ec7-aea3-c90f559589a7",
+      "name": "Whatsapp 5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2128,
+        -32
+      ]
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200 OK": {
+      "main": [
+        [
+          {
+            "node": "Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [
+          {
+            "node": "IF: From Boss",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: From Boss": {
+      "main": [
+        [
+          {
+            "node": "IF: Password OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF: Password OK": {
+      "main": [
+        [
+          {
+            "node": "IF: Help Menu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply: Wrong Password",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Help Menu": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build SQL Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SQL Request": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Generate SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Generate SQL": {
+      "main": [
+        [
+          {
+            "node": "Extract SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract SQL": {
+      "main": [
+        [
+          {
+            "node": "Query Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Postgres": {
+      "main": [
+        [
+          {
+            "node": "Build Answer Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Answer Request": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Format Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Format Answer": {
+      "main": [
+        [
+          {
+            "node": "Extract Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Answer": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets2": {
+      "main": [
+        [
+          {
+            "node": "Reply: Help Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {
+    "WhatsApp Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n-app-do-d9hvm.ondigitalocean.app",
+            "x-forwarded-for": "2a03:2880:2ff:48::,108.162.245.168",
+            "accept-encoding": "gzip, br",
+            "user-agent": "facebookexternalua",
+            "x-hub-signature-256": "sha256=752e507a39be2b0287c7bdf42357b324197358d9ff2cd5ea18c8c9aa15587426",
+            "x-hub-signature": "sha1=26ae8625add300a34d6cc25bc33b276c3cb61225",
+            "content-type": "application/json",
+            "content-length": "554",
+            "accept": "*/*",
+            "cdn-loop": "cloudflare; loops=1",
+            "x-forwarded-proto": "https",
+            "do-connecting-ip": "2a03:2880:2ff:48::"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "object": "whatsapp_business_account",
+            "entry": [
+              {
+                "id": "780222944874670",
+                "changes": [
+                  {
+                    "value": {
+                      "messaging_product": "whatsapp",
+                      "metadata": {
+                        "display_phone_number": "85298051607",
+                        "phone_number_id": "793508627177133"
+                      },
+                      "contacts": [
+                        {
+                          "profile": {
+                            "name": "Anthony Chu"
+                          },
+                          "wa_id": "85261172810",
+                          "user_id": "HK.943475315048611"
+                        }
+                      ],
+                      "messages": [
+                        {
+                          "from": "85261172810",
+                          "from_user_id": "HK.943475315048611",
+                          "id": "wamid.HBgLODUyNjExNzI4MTAVAgASGCBBQzFENzM0OEMwQjA4NDQyNTlCQjdEMDgyQzVGMjUxRQA=",
+                          "timestamp": "1777017686",
+                          "text": {
+                            "body": "6778"
+                          },
+                          "type": "text"
+                        }
+                      ]
+                    },
+                    "field": "messages"
+                  }
+                ]
+              }
+            ]
+          },
+          "webhookUrl": "https://n8n-app-do-d9hvm.ondigitalocean.app/webhook/go24-bot",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "versionId": "6f9ecaf9-093d-42ee-a228-6768ed5fac90",
+  "activeVersionId": "6f9ecaf9-093d-42ee-a228-6768ed5fac90",
+  "versionCounter": 27,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-24T06:40:46.398Z",
+      "createdAt": "2026-04-24T06:40:46.398Z",
+      "role": "workflow:owner",
+      "workflowId": "B0jQQCphiw7jSx3W",
+      "projectId": "gobjToOiw1I8NPmQ",
+      "project": {
+        "updatedAt": "2024-09-12T08:05:52.501Z",
+        "createdAt": "2024-09-12T08:03:46.935Z",
+        "id": "gobjToOiw1I8NPmQ",
+        "name": "Anthony Chu <anthony.chu@go24.fitness>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "19a653dc-effa-4220-8b14-8664f3913949"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-24T08:04:29.586Z",
+    "createdAt": "2026-04-24T08:04:27.186Z",
+    "versionId": "6f9ecaf9-093d-42ee-a228-6768ed5fac90",
+    "workflowId": "B0jQQCphiw7jSx3W",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "go24-bot",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "n01",
+        "name": "WhatsApp Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          272,
+          304
+        ],
+        "webhookId": "e46d8c19-bb5f-4769-9a51-ab5ea9ba3fa1"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "OK",
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "id": "n02",
+        "name": "Respond 200 OK",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          480,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body || {};\nconst value = body.entry?.[0]?.changes?.[0]?.value;\nconst messages = value?.messages;\nif (!messages || !messages[0]) return [];\nconst msg = messages[0];\nif (msg.type !== \"text\") return [];\nconst from = msg.from;\nconst rawText = (msg.text?.body || \"\").trim();\nconst PASSWORD = \"6778\";\nlet authenticated = false, question = \"\";\nif (rawText === PASSWORD) { authenticated = true; question = \"__HELP__\"; }\nelse if (rawText.startsWith(PASSWORD + \" \")) { authenticated = true; question = rawText.slice(PASSWORD.length + 1).trim(); }\nelse { authenticated = false; question = rawText; }\nreturn [{ json: { from, messageId: msg.id, rawText, question, authenticated } }];"
+        },
+        "id": "n03",
+        "name": "Extract Message",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          704,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "c1",
+                "leftValue": "={{ $json.from }}",
+                "rightValue": "85261172810",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "n04",
+        "name": "IF: From Boss",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          928,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "c2",
+                "leftValue": "={{ $(\"Extract Message\").first().json.authenticated }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "n06",
+        "name": "IF: Password OK",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1360,
+          224
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $(\"Get WhatsApp Token\").first().json[\"Access Token\"] }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $(\"Extract Message\").first().json.from, type: \"text\", text: { body: \"❌ 請先輸入密碼再問問題\\n例如：6778 依家有幾多個 active member?\" } }) }}",
+          "options": {}
+        },
+        "id": "n07",
+        "name": "Reply: Wrong Password",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1584,
+          432
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "c3",
+                "leftValue": "={{ $(\"Extract Message\").first().json.question }}",
+                "rightValue": "__HELP__",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "n08",
+        "name": "IF: Help Menu",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1584,
+          224
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('Google Sheets2').item.json['Access Token'] }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $(\"Extract Message\").first().json.from, type: \"text\", text: { body: \"✅ 密碼正確！歡迎使用 GO24 數據查詢\\n\\n用法：6778 + 問題\\n\\n📊 可以問嘅嘢：\\n• 依家有幾多個 active member?\\n• 今個月 POS 收入幾多?\\n• 邊個分店會員最多?\\n• 今日有幾多堂 studio class?\\n• 最近 join 嘅 10 個 member?\" } }) }}",
+          "options": {}
+        },
+        "id": "n09",
+        "name": "Reply: Help Menu",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1968,
+          -224
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const question = $(\"Extract Message\").first().json.question;\nconst today = new Date().toLocaleDateString(\"en-CA\", { timeZone: \"Asia/Hong_Kong\" });\nconst sp = `You are a SQL expert for GO24 Fitness gym chain in Hong Kong. Generate ONE PostgreSQL SELECT query. Return ONLY raw SQL, no markdown, no explanation.\\n\\nToday HKT: ${today}\\n\\npgm.members(member_code,name,phone,email,gender,dob DATE,join_date DATE,plan_type,plan_start DATE,plan_end DATE,status VARCHAR,pt_sessions_left INT,last_visit DATE,total_paid NUMERIC,branch,notes) status:Active,Frozen,Expired,Cancelled\\ncommissions.sold(club,sell_date DATE,user_number,first_name,product_name,net_sold NUMERIC,gross_sold NUMERIC,is_new BOOL,sold_employee,commission_category)\\ncommissions.done(club,done_date DATE,user_number,product_name,done_amount NUMERIC,done_employee,department,commission_category)\\nstudio.classes(club,class_name,category,employee_name,start_date DATE,day_of_week,class_time,users_limit INT,users_assigned INT,users_present INT,rating NUMERIC)\\nstudio.by_member(club,class_date DATE,class_name,first_name,last_name,user_number,has_presence BOOL)\\npos.transactions(club,transaction_date DATE,product_name,category,quantity NUMERIC,net_amount NUMERIC,gross_amount NUMERIC,payment_method,full_name,employee)\\npayments.epayment_log(club,user_number,name,payment_date DATE,amount NUMERIC,net_amount NUMERIC,status,provider,membership_status,payment_plan)\\nRules: LIMIT 20 detail queries; no limit aggregations; name ILIKE; readable English aliases`;\nreturn [{ json: { geminiBody: JSON.stringify({ systemInstruction: { parts: [{ text: sp }] }, contents: [{ role: \"user\", parts: [{ text: question }] }], generationConfig: { maxOutputTokens: 600, temperature: 0.1 } }), question } }];"
+        },
+        "id": "n10",
+        "name": "Build SQL Request",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1808,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBtW9YkhUAEg0-cdCBI2esY9jtf4tTOsOo",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json.geminiBody }}",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "n11",
+        "name": "Gemini: Generate SQL",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2032,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const r = $input.first().json;\nlet sql = r.candidates?.[0]?.content?.parts?.[0]?.text || \"\";\nsql = sql.replace(/```sql/gi, \"\").replace(/```/g, \"\").trim();\nif (!sql.toUpperCase().startsWith(\"SELECT\")) throw new Error(\"Non-SELECT: \" + sql.slice(0, 100));\nreturn [{ json: { sql, question: $(\"Build SQL Request\").first().json.question } }];"
+        },
+        "id": "n12",
+        "name": "Extract SQL",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2240,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "{{ $json.sql }}",
+          "options": {}
+        },
+        "id": "n13",
+        "name": "Query Postgres",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.4,
+        "position": [
+          2464,
+          304
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "BdWjFTVmkC8DZtSo",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const results = $input.all().map(i => i.json);\nconst question = $(\"Extract SQL\").first().json.question;\nconst sp2 = \"You are a helpful assistant for GO24 Fitness in Hong Kong. Reply in the same language as the question (Cantonese or English). Be brief (1-4 sentences). Use numbers clearly. Add 1-2 relevant emoji. Do NOT mention SQL or database.\";\nconst userContent = `Question: ${question}\\n\\nData (${results.length} rows):\\n${JSON.stringify(results, null, 2)}`;\nreturn [{ json: { geminiBody: JSON.stringify({ systemInstruction: { parts: [{ text: sp2 }] }, contents: [{ role: \"user\", parts: [{ text: userContent }] }], generationConfig: { maxOutputTokens: 400, temperature: 0.7 } }) } }];"
+        },
+        "id": "n14",
+        "name": "Build Answer Request",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2688,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBtW9YkhUAEg0-cdCBI2esY9jtf4tTOsOo",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json.geminiBody }}",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "n15",
+        "name": "Gemini: Format Answer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2912,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const r = $input.first().json;\nconst answer = r.candidates?.[0]?.content?.parts?.[0]?.text || \"唔好意思，暫時無法回答。\";\nreturn [{ json: { answer, to: $(\"Extract Message\").first().json.from } }];"
+        },
+        "id": "n16",
+        "name": "Extract Answer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3120,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $(\"Get WhatsApp Token\").first().json[\"Access Token\"] }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $json.to, type: \"text\", text: { body: $json.answer } }) }}",
+          "options": {}
+        },
+        "id": "n17",
+        "name": "Send WhatsApp Reply",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          3344,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "documentId": {
+            "__rl": true,
+            "value": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit?gid=0#gid=0",
+            "mode": "url"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": 2041211722,
+            "mode": "list",
+            "cachedResultName": "FB",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit#gid=2041211722"
+          },
+          "options": {}
+        },
+        "id": "f1edb866-3dd0-4682-8679-1f51388bae68",
+        "name": "Google Sheets2",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          1680,
+          0
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "0XbB4tqamwjFQ6RO",
+            "name": "Google Sheets account 6"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('Google Sheets2').item.json['Access Token'] }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"85293199887\",\n  \"type\": \"template\",\n  \"template\": {\n    \"name\": \"clubmembership\",\n    \"language\": {\n      \"code\": \"en\"\n    },\n    \"components\": [\n      {\n        \"type\": \"body\",\n        \"parameters\": [\n          { \"type\": \"text\", \"text\": \"{{ $('Get Club').item.json.name }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Edit Fields').item.json['New signUpDate'] }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Webhook').item.json.body.data.user.userNumber }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Webhook').item.json.body.data.user.userFirstName }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Webhook').item.json.body.data.user.userLastName }}\"},\n          { \"type\": \"text\", \"text\": \"{{ $('Get Payment Plan').item.json.name }}\" },\n          { \"type\": \"text\", \"text\": \"{{ $('Edit Fields').item.json['New startDate'] }}\" },{ \"type\": \"text\", \"text\": \"Evis\" }\n        ]\n      }\n    ]\n  }\n}\n",
+          "options": {}
+        },
+        "id": "93f934c8-60c1-4ec7-aea3-c90f559589a7",
+        "name": "Whatsapp 5",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2128,
+          -32
+        ]
+      }
+    ],
+    "connections": {
+      "WhatsApp Webhook": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 OK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond 200 OK": {
+        "main": [
+          [
+            {
+              "node": "Extract Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Message": {
+        "main": [
+          [
+            {
+              "node": "IF: From Boss",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF: From Boss": {
+        "main": [
+          [
+            {
+              "node": "IF: Password OK",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "IF: Password OK": {
+        "main": [
+          [
+            {
+              "node": "IF: Help Menu",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Reply: Wrong Password",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF: Help Menu": {
+        "main": [
+          [
+            {
+              "node": "Google Sheets2",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build SQL Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build SQL Request": {
+        "main": [
+          [
+            {
+              "node": "Gemini: Generate SQL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gemini: Generate SQL": {
+        "main": [
+          [
+            {
+              "node": "Extract SQL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract SQL": {
+        "main": [
+          [
+            {
+              "node": "Query Postgres",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Query Postgres": {
+        "main": [
+          [
+            {
+              "node": "Build Answer Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Answer Request": {
+        "main": [
+          [
+            {
+              "node": "Gemini: Format Answer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gemini: Format Answer": {
+        "main": [
+          [
+            {
+              "node": "Extract Answer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Answer": {
+        "main": [
+          [
+            {
+              "node": "Send WhatsApp Reply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Sheets2": {
+        "main": [
+          [
+            {
+              "node": "Reply: Help Menu",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Anthony Chu",
+    "name": "Version 6f9ecaf9",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-24T08:04:29.582Z",
+        "id": 713,
+        "workflowId": "B0jQQCphiw7jSx3W",
+        "versionId": "6f9ecaf9-093d-42ee-a228-6768ed5fac90",
+        "event": "activated",
+        "userId": "19a653dc-effa-4220-8b14-8664f3913949"
+      }
+    ]
+  }
+}

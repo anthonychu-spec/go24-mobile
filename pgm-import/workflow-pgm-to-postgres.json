@@ -1,0 +1,262 @@
+{
+  "name": "PGM Reports → Google Drive + Postgres",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": { "item": [{ "mode": "everyX", "value": 10, "unit": "minutes" }] },
+        "simple": false,
+        "filters": { "readStatus": "unread" },
+        "options": { "downloadAttachments": true }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [-3280, 1088],
+      "id": "5259516e-5303-468a-a1bc-689f1c811993",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": { "id": "dj7Ln4aTXh0OLprg", "name": "GO24anthony@gmail.com" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+          "conditions": [{ "id": "af01ae67-79b6-4c5d-8b0a-c82e63b46614", "leftValue": "={{ $json.headers.from }}", "rightValue": "wongtaisin@go24.fitness", "operator": { "type": "string", "operation": "contains" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-3056, 1088],
+      "id": "fc13422f-5c06-4062-a04c-59144e932830",
+      "name": "If",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const html = item.json.html || '';\n  const regex = /https:\\/\\/go24fitness-hk\\.perfectgym\\.com\\/Api\\/Reports\\/Download\\/[^\"]+/g;\n  const matches = html.match(regex);\n  if (!matches || matches.length === 0) return null;\n  let url = matches[0];\n  url = url.replace(/[>\\]\"')]+$/, '').replace(/\\+/g, '');\n  const parts = url.split('/');\n  const reportName = parts[6] || 'Report';\n  const today = new Date().toISOString().slice(0, 10);\n  return { json: { downloadUrl: url, reportName, filename: reportName + '_' + today + '.xlsx' } };\n}).filter(item => item !== null);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2832, 1088],
+      "id": "d5026c40-58bb-4704-bf3c-eca4662ed792",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [-2608, 1088],
+      "id": "81af4bf1-0a15-4f55-aa5f-bd7c782938d2",
+      "name": "Limit",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.downloadUrl }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-2384, 1088],
+      "id": "e0208a67-1e95-4c8d-8433-ad31218cbe85",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "leftValue": "={{ $json.reportName }}", "rightValue": "Commissions", "operator": { "type": "string", "operation": "contains" }, "id": "65d7d45f-b22b-426a-b787-945bb5aafa98" }], "combinator": "and" }, "renameOutput": true, "outputKey": "Commissions" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "aeb299d8-14f9-4d82-ab2d-66cbb9fdf083", "leftValue": "={{ $json.reportName }}", "rightValue": "Epaymen", "operator": { "type": "string", "operation": "contains" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Epayment log" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "c3ee8766-bf2a-46b8-8228-5ce1f11af85c", "leftValue": "={{ $json.reportName }}", "rightValue": "Visit_in_Club", "operator": { "type": "string", "operation": "contains" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Visit in Club" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "305afcde-fa6a-4714-ace0-400afa973d26", "leftValue": "={{ $json.reportName }}", "rightValue": "Studio", "operator": { "type": "string", "operation": "contains" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Studio" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "05559d39-0706-4d3d-ba9b-eb8a79954181", "leftValue": "={{ $json.reportName }}", "rightValue": "All_Members", "operator": { "type": "string", "operation": "contains" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "All Members" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "d8fa1d6a-c931-48b2-9ec5-d6d36eaf1267", "leftValue": "={{ $json.reportName }}", "rightValue": "POS", "operator": { "type": "string", "operation": "contains" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "POS" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "27d27d42-c5b7-46f1-bc6c-3f15a82424fe", "leftValue": "={{ $json.reportName }}", "rightValue": "Expired_Credit_Cards", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Expired Credit Cards" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "be8ac279-6bf0-43bd-969f-e899be3a2527", "leftValue": "={{ $json.reportName }}", "rightValue": "Payment_Plan", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Payment Plan" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "9db44c87-d73c-4102-9aa9-5d5eb15a3ef9", "leftValue": "={{ $json.reportName }}", "rightValue": "Reativation_and_extensions", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Reativation and extensions" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "12909161-e0f6-4ea8-85ca-ed7c3c507db8", "leftValue": "={{ $json.reportName }}", "rightValue": "new_contracts", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "new contracts" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "288b6d37-d9d7-4eff-b423-8019250ce9c5", "leftValue": "={{ $json.reportName }}", "rightValue": "Ended_Contract", "operator": { "type": "string", "operation": "contains" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Ended Contract (All Contract)" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "4f33d80b-9a1e-42c1-bca0-beb546191267", "leftValue": "={{ $json.reportName }}", "rightValue": "Booking_Calender", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Booking Calender" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "87b28f4b-5a90-4677-a8eb-97176672ce0e", "leftValue": "={{ $json.reportName }}", "rightValue": "PT_Details", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "PT Details" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "77476bba-56fb-4692-9900-c61de53c56e5", "leftValue": "={{ $json.reportName }}", "rightValue": "O2", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "O2" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "489e9d4c-7415-40b5-b3ef-3e45b7ddf451", "leftValue": "={{ $json.reportName }}", "rightValue": "Autopay_Summary", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Autopay Summary" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "1a86ab4b-e8d8-4196-b1f1-3cbfb8c7dcda", "leftValue": "={{ $json.reportName }}", "rightValue": "Employee", "operator": { "type": "string", "operation": "contains" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Employee" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "9004a81d-8229-4e7b-a8ec-2aa2894eec5d", "leftValue": "={{ $json.reportName }}", "rightValue": "Reformer", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Reformer" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "40302622-2742-43b5-a9e0-1d406ee39d98", "leftValue": "={{ $json.reportName }}", "rightValue": "PT Dashboard", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "PT Dashboard" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [-2160, 848],
+      "id": "8cd82161-6de2-4a67-8d4a-a6a1cd60985b",
+      "name": "Switch"
+    },
+    {
+      "parameters": { "operation": "update", "fileId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/u/1/d/1UWEOCXHe7-XXml_qI7U4y7vDQeYNOJDIOJIAFuFUbPo/edit?usp=drive_web&ouid=116610247038890113972", "mode": "url" }, "changeFileContent": true, "newUpdatedFileName": "2025AllMembers.xlsx", "options": {} },
+      "type": "n8n-nodes-base.googleDrive", "typeVersion": 3, "position": [-1936, 512],
+      "id": "25152531-f819-4fd7-8cf3-51c3931129dc", "name": "Google Drive4",
+      "retryOnFail": true, "waitBetweenTries": 5000,
+      "credentials": { "googleDriveOAuth2Api": { "id": "I0aMwPUMIn4qxlNK", "name": "go24anthony@gmail.com" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": { "operation": "update", "fileId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/d/19w7np36wj_Xty3mXorgC8kn-g2TEr2MjWHthfxsT7eo/edit?gid=1515894110#gid=1515894110", "mode": "url" }, "changeFileContent": true, "newUpdatedFileName": "2025PosTransactionLogDetails.xlsx", "options": {} },
+      "type": "n8n-nodes-base.googleDrive", "typeVersion": 3, "position": [-1936, 704],
+      "id": "15712935-d293-48b8-95fc-9abc73facdda", "name": "Google Drive5",
+      "retryOnFail": true, "waitBetweenTries": 5000,
+      "credentials": { "googleDriveOAuth2Api": { "id": "I0aMwPUMIn4qxlNK", "name": "go24anthony@gmail.com" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": { "operation": "update", "fileId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/d/1xKFRYYUYjkBTiviic9s6O9BrOpjhucg-o_lfZrLDHvs/edit", "mode": "url" }, "changeFileContent": true, "newUpdatedFileName": "2025ExpiredCreditCards.xlsx", "options": {} },
+      "type": "n8n-nodes-base.googleDrive", "typeVersion": 3, "position": [-1936, 896],
+      "id": "d197ca60-b1ac-4d17-a1ba-624ff0ce6a84", "name": "Google Drive6",
+      "retryOnFail": true, "waitBetweenTries": 5000,
+      "credentials": { "googleDriveOAuth2Api": { "id": "I0aMwPUMIn4qxlNK", "name": "go24anthony@gmail.com" } }
+    },
+    {
+      "parameters": { "operation": "update", "fileId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/d/1NMY5nGTak5aAPax8v6mus0iq5nmmN9icV3v51QD7E6k/edit?usp=drive_web&ouid=116610247038890113972", "mode": "url" }, "changeFileContent": true, "newUpdatedFileName": "2025PaymentPlans.xlsx", "options": {} },
+      "type": "n8n-nodes-base.googleDrive", "typeVersion": 3, "position": [-1936, 1088],
+      "id": "e74ac361-7f97-4c89-ab69-b9311750f823", "name": "Google Drive7",
+      "retryOnFail": true, "credentials": { "googleDriveOAuth2Api": { "id": "I0aMwPUMIn4qxlNK", "name": "go24anthony@gmail.com" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": { "operation": "update", "fileId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/d/1geqbR3HStFTVcF6UECf4QnaiP8lcTXi5LIzhKX_uURI/edit?gid=1520804778#gid=1520804778", "mode": "url" }, "changeFileContent": true, "newUpdatedFileName": "2025Reactivationandextensionsofcontracts.xlsx", "options": {} },
+      "type": "n8n-nodes-base.googleDrive", "typeVersion": 3, "position": [-1936, 1280],
+      "id": "5cda675c-cb8f-40bd-8af9-f65474e32563", "name": "Google Drive8",
+      "retryOnFail": true, "credentials": { "googleDriveOAuth2Api": { "id": "I0aMwPUMIn4qxlNK", "name": "go24anthony@gmail.com" } }
+    },
+    {
+      "parameters": { "operation": "update", "fileId": { "__rl": true, "value": "https://docs.google.com/spreadsheets/d/1cc9COlP5eZwKVOyTafzSe0R0d3WbiyHFxXa_QK6Q-hw/edit?gid=133879915#gid=133879915", "mode": "url" }, "changeFileContent": true, "newUpdatedFileName": "2025NewContracts.xlsx", "options": {} },
+      "type": "n8n-nodes-base.googleDrive", "typeVersion": 3, "position": [-1936, 1472],
+      "id": "a31f29ec-cdaf-48e1-a8c2-fd06c4285300", "name": "Google Drive9",
+      "retryOnFail": true, "credentials": { "googleDriveOAuth2Api": { "id": "I0aMwPUMIn4qxlNK", "name": "go24anthony@gmail.com" } }
+    },
+
+    {
+      "parameters": {
+        "operation": "fromFile",
+        "fileFormat": "xlsx",
+        "options": { "headerRow": true, "rawData": false }
+      },
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [-1400, 300],
+      "id": "aa000001-0001-4000-8000-000000000001",
+      "name": "Parse All Members XLS"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// MAP PGM All_Members XLS columns -> pgm.members\n// NOTE: 第一次跑後查: SELECT jsonb_object_keys(raw_data) FROM pgm.members LIMIT 1;\n// 睇真實 column name，tune pick() 裡面嘅 key\n// ============================================================\nconst pick = (r, ...keys) => {\n  for (const k of keys) {\n    const v = r[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return null;\n};\nconst parseDate = (v) => {\n  if (!v) return null;\n  const s = String(v).trim();\n  if (/^\\d{4,6}$/.test(s)) {\n    const d = new Date((Number(s) - 25569) * 86400 * 1000);\n    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);\n  }\n  const d = new Date(s);\n  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);\n};\nconst parseNum = (v) => {\n  if (v === null || v === undefined || v === '') return null;\n  const n = Number(String(v).replace(/[,$\\s]/g, ''));\n  return isNaN(n) ? null : n;\n};\nconst out = [];\nfor (const item of $input.all()) {\n  const r = item.json;\n  const firstName = pick(r, 'First Name', 'FirstName') || '';\n  const lastName  = pick(r, 'Last Name',  'LastName')  || '';\n  const fullName  = pick(r, 'Full Name', 'Name', 'Member Name', 'Client Name') || (firstName + ' ' + lastName).trim();\n  const rec = {\n    member_code:      pick(r, 'Member No', 'MemberNo', 'Member Code', 'MemberCode', 'ID', 'Member ID', 'Code', 'Client No'),\n    name:             fullName || null,\n    phone:            pick(r, 'Phone', 'Mobile', 'Mobile Phone', 'Phone Number', 'Tel', 'Telephone', 'Cell Phone'),\n    email:            pick(r, 'Email', 'E-mail', 'Email Address'),\n    gender:           pick(r, 'Gender', 'Sex'),\n    dob:              parseDate(pick(r, 'Date of Birth', 'DOB', 'Birthday', 'Birth Date')),\n    join_date:        parseDate(pick(r, 'Join Date', 'Registration Date', 'Joined', 'Member Since')),\n    plan_type:        pick(r, 'Membership Type', 'Product', 'Plan', 'Contract Type', 'Membership', 'Contract Name', 'Agreement'),\n    plan_start:       parseDate(pick(r, 'Contract Start', 'Membership Start', 'Plan Start', 'Start Date', 'Valid From')),\n    plan_end:         parseDate(pick(r, 'Contract End', 'Membership End', 'Plan End', 'End Date', 'Expiry Date', 'Expiry', 'Valid To')),\n    status:           pick(r, 'Status', 'Contract Status', 'Membership Status', 'Member Status'),\n    pt_sessions_left: Math.round(parseNum(pick(r, 'PT Sessions Left', 'PT Remaining', 'Sessions Left', 'Remaining Sessions', 'Classes Left')) || 0),\n    last_visit:       parseDate(pick(r, 'Last Visit', 'Last Check-in', 'Last Entry', 'Last Visited')),\n    total_paid:       parseNum(pick(r, 'Total Paid', 'Amount Paid', 'Revenue', 'Total', 'Paid Amount')),\n    branch:           pick(r, 'Branch', 'Club', 'Location', 'Home Club', 'Home Branch'),\n    notes:            pick(r, 'Notes', 'Remarks', 'Comment', 'Comments'),\n    raw_data:         r\n  };\n  if (!rec.member_code) continue;\n  out.push({ json: rec });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1140, 300],
+      "id": "aa000001-0002-4000-8000-000000000002",
+      "name": "Map columns to pgm.members"
+    },
+
+    {
+      "parameters": {
+        "batchSize": 500,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-880, 300],
+      "id": "aa000001-0005-4000-8000-000000000005",
+      "name": "Split 500 rows"
+    },
+
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": { "__rl": true, "value": "pgm", "mode": "list" },
+        "table": { "__rl": true, "value": "members", "mode": "list" },
+        "conflictColumns": "member_code",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": ["member_code"],
+          "schema": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [-620, 200],
+      "id": "aa000001-0003-4000-8000-000000000003",
+      "name": "Postgres UPSERT members",
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_ADMIN_CRED_ID",
+          "name": "Postgres gym_data (admin)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pgm.import_log (source, file_name, rows_total, rows_inserted, finished_at)\nVALUES ('pgm_all_members', 'All_Members_' || NOW()::date, $1, $1, NOW());",
+        "additionalFields": { "queryParams": "={{ $('Map columns to pgm.members').all().length }}" },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [-380, 400],
+      "id": "aa000001-0004-4000-8000-000000000004",
+      "name": "Postgres log import",
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_ADMIN_CRED_ID",
+          "name": "Postgres gym_data (admin)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+
+  "connections": {
+    "Gmail Trigger": { "main": [[{ "node": "If", "type": "main", "index": 0 }]] },
+    "If": { "main": [[{ "node": "Code in JavaScript", "type": "main", "index": 0 }], []] },
+    "Code in JavaScript": { "main": [[{ "node": "Limit", "type": "main", "index": 0 }]] },
+    "Limit": { "main": [[{ "node": "HTTP Request", "type": "main", "index": 0 }]] },
+    "HTTP Request": { "main": [[{ "node": "Switch", "type": "main", "index": 0 }]] },
+    "Switch": {
+      "main": [
+        [],
+        [],
+        [],
+        [],
+        [
+          { "node": "Google Drive4", "type": "main", "index": 0 },
+          { "node": "Parse All Members XLS", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Google Drive5", "type": "main", "index": 0 }],
+        [{ "node": "Google Drive6", "type": "main", "index": 0 }],
+        [{ "node": "Google Drive7", "type": "main", "index": 0 }],
+        [{ "node": "Google Drive8", "type": "main", "index": 0 }],
+        [{ "node": "Google Drive9", "type": "main", "index": 0 }],
+        [], [], [], [], [], [], [], []
+      ]
+    },
+    "Parse All Members XLS": { "main": [[{ "node": "Map columns to pgm.members", "type": "main", "index": 0 }]] },
+    "Map columns to pgm.members": { "main": [[{ "node": "Split 500 rows", "type": "main", "index": 0 }]] },
+    "Split 500 rows": {
+      "main": [
+        [{ "node": "Postgres UPSERT members", "type": "main", "index": 0 }],
+        [{ "node": "Postgres log import", "type": "main", "index": 0 }]
+      ]
+    },
+    "Postgres UPSERT members": { "main": [[{ "node": "Split 500 rows", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

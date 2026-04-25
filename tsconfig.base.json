@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@go24/shared-ui": ["packages/shared-ui/src"],
+      "@go24/shared-ui/*": ["packages/shared-ui/src/*"],
+      "@go24/api-client": ["packages/api-client/src"],
+      "@go24/api-client/*": ["packages/api-client/src/*"],
+      "@go24/shared-types": ["packages/shared-types/src"],
+      "@go24/shared-types/*": ["packages/shared-types/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next", ".expo"]
+}

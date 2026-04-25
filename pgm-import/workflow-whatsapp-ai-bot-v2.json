@@ -1,0 +1,255 @@
+{
+  "name": "GO24 WhatsApp AI Bot 🤖",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "go24-bot",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n01-webhook",
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": { "responseCode": 200 }
+      },
+      "id": "n02-respond",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse incoming WhatsApp Cloud API webhook\nconst body = $input.first().json.body || {};\nconst entry = body.entry?.[0];\nconst value = entry?.changes?.[0]?.value;\nconst messages = value?.messages;\n\n// Ignore status updates (delivered, read, etc.)\nif (!messages || !messages[0]) return [];\n\nconst msg = messages[0];\n\n// Only process text messages\nif (msg.type !== 'text') return [];\n\nreturn [{ json: {\n  from: msg.from,\n  messageId: msg.id,\n  text: msg.text?.body || '',\n  phoneNumberId: value?.metadata?.phone_number_id || '793508627177133',\n  timestamp: msg.timestamp\n}}];"
+      },
+      "id": "n03-extract",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [{
+            "id": "cond-boss",
+            "leftValue": "={{ $json.from }}",
+            "rightValue": "85293199887",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n04-if-boss",
+      "name": "IF: From Boss",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "REPLACE_GOOGLE_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "gid=0", "mode": "id" },
+        "options": {}
+      },
+      "id": "n05-token",
+      "name": "Get WhatsApp Token",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1140, 220],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Claude API request body for SQL generation\nconst question = $('Extract Message').first().json.text;\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Hong_Kong' });\n\nconst systemPrompt = `You are a SQL expert for GO24 Fitness gym chain in Hong Kong. Generate ONE PostgreSQL SELECT query to answer the manager's question. Return ONLY the raw SQL — no explanation, no markdown, no code blocks.\n\nToday (HKT): ${today}\n\nDatabase schema:\n\npgm.members (member_code, name, phone, email, gender, dob DATE, join_date DATE, plan_type, plan_start DATE, plan_end DATE, status VARCHAR, pt_sessions_left INT, last_visit DATE, total_paid NUMERIC, branch, notes, updated_at TIMESTAMP)\nstatus values: 'Active', 'Frozen', 'Expired', 'Cancelled'\nbranch: club names e.g. 'GO24 MK', 'GO24 CWB', 'GO24 TKO'\n\ncommissions.sold (club, sell_date DATE, user_number, first_name, product_name, package_name, sold_quantity, net_sold NUMERIC, gross_sold NUMERIC, is_paid BOOL, is_new BOOL, sold_employee, discount NUMERIC, expiry_date DATE, commission_category)\n\ncommissions.done (club, done_date DATE, sell_date DATE, user_number, product_name, done_quantity NUMERIC, net_sold NUMERIC, done_amount NUMERIC, done_gross NUMERIC, done_employee, done_employee_position, department, commission_category)\n\nstudio.classes (club, class_name, category, employee_name, start_date DATE, day_of_week, class_time, duration INT, users_limit INT, users_assigned INT, users_present INT, rating NUMERIC)\n\nstudio.by_member (club, class_date DATE, class_name, first_name, last_name, user_number, has_presence BOOL)\n\npos.transactions (club, transaction_date DATE, product_name, category, quantity NUMERIC, net_amount NUMERIC, gross_amount NUMERIC, payment_method, full_name, employee)\n\npayments.epayment_log (club, user_number, name, payment_date DATE, amount NUMERIC, net_amount NUMERIC, status, provider, membership_status, payment_plan, transaction_type)\n\nRules:\n- Always use LIMIT 20 for detail queries; no limit needed for aggregations\n- For 'today' filter: WHERE date_col = '${today}'\n- For 'this month': WHERE date_trunc('month', date_col) = date_trunc('month', CURRENT_DATE)\n- For member lookup by name: use ILIKE '%name%'\n- Prefer readable column aliases in English`;\n\nreturn [{ json: {\n  claudeBody: JSON.stringify({\n    model: 'claude-3-5-haiku-20241022',\n    max_tokens: 600,\n    system: systemPrompt,\n    messages: [{ role: 'user', content: question }]\n  }),\n  question: question\n}}];"
+      },
+      "id": "n06-build-sql-req",
+      "name": "Build SQL Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1360, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "REPLACE_CLAUDE_API_KEY" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.claudeBody }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "n07-claude-sql",
+      "name": "Claude: Generate SQL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1580, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet sql = response.content?.[0]?.text || '';\n\n// Strip any accidental markdown code fences\nsql = sql.replace(/```sql/gi, '').replace(/```/g, '').trim();\n\n// Safety: only allow SELECT statements\nif (!sql.toUpperCase().startsWith('SELECT')) {\n  throw new Error('Claude returned non-SELECT SQL: ' + sql.substring(0, 100));\n}\n\nconst question = $('Build SQL Request').first().json.question;\nreturn [{ json: { sql, question } }];"
+      },
+      "id": "n08-extract-sql",
+      "name": "Extract SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 220]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}",
+        "options": {}
+      },
+      "id": "n09-postgres",
+      "name": "Query Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2020, 220],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_POSTGRES_CRED_ID",
+          "name": "Postgres gym_data"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all result rows and build Claude answer request\nconst results = $input.all().map(i => i.json);\nconst question = $('Extract SQL').first().json.question;\nconst sql = $('Extract SQL').first().json.sql;\n\nconst resultSummary = results.length === 0\n  ? 'No results found'\n  : JSON.stringify(results, null, 2);\n\nconst systemPrompt = 'You are a helpful assistant for GO24 Fitness gym management in Hong Kong. The manager asked a question and you have the database results. Write a concise, friendly reply in the same language as the question (Cantonese/Traditional Chinese or English). Be brief (1–4 sentences). Present numbers clearly. Add 1–2 relevant emoji. Do NOT mention SQL or database.';\n\nconst userContent = `Manager asked: ${question}\\n\\nDatabase result (${results.length} rows):\\n${resultSummary}`;\n\nreturn [{ json: {\n  claudeBody: JSON.stringify({\n    model: 'claude-3-5-haiku-20241022',\n    max_tokens: 400,\n    system: systemPrompt,\n    messages: [{ role: 'user', content: userContent }]\n  }),\n  rowCount: results.length\n}}];"
+      },
+      "id": "n10-build-ans-req",
+      "name": "Build Answer Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "REPLACE_CLAUDE_API_KEY" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.claudeBody }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "n11-claude-ans",
+      "name": "Claude: Format Answer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2460, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst answer = response.content?.[0]?.text || '唔好意思，暫時無法回答。';\nconst to = $('Extract Message').first().json.from;\nreturn [{ json: { answer, to } }];"
+      },
+      "id": "n12-extract-ans",
+      "name": "Extract Answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2680, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Get WhatsApp Token').first().json['Access Token'] }}"
+            },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.to, type: 'text', text: { body: $json.answer } }) }}",
+        "options": {}
+      },
+      "id": "n13-send-reply",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2900, 220]
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": {
+      "main": [[{ "node": "Respond 200 OK", "type": "main", "index": 0 }]]
+    },
+    "Respond 200 OK": {
+      "main": [[{ "node": "Extract Message", "type": "main", "index": 0 }]]
+    },
+    "Extract Message": {
+      "main": [[{ "node": "IF: From Boss", "type": "main", "index": 0 }]]
+    },
+    "IF: From Boss": {
+      "main": [
+        [{ "node": "Get WhatsApp Token", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Get WhatsApp Token": {
+      "main": [[{ "node": "Build SQL Request", "type": "main", "index": 0 }]]
+    },
+    "Build SQL Request": {
+      "main": [[{ "node": "Claude: Generate SQL", "type": "main", "index": 0 }]]
+    },
+    "Claude: Generate SQL": {
+      "main": [[{ "node": "Extract SQL", "type": "main", "index": 0 }]]
+    },
+    "Extract SQL": {
+      "main": [[{ "node": "Query Postgres", "type": "main", "index": 0 }]]
+    },
+    "Query Postgres": {
+      "main": [[{ "node": "Build Answer Request", "type": "main", "index": 0 }]]
+    },
+    "Build Answer Request": {
+      "main": [[{ "node": "Claude: Format Answer", "type": "main", "index": 0 }]]
+    },
+    "Claude: Format Answer": {
+      "main": [[{ "node": "Extract Answer", "type": "main", "index": 0 }]]
+    },
+    "Extract Answer": {
+      "main": [[{ "node": "Send WhatsApp Reply", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

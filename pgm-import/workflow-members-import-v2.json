@@ -1,0 +1,99 @@
+{
+  "name": "PGM All Members → Postgres (via Droplet)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": { "item": [{ "mode": "everyX", "value": 10, "unit": "minutes" }] },
+        "filters": { "readStatus": "unread" },
+        "options": {}
+      },
+      "id": "f4896135-e7a1-4a4f-9cb5-e43463578dd5",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [-1200, 300],
+      "credentials": {
+        "gmailOAuth2": { "id": "dj7Ln4aTXh0OLprg", "name": "GO24anthony@gmail.com" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const html = item.json.html || '';\n  const regex = /https:\\/\\/go24fitness-hk\\.perfectgym\\.com\\/Api\\/Reports\\/Download\\/[^\"]+/g;\n  const matches = html.match(regex);\n  if (!matches) return null;\n  let url = matches[0].replace(/[>\\]\"')]+$/, '').replace(/\\+/g, '');\n  const parts = url.split('/');\n  const reportName = parts[6] || 'Report';\n  return { json: { downloadUrl: url, reportName } };\n}).filter(Boolean);"
+      },
+      "id": "08899a52-6123-4943-82c4-28b153fc766b",
+      "name": "Extract URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-980, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [{
+            "id": "aaa00001",
+            "leftValue": "={{ $json.reportName }}",
+            "rightValue": "All_Members",
+            "operator": { "type": "string", "operation": "contains" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "aaa00002-if-members",
+      "name": "IF: All Members report",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-760, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://146.190.87.137:8765/import/members",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "REPLACE_STRONG_SECRET_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ downloadUrl: $json.downloadUrl }) }}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "aaa00003-http-droplet",
+      "name": "POST to Droplet Importer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [-540, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nif (result.status === 'ok') {\n  return [{ json: { success: true, message: 'Imported ' + result.rows_inserted + ' members to Postgres' } }];\n} else {\n  throw new Error('Import failed: ' + (result.message || JSON.stringify(result)));\n}"
+      },
+      "id": "aaa00004-check-result",
+      "name": "Check result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-320, 220]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [[{ "node": "Extract URL", "type": "main", "index": 0 }]]
+    },
+    "Extract URL": {
+      "main": [[{ "node": "IF: All Members report", "type": "main", "index": 0 }]]
+    },
+    "IF: All Members report": {
+      "main": [
+        [{ "node": "POST to Droplet Importer", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "POST to Droplet Importer": {
+      "main": [[{ "node": "Check result", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

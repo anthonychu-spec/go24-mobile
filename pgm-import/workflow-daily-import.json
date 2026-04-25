@@ -1,0 +1,160 @@
+{
+  "name": "PGM Daily Import",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "Schedule (hourly check)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "q": "from:(noreply@perfectgym.com OR reports@perfectgym.com) subject:(daily OR export OR members) newer_than:1d is:unread",
+          "readStatus": "unread"
+        },
+        "options": { "downloadAttachments": false }
+      },
+      "name": "Gmail: fetch PGM email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [420, 300],
+      "credentials": { "gmailOAuth2": { "id": "REPLACE_GMAIL_CRED_ID", "name": "Gmail" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "combinator": "and" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ]
+        }
+      },
+      "name": "IF: email found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract download link from email body\nconst items = $input.all();\nconst out = [];\nfor (const it of items) {\n  const body = it.json.snippet + '\\n' + (it.json.textPlain || '') + '\\n' + (it.json.textHtml || '');\n  // tune this regex to match your PGM email's link format\n  const m = body.match(/https?:\\/\\/[^\\s\"'<>]+\\.(xlsx?|XLSX?)(\\?[^\\s\"'<>]*)?/);\n  if (!m) {\n    throw new Error('No XLS download link found in email ' + it.json.id);\n  }\n  out.push({ json: { emailId: it.json.id, downloadUrl: m[0] } });\n}\nreturn out;"
+      },
+      "name": "Extract download link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 260]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.downloadUrl }}",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } },
+          "timeout": 120000
+        }
+      },
+      "name": "HTTP: download XLS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 260]
+    },
+    {
+      "parameters": {
+        "operation": "fromFile",
+        "fileFormat": "xlsx",
+        "options": { "headerRow": true, "readAsString": false }
+      },
+      "name": "Parse XLSX",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [1300, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize PGM columns -> our schema.\n// Adjust the mapping to match the actual column headers in your PGM export.\nconst rows = $input.all();\nconst out = [];\n\nconst pick = (r, ...keys) => {\n  for (const k of keys) {\n    if (r[k] !== undefined && r[k] !== null && r[k] !== '') return r[k];\n  }\n  return null;\n};\n\nconst parseDate = (v) => {\n  if (!v) return null;\n  if (v instanceof Date) return v.toISOString().slice(0,10);\n  const s = String(v).trim();\n  // Excel serial?\n  if (/^\\d+(\\.\\d+)?$/.test(s)) {\n    const d = new Date((Number(s) - 25569) * 86400 * 1000);\n    return d.toISOString().slice(0,10);\n  }\n  const d = new Date(s);\n  return isNaN(d) ? null : d.toISOString().slice(0,10);\n};\n\nconst parseNum = (v) => {\n  if (v === null || v === undefined || v === '') return null;\n  const n = Number(String(v).replace(/[$,\\s]/g,''));\n  return isNaN(n) ? null : n;\n};\n\nfor (const r of rows.map(x => x.json)) {\n  const rec = {\n    member_code:  pick(r, 'Member Code','MemberCode','Code','ID','Member ID'),\n    name:         pick(r, 'Full Name','Name','Member Name'),\n    phone:        pick(r, 'Phone','Mobile','Phone Number','Tel'),\n    email:        pick(r, 'Email','E-mail'),\n    gender:       pick(r, 'Gender','Sex'),\n    dob:          parseDate(pick(r, 'DOB','Date of Birth','Birthday')),\n    join_date:    parseDate(pick(r, 'Join Date','Joined','Registration Date')),\n    plan_type:    pick(r, 'Plan','Membership Type','Contract Type','Product'),\n    plan_start:   parseDate(pick(r, 'Plan Start','Contract Start','Start Date')),\n    plan_end:     parseDate(pick(r, 'Plan End','Contract End','End Date','Expiry')),\n    status:       pick(r, 'Status','Contract Status'),\n    pt_sessions_left: parseNum(pick(r, 'PT Sessions Left','PT Remaining','Sessions Left')),\n    last_visit:   parseDate(pick(r, 'Last Visit','Last Check-in')),\n    total_paid:   parseNum(pick(r, 'Total Paid','Revenue','Amount Paid')),\n    branch:       pick(r, 'Branch','Club','Location'),\n    notes:        pick(r, 'Notes','Remarks'),\n    raw_data:     r\n  };\n  if (!rec.member_code) continue; // skip rows without code\n  out.push({ json: rec });\n}\nreturn out;"
+      },
+      "name": "Clean & map columns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 260]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO members (member_code, name, phone, email, gender, dob, join_date, plan_type, plan_start, plan_end, status, pt_sessions_left, last_visit, total_paid, branch, notes, raw_data)\nVALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb)\nON CONFLICT (member_code) DO UPDATE SET\n  name = EXCLUDED.name,\n  phone = EXCLUDED.phone,\n  email = EXCLUDED.email,\n  gender = EXCLUDED.gender,\n  dob = EXCLUDED.dob,\n  join_date = EXCLUDED.join_date,\n  plan_type = EXCLUDED.plan_type,\n  plan_start = EXCLUDED.plan_start,\n  plan_end = EXCLUDED.plan_end,\n  status = EXCLUDED.status,\n  pt_sessions_left = EXCLUDED.pt_sessions_left,\n  last_visit = EXCLUDED.last_visit,\n  total_paid = EXCLUDED.total_paid,\n  branch = EXCLUDED.branch,\n  notes = EXCLUDED.notes,\n  raw_data = EXCLUDED.raw_data,\n  updated_at = NOW();",
+        "additionalFields": {
+          "queryParams": "={{ $json.member_code }},{{ $json.name }},{{ $json.phone }},{{ $json.email }},{{ $json.gender }},{{ $json.dob }},{{ $json.join_date }},{{ $json.plan_type }},{{ $json.plan_start }},{{ $json.plan_end }},{{ $json.status }},{{ $json.pt_sessions_left }},{{ $json.last_visit }},{{ $json.total_paid }},{{ $json.branch }},{{ $json.notes }},{{ JSON.stringify($json.raw_data) }}"
+        }
+      },
+      "name": "Postgres: UPSERT members",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1740, 260],
+      "credentials": { "postgres": { "id": "REPLACE_PG_CRED_ID", "name": "Postgres gym_members" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO import_log (source, file_name, rows_total, rows_inserted, finished_at) VALUES ('pgm_daily_email', $1, $2, $2, NOW()) RETURNING id;",
+        "additionalFields": {
+          "queryParams": "={{ $('HTTP: download XLS').item.json.downloadUrl }},{{ $items('Clean & map columns').length }}"
+        }
+      },
+      "name": "Postgres: log import",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1960, 260],
+      "credentials": { "postgres": { "id": "REPLACE_PG_CRED_ID", "name": "Postgres gym_members" } }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "REPLACE_WA_PHONE_ID",
+        "recipientPhoneNumber": "REPLACE_YOUR_PHONE",
+        "textBody": "=✅ PGM Daily import done\\nRows: {{ $items('Clean & map columns').length }}\\nTime: {{ $now.format('YYYY-MM-DD HH:mm') }}"
+      },
+      "name": "WhatsApp: notify",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [2180, 260],
+      "credentials": { "whatsAppApi": { "id": "REPLACE_WA_CRED_ID", "name": "WhatsApp" } }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead"
+      },
+      "name": "Gmail: mark read",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2180, 420],
+      "credentials": { "gmailOAuth2": { "id": "REPLACE_GMAIL_CRED_ID", "name": "Gmail" } }
+    }
+  ],
+  "connections": {
+    "Schedule (hourly check)": { "main": [[{ "node": "Gmail: fetch PGM email", "type": "main", "index": 0 }]] },
+    "Gmail: fetch PGM email": { "main": [[{ "node": "IF: email found", "type": "main", "index": 0 }]] },
+    "IF: email found": { "main": [[{ "node": "Extract download link", "type": "main", "index": 0 }], []] },
+    "Extract download link": { "main": [[{ "node": "HTTP: download XLS", "type": "main", "index": 0 }]] },
+    "HTTP: download XLS": { "main": [[{ "node": "Parse XLSX", "type": "main", "index": 0 }]] },
+    "Parse XLSX": { "main": [[{ "node": "Clean & map columns", "type": "main", "index": 0 }]] },
+    "Clean & map columns": { "main": [[{ "node": "Postgres: UPSERT members", "type": "main", "index": 0 }]] },
+    "Postgres: UPSERT members": { "main": [[{ "node": "Postgres: log import", "type": "main", "index": 0 }]] },
+    "Postgres: log import": { "main": [[{ "node": "WhatsApp: notify", "type": "main", "index": 0 }, { "node": "Gmail: mark read", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
