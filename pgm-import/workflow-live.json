@@ -1,0 +1,1426 @@
+{
+  "updatedAt": "2026-04-27T05:09:01.277Z",
+  "createdAt": "2026-04-24T06:40:46.398Z",
+  "id": "B0jQQCphiw7jSx3W",
+  "name": "GO24 WhatsApp AI Bot",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "go24-bot",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n01",
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        272,
+        304
+      ],
+      "webhookId": "e46d8c19-bb5f-4769-9a51-ab5ea9ba3fa1"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "n02",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        480,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst value = body.entry?.[0]?.changes?.[0]?.value;\nconst messages = value?.messages;\nif (!messages || !messages[0]) return [];\nconst msg = messages[0];\n\nlet from = msg.from, messageId = msg.id, rawText = '', question = '';\n\nif (msg.type === 'text') {\n  rawText = (msg.text?.body || '').trim();\n} else if (msg.type === 'interactive' && msg.interactive?.type === 'button_reply') {\n  rawText = msg.interactive.button_reply.id;\n  // Translate button IDs to real questions\n  const btnMap = {\n    'q_active':  '依家有幾多個 Active Members？',\n    'q_pos':     '今日 POS Revenue 係幾多？',\n    'q_studio':  '今日有咩 Studio Classes？'\n  };\n  question = btnMap[rawText] || rawText;\n}\n\nif (!rawText) return [];\n\nconst PASSWORD = '6778';\nlet authenticated = false;\n\nif (rawText === PASSWORD) {\n  authenticated = true;\n  question = '__HELP__';\n} else if (rawText.startsWith(PASSWORD + ' ')) {\n  authenticated = true;\n  question = rawText.slice(PASSWORD.length + 1).trim();\n} else {\n  if (!question) question = rawText;\n  authenticated = false;\n}\n\nreturn [{ json: { from, messageId, rawText, question, authenticated } }];"
+      },
+      "id": "n03",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.from }}",
+              "rightValue": "85261172810",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n04",
+      "name": "IF: From Boss",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        928,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $(\"Extract Message\").first().json.authenticated }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n06",
+      "name": "IF: Password OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Google Sheets').first().json['Access Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $(\"Extract Message\").first().json.from, type: 'interactive', interactive: { type: 'button', body: { text: '✅ 密碼正確！\\n\\n按下面選項，或直接打��������題：' }, action: { buttons: [{ type: 'reply', reply: { id: 'q_active', title: '🧑 Active Members' } }, { type: 'reply', reply: { id: 'q_pos', title: '💰 POS Revenue' } }, { type: 'reply', reply: { id: 'q_studio', title: '🎯 Studio Classes' } }] } } }) }}",
+        "options": {}
+      },
+      "id": "n09",
+      "name": "Reply: Help Menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2272,
+        -224
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2041211722,
+          "mode": "list",
+          "cachedResultName": "FB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit#gid=2041211722"
+        },
+        "options": {}
+      },
+      "id": "f1edb866-3dd0-4682-8679-1f51388bae68",
+      "name": "Google Sheets2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1824,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0XbB4tqamwjFQ6RO",
+          "name": "Google Sheets account 6"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bot.sessions (phone, authed_at, last_seen_at)\nVALUES ('{{ $(\"Extract Message\").first().json.from }}', NOW(), NOW())\nON CONFLICT (phone) DO UPDATE SET last_seen_at = NOW();",
+        "options": {}
+      },
+      "id": "pg_upsert_1",
+      "name": "PG Upsert Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2048,
+        -224
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "BdWjFTVmkC8DZtSo",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT (last_seen_at > NOW() - INTERVAL '2 hours') AS is_valid\nFROM bot.sessions WHERE phone = '{{ $(\"Extract Message\").first().json.from }}';",
+        "options": {}
+      },
+      "id": "pg_check_session_1",
+      "name": "PG Check Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1824,
+        560
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "BdWjFTVmkC8DZtSo",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "sv1",
+              "leftValue": "={{ $json.is_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if_session_valid_1",
+      "name": "IF Session Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Google Sheets').first().json['Access Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $(\"Extract Message\").first().json.from, type: 'text', text: { body: '⏱️ Session 已過期，請重新輸入：\\n6778' } }) }}",
+        "options": {}
+      },
+      "id": "reply_expired_1",
+      "name": "Reply Session Expired",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2272,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2041211722,
+          "mode": "list",
+          "cachedResultName": "FB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit#gid=2041211722"
+        },
+        "options": {}
+      },
+      "id": "f2a6cd19-4ccf-4e0b-a2c1-e5a0b2f532e3",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1136,
+        224
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0XbB4tqamwjFQ6RO",
+          "name": "Google Sheets account 6"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Google Sheets').first().json['Access Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $('Extract Message').first().json.from, type: \"text\", text: { body: $('AI Agent').first().json.output } }) }}",
+        "options": {}
+      },
+      "id": "a2f98900-0977-48ce-a839-d2947ad0e005",
+      "name": "Send WhatsApp Reply2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3200,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ $('Extract Message').first().json.question }}",
+        "options": {
+          "systemMessage": "You are a smart data assistant for GO24 Fitness gym chain in Hong Kong.\nAnswer in the SAME language as the question: 廣東話 if Chinese, English if English.\nBe concise (1-4 sentences). Use numbers clearly. Add 1-2 relevant emoji. Do NOT mention SQL or database.\nToday HKT: {{ new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Hong_Kong' }) }}\n\nUse the \"Query Database\" tool to fetch real data — ALWAYS query the DB instead of guessing.\n\n═══════════════════════════════════════════\nDATABASE TABLES (PostgreSQL)\n═══════════════════════════════════════════\n\n▸ pgm.members — member master record\n  columns: member_code, name, phone, email, gender, dob DATE, join_date DATE,\n           plan_type, plan_start DATE, plan_end DATE, status, pt_sessions_left INT,\n           last_visit DATE, total_paid NUMERIC, branch, notes\n  status (case-sensitive): 'Current'=active, 'Ended'=expired/left, 'Frozen'=frozen,\n                            'Not started'=pending, '10DMB'=10-day trial\n\n▸ commissions.sold — membership/PT package SALES (when sold)\n  columns: club, sell_date DATE, user_number, first_name, product_name,\n           net_sold NUMERIC, gross_sold NUMERIC, is_new BOOL, sold_employee, commission_category\n\n▸ commissions.done — service DELIVERY (when PT/class done, commission earned)\n  columns: club, done_date DATE, user_number, product_name, done_amount NUMERIC,\n           done_employee, department, commission_category\n\n▸ studio.classes — group class schedule (one row per class instance)\n  columns: club, class_name, category, employee_name, start_date DATE, day_of_week,\n           class_time, users_limit INT, users_assigned INT, users_present INT, rating NUMERIC\n\n▸ studio.by_member — class attendance per member\n  columns: club, class_date DATE, class_name, first_name, last_name, user_number, has_presence BOOL\n\n▸ pos.transactions — shop sales (drinks, supplements, towels, etc.)\n  columns: club, transaction_date DATE, product_name, category, quantity NUMERIC,\n           net_amount NUMERIC, gross_amount NUMERIC, payment_method, full_name, employee\n\n▸ payments.epayment_log — online/autopay transactions\n  columns: club, user_number, name, payment_date DATE, amount NUMERIC, net_amount NUMERIC,\n           status, provider, membership_status, payment_plan\n\n═══════════════════════════════════════════\nTOPIC → TABLE GUIDE (pick the right one!)\n═══════════════════════════════════════════\n\"會員 / member count / active member\"   → pgm.members (status='Current')\n\"今日新會員 / new contract / 賣咗幾多\"   → commissions.sold (sell_date)\n\"PT sessions left / 仲有幾多堂PT\"         → pgm.members.pt_sessions_left\n\"PT 做咗 / PT session 完成\"              → commissions.done (department='PT')\n\"今日做咗 / completed today\"             → commissions.done (done_date)\n\"Studio 班 / 團體班 / class schedule\"    → studio.classes (start_date)\n\"出席率 / attendance / 簽到\"             → studio.by_member (has_presence)\n\"POS / 鋪頭賣 / shop revenue / 飲品\"     → pos.transactions (transaction_date)\n\"Autopay / 自動扣賬 / online payment\"    → payments.epayment_log (payment_date)\n\"Revenue 總和 / 營業額\"                  → SUM(net_amount) — pick table by source\n\n══════════════��════════════════════════════\nSQL RULES\n═══════════════════════════════════════════\n• Today: WHERE date_col = CURRENT_DATE\n• This month: WHERE date_col >= date_trunc('month', CURRENT_DATE)\n• Last 7 days: WHERE date_col >= CURRENT_DATE - INTERVAL '7 days'\n• Year-to-date: WHERE date_col >= date_trunc('year', CURRENT_DATE)\n• Name search: name ILIKE '%john%' (case-insensitive)\n• Status: exact case — 'Current' not 'active'\n• Aggregations (count, sum, avg): NO LIMIT\n• Detail rows: LIMIT 20\n• Always use readable English aliases (AS active_members, AS total_revenue)\n• If asked across categories, do GROUP BY and return top results\n• If a question is ambiguous, run a small exploratory query (DISTINCT/sample) first\n\nALWAYS call Query Database to fetch real numbers. Never guess."
+        },
+        "promptType": "define"
+      },
+      "id": "ai_agent_1",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        2608,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {
+          "maxOutputTokens": 1024,
+          "temperature": 0.4
+        }
+      },
+      "id": "gemini_model_1",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2608,
+        1200
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "JnCU08CNhdH8zbnG",
+          "name": "Google Gemini(PaLM) Api account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $fromAI('query', 'The PostgreSQL SELECT query to execute') }}",
+        "options": {}
+      },
+      "id": "pg_tool_1",
+      "name": "Query Database",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        2816,
+        768
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "BdWjFTVmkC8DZtSo",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "simple_memory_1",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        2608,
+        960
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Extract Message').first().json.from }}",
+        "contextWindowLength": 5
+      }
+    },
+    {
+      "id": "typing_indicator_1",
+      "name": "Typing Indicator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        224
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Google Sheets').first().json['Access Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", recipient_type: \"individual\", to: $(\"Extract Message\").first().json.from, type: \"typing_indicator\", typing_indicator: { type: \"text\" } }) }}",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200 OK": {
+      "main": [
+        [
+          {
+            "node": "Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [
+          {
+            "node": "IF: From Boss",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: From Boss": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF: Password OK": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PG Check Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets2": {
+      "main": [
+        [
+          {
+            "node": "PG Upsert Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG Upsert Session": {
+      "main": [
+        [
+          {
+            "node": "Reply: Help Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG Check Session": {
+      "main": [
+        [
+          {
+            "node": "IF Session Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Session Valid": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Session Expired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Session Expired": {
+      "main": [
+        []
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Typing Indicator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Database": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing Indicator": {
+      "main": [
+        [
+          {
+            "node": "IF: Password OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {
+    "WhatsApp Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n-app-do-d9hvm.ondigitalocean.app",
+            "x-forwarded-for": "2a03:2880:22ff:45::,104.23.209.74",
+            "accept-encoding": "gzip, br",
+            "user-agent": "facebookexternalua",
+            "x-hub-signature-256": "sha256=f652bbdce875c30049f9f6da0a4d2963a91a00032507d6c2460485a3025377fb",
+            "x-hub-signature": "sha1=c4f67825f89fe46455817a7a540c7a82dc7cbc20",
+            "content-type": "application/json",
+            "content-length": "598",
+            "accept": "*/*",
+            "cdn-loop": "cloudflare; loops=1",
+            "x-forwarded-proto": "https",
+            "do-connecting-ip": "2a03:2880:22ff:45::"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "object": "whatsapp_business_account",
+            "entry": [
+              {
+                "id": "780222944874670",
+                "changes": [
+                  {
+                    "value": {
+                      "messaging_product": "whatsapp",
+                      "metadata": {
+                        "display_phone_number": "85298051607",
+                        "phone_number_id": "793508627177133"
+                      },
+                      "contacts": [
+                        {
+                          "profile": {
+                            "name": "Anthony Chu"
+                          },
+                          "wa_id": "85261172810",
+                          "user_id": "HK.943475315048611"
+                        }
+                      ],
+                      "messages": [
+                        {
+                          "from": "85261172810",
+                          "from_user_id": "HK.943475315048611",
+                          "id": "wamid.HBgLODUyNjExNzI4MTAVAgASGCBBQzU0RUI1RTk3N0RGOTIxOTcyQTdDRUZGRjNGRkY2RgA=",
+                          "timestamp": "1777097833",
+                          "text": {
+                            "body": "邊五個客上最多堂"
+                          },
+                          "type": "text"
+                        }
+                      ]
+                    },
+                    "field": "messages"
+                  }
+                ]
+              }
+            ]
+          },
+          "webhookUrl": "https://n8n-app-do-d9hvm.ondigitalocean.app/webhook/go24-bot",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "versionId": "ad4e7529-55bf-42b2-9722-7ef35c189c6b",
+  "activeVersionId": "ad4e7529-55bf-42b2-9722-7ef35c189c6b",
+  "versionCounter": 95,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-24T06:40:46.398Z",
+      "createdAt": "2026-04-24T06:40:46.398Z",
+      "role": "workflow:owner",
+      "workflowId": "B0jQQCphiw7jSx3W",
+      "projectId": "gobjToOiw1I8NPmQ",
+      "project": {
+        "updatedAt": "2024-09-12T08:05:52.501Z",
+        "createdAt": "2024-09-12T08:03:46.935Z",
+        "id": "gobjToOiw1I8NPmQ",
+        "name": "Anthony Chu <anthony.chu@go24.fitness>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "19a653dc-effa-4220-8b14-8664f3913949"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-27T05:09:01.320Z",
+    "createdAt": "2026-04-27T05:09:01.320Z",
+    "versionId": "ad4e7529-55bf-42b2-9722-7ef35c189c6b",
+    "workflowId": "B0jQQCphiw7jSx3W",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "go24-bot",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "n01",
+        "name": "WhatsApp Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          272,
+          304
+        ],
+        "webhookId": "e46d8c19-bb5f-4769-9a51-ab5ea9ba3fa1"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "OK",
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "id": "n02",
+        "name": "Respond 200 OK",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          480,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body || {};\nconst value = body.entry?.[0]?.changes?.[0]?.value;\nconst messages = value?.messages;\nif (!messages || !messages[0]) return [];\nconst msg = messages[0];\n\nlet from = msg.from, messageId = msg.id, rawText = '', question = '';\n\nif (msg.type === 'text') {\n  rawText = (msg.text?.body || '').trim();\n} else if (msg.type === 'interactive' && msg.interactive?.type === 'button_reply') {\n  rawText = msg.interactive.button_reply.id;\n  // Translate button IDs to real questions\n  const btnMap = {\n    'q_active':  '依家有幾多個 Active Members？',\n    'q_pos':     '今日 POS Revenue 係幾多？',\n    'q_studio':  '今日有咩 Studio Classes？'\n  };\n  question = btnMap[rawText] || rawText;\n}\n\nif (!rawText) return [];\n\nconst PASSWORD = '6778';\nlet authenticated = false;\n\nif (rawText === PASSWORD) {\n  authenticated = true;\n  question = '__HELP__';\n} else if (rawText.startsWith(PASSWORD + ' ')) {\n  authenticated = true;\n  question = rawText.slice(PASSWORD.length + 1).trim();\n} else {\n  if (!question) question = rawText;\n  authenticated = false;\n}\n\nreturn [{ json: { from, messageId, rawText, question, authenticated } }];"
+        },
+        "id": "n03",
+        "name": "Extract Message",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          704,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "c1",
+                "leftValue": "={{ $json.from }}",
+                "rightValue": "85261172810",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "n04",
+        "name": "IF: From Boss",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          928,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "c2",
+                "leftValue": "={{ $(\"Extract Message\").first().json.authenticated }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "n06",
+        "name": "IF: Password OK",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1600,
+          224
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('Google Sheets').first().json['Access Token'] }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $(\"Extract Message\").first().json.from, type: 'interactive', interactive: { type: 'button', body: { text: '✅ 密碼正確！\\n\\n按下面選項，或直接打��������題：' }, action: { buttons: [{ type: 'reply', reply: { id: 'q_active', title: '🧑 Active Members' } }, { type: 'reply', reply: { id: 'q_pos', title: '💰 POS Revenue' } }, { type: 'reply', reply: { id: 'q_studio', title: '🎯 Studio Classes' } }] } } }) }}",
+          "options": {}
+        },
+        "id": "n09",
+        "name": "Reply: Help Menu",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2272,
+          -224
+        ]
+      },
+      {
+        "parameters": {
+          "documentId": {
+            "__rl": true,
+            "value": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit?gid=0#gid=0",
+            "mode": "url"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": 2041211722,
+            "mode": "list",
+            "cachedResultName": "FB",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit#gid=2041211722"
+          },
+          "options": {}
+        },
+        "id": "f1edb866-3dd0-4682-8679-1f51388bae68",
+        "name": "Google Sheets2",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          1824,
+          0
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "0XbB4tqamwjFQ6RO",
+            "name": "Google Sheets account 6"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO bot.sessions (phone, authed_at, last_seen_at)\nVALUES ('{{ $(\"Extract Message\").first().json.from }}', NOW(), NOW())\nON CONFLICT (phone) DO UPDATE SET last_seen_at = NOW();",
+          "options": {}
+        },
+        "id": "pg_upsert_1",
+        "name": "PG Upsert Session",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          2048,
+          -224
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "BdWjFTVmkC8DZtSo",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT (last_seen_at > NOW() - INTERVAL '2 hours') AS is_valid\nFROM bot.sessions WHERE phone = '{{ $(\"Extract Message\").first().json.from }}';",
+          "options": {}
+        },
+        "id": "pg_check_session_1",
+        "name": "PG Check Session",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          1824,
+          560
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "BdWjFTVmkC8DZtSo",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "sv1",
+                "leftValue": "={{ $json.is_valid }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "if_session_valid_1",
+        "name": "IF Session Valid",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          2048,
+          560
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('Google Sheets').first().json['Access Token'] }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $(\"Extract Message\").first().json.from, type: 'text', text: { body: '⏱️ Session 已過期，請重新輸入：\\n6778' } }) }}",
+          "options": {}
+        },
+        "id": "reply_expired_1",
+        "name": "Reply Session Expired",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2272,
+          704
+        ]
+      },
+      {
+        "parameters": {
+          "documentId": {
+            "__rl": true,
+            "value": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit?gid=0#gid=0",
+            "mode": "url"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": 2041211722,
+            "mode": "list",
+            "cachedResultName": "FB",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit#gid=2041211722"
+          },
+          "options": {}
+        },
+        "id": "f2a6cd19-4ccf-4e0b-a2c1-e5a0b2f532e3",
+        "name": "Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          1136,
+          224
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "0XbB4tqamwjFQ6RO",
+            "name": "Google Sheets account 6"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('Google Sheets').first().json['Access Token'] }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $('Extract Message').first().json.from, type: \"text\", text: { body: $('AI Agent').first().json.output } }) }}",
+          "options": {}
+        },
+        "id": "a2f98900-0977-48ce-a839-d2947ad0e005",
+        "name": "Send WhatsApp Reply2",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          3200,
+          432
+        ]
+      },
+      {
+        "parameters": {
+          "text": "={{ $('Extract Message').first().json.question }}",
+          "options": {
+            "systemMessage": "You are a smart data assistant for GO24 Fitness gym chain in Hong Kong.\nAnswer in the SAME language as the question: 廣東話 if Chinese, English if English.\nBe concise (1-4 sentences). Use numbers clearly. Add 1-2 relevant emoji. Do NOT mention SQL or database.\nToday HKT: {{ new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Hong_Kong' }) }}\n\nUse the \"Query Database\" tool to fetch real data — ALWAYS query the DB instead of guessing.\n\n═══════════════════════════════════════════\nDATABASE TABLES (PostgreSQL)\n═══════════════════════════════════════════\n\n▸ pgm.members — member master record\n  columns: member_code, name, phone, email, gender, dob DATE, join_date DATE,\n           plan_type, plan_start DATE, plan_end DATE, status, pt_sessions_left INT,\n           last_visit DATE, total_paid NUMERIC, branch, notes\n  status (case-sensitive): 'Current'=active, 'Ended'=expired/left, 'Frozen'=frozen,\n                            'Not started'=pending, '10DMB'=10-day trial\n\n▸ commissions.sold — membership/PT package SALES (when sold)\n  columns: club, sell_date DATE, user_number, first_name, product_name,\n           net_sold NUMERIC, gross_sold NUMERIC, is_new BOOL, sold_employee, commission_category\n\n▸ commissions.done — service DELIVERY (when PT/class done, commission earned)\n  columns: club, done_date DATE, user_number, product_name, done_amount NUMERIC,\n           done_employee, department, commission_category\n\n▸ studio.classes — group class schedule (one row per class instance)\n  columns: club, class_name, category, employee_name, start_date DATE, day_of_week,\n           class_time, users_limit INT, users_assigned INT, users_present INT, rating NUMERIC\n\n▸ studio.by_member — class attendance per member\n  columns: club, class_date DATE, class_name, first_name, last_name, user_number, has_presence BOOL\n\n▸ pos.transactions — shop sales (drinks, supplements, towels, etc.)\n  columns: club, transaction_date DATE, product_name, category, quantity NUMERIC,\n           net_amount NUMERIC, gross_amount NUMERIC, payment_method, full_name, employee\n\n▸ payments.epayment_log — online/autopay transactions\n  columns: club, user_number, name, payment_date DATE, amount NUMERIC, net_amount NUMERIC,\n           status, provider, membership_status, payment_plan\n\n═══════════════════════════════════════════\nTOPIC → TABLE GUIDE (pick the right one!)\n═══════════════════════════════════════════\n\"會員 / member count / active member\"   → pgm.members (status='Current')\n\"今日新會員 / new contract / 賣咗幾多\"   → commissions.sold (sell_date)\n\"PT sessions left / 仲有幾多堂PT\"         → pgm.members.pt_sessions_left\n\"PT 做咗 / PT session 完成\"              → commissions.done (department='PT')\n\"今日做咗 / completed today\"             → commissions.done (done_date)\n\"Studio 班 / 團體班 / class schedule\"    → studio.classes (start_date)\n\"出席率 / attendance / 簽到\"             → studio.by_member (has_presence)\n\"POS / 鋪頭賣 / shop revenue / 飲品\"     → pos.transactions (transaction_date)\n\"Autopay / 自動扣賬 / online payment\"    → payments.epayment_log (payment_date)\n\"Revenue 總和 / 營業額\"                  → SUM(net_amount) — pick table by source\n\n═══════════════════════════════════════════\nSQL RULES\n═══════════════════════════════════════════\n• Today: WHERE date_col = CURRENT_DATE\n• This month: WHERE date_col >= date_trunc('month', CURRENT_DATE)\n• Last 7 days: WHERE date_col >= CURRENT_DATE - INTERVAL '7 days'\n• Year-to-date: WHERE date_col >= date_trunc('year', CURRENT_DATE)\n• Name search: name ILIKE '%john%' (case-insensitive)\n• Status: exact case — 'Current' not 'active'\n• Aggregations (count, sum, avg): NO LIMIT\n• Detail rows: LIMIT 20\n• Always use readable English aliases (AS active_members, AS total_revenue)\n• If asked across categories, do GROUP BY and return top results\n• If a question is ambiguous, run a small exploratory query (DISTINCT/sample) first\n\nALWAYS call Query Database to fetch real numbers. Never guess."
+          },
+          "promptType": "define"
+        },
+        "id": "ai_agent_1",
+        "name": "AI Agent",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 1.7,
+        "position": [
+          2608,
+          560
+        ]
+      },
+      {
+        "parameters": {
+          "modelName": "models/gemini-2.0-flash",
+          "options": {
+            "maxOutputTokens": 1024,
+            "temperature": 0.4
+          }
+        },
+        "id": "gemini_model_1",
+        "name": "Google Gemini Chat Model",
+        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+        "typeVersion": 1,
+        "position": [
+          2608,
+          1200
+        ],
+        "credentials": {
+          "googlePalmApi": {
+            "id": "JnCU08CNhdH8zbnG",
+            "name": "Google Gemini(PaLM) Api account 3"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "{{ $fromAI('query', 'The PostgreSQL SELECT query to execute') }}",
+          "options": {}
+        },
+        "id": "pg_tool_1",
+        "name": "Query Database",
+        "type": "n8n-nodes-base.postgresTool",
+        "typeVersion": 2.6,
+        "position": [
+          2816,
+          768
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "BdWjFTVmkC8DZtSo",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "simple_memory_1",
+        "name": "Simple Memory",
+        "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+        "typeVersion": 1.3,
+        "position": [
+          2608,
+          960
+        ],
+        "parameters": {
+          "sessionIdType": "customKey",
+          "sessionKey": "={{ $('Extract Message').first().json.from }}",
+          "contextWindowLength": 5
+        }
+      },
+      {
+        "id": "typing_indicator_1",
+        "name": "Typing Indicator",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1360,
+          224
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('Google Sheets').first().json['Access Token'] }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", recipient_type: \"individual\", to: $(\"Extract Message\").first().json.from, type: \"typing_indicator\", typing_indicator: { type: \"text\" } }) }}",
+          "options": {}
+        },
+        "onError": "continueRegularOutput"
+      }
+    ],
+    "connections": {
+      "WhatsApp Webhook": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 OK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond 200 OK": {
+        "main": [
+          [
+            {
+              "node": "Extract Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Message": {
+        "main": [
+          [
+            {
+              "node": "IF: From Boss",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF: From Boss": {
+        "main": [
+          [
+            {
+              "node": "Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "IF: Password OK": {
+        "main": [
+          [
+            {
+              "node": "Google Sheets2",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "PG Check Session",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Sheets2": {
+        "main": [
+          [
+            {
+              "node": "PG Upsert Session",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PG Upsert Session": {
+        "main": [
+          [
+            {
+              "node": "Reply: Help Menu",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PG Check Session": {
+        "main": [
+          [
+            {
+              "node": "IF Session Valid",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Session Valid": {
+        "main": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Reply Session Expired",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reply Session Expired": {
+        "main": [
+          []
+        ]
+      },
+      "Google Sheets": {
+        "main": [
+          [
+            {
+              "node": "Typing Indicator",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Agent": {
+        "main": [
+          [
+            {
+              "node": "Send WhatsApp Reply2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Gemini Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Query Database": {
+        "ai_tool": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Simple Memory": {
+        "ai_memory": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_memory",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Typing Indicator": {
+        "main": [
+          [
+            {
+              "node": "IF: Password OK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Anthony Chu",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-27T05:09:02.322Z",
+        "id": 776,
+        "workflowId": "B0jQQCphiw7jSx3W",
+        "versionId": "ad4e7529-55bf-42b2-9722-7ef35c189c6b",
+        "event": "deactivated",
+        "userId": "19a653dc-effa-4220-8b14-8664f3913949"
+      },
+      {
+        "createdAt": "2026-04-27T05:09:02.529Z",
+        "id": 777,
+        "workflowId": "B0jQQCphiw7jSx3W",
+        "versionId": "ad4e7529-55bf-42b2-9722-7ef35c189c6b",
+        "event": "activated",
+        "userId": "19a653dc-effa-4220-8b14-8664f3913949"
+      }
+    ]
+  }
+}

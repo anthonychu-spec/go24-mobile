@@ -1,0 +1,233 @@
+{
+  "updatedAt": "2025-09-29T00:55:37.649Z",
+  "createdAt": "2025-09-23T05:11:29.945Z",
+  "id": "v9Dcy21XRG7zFDNb",
+  "name": "whatsapp ai agent",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messages[0].text.body }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a WhatsApp AI assistant for [Company Name]. Your task is to collect a member’s name, email, and gender in a friendly and concise manner. Follow this exact order:\n\nGreet the user and ask for their name.\n\nAfter the user responds, ask for their email.\n\nAfter the user responds, ask for their gender (Male / Female / Prefer not to say).\n\nAfter all responses, confirm the collected information by repeating: Name: [Name], Email: [Email], Gender: [Gender].\n\nKeep all messages short, polite, and friendly. Do not ask for any other information.\n\nExample conversation:\nAI: Hello, may I have your name?\nUser: John Doe\nAI: Thank you. Please share your email.\nUser: john@example.com\n\nAI: Lastly, what is your gender? (Male / Female / Prefer not to say)\nUser: Male\nAI: Thanks! Your details are saved.\n\nNow, start the conversation."
+        }
+      },
+      "id": "479bb8dc-82b9-4680-b5e8-0826c6d59592",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "maxTries": 5,
+      "position": [
+        880,
+        464
+      ],
+      "retryOnFail": false,
+      "typeVersion": 1.7,
+      "alwaysOutputData": true,
+      "waitBetweenTries": null
+    },
+    {
+      "parameters": {
+        "jsCode": "// cleanAnswer – run once per item\nlet txt = $('AI Agent').first().json.output || '';\n\n// 1. Remove bold / italic / strike markers\ntxt = txt.replace(/[*_~]+/g, '');\n\n// 2. Convert [Texto](https://url) → Texto https://url\ntxt = txt.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, '$1 $2');\n\n// 3. Collapse 3+ blank lines\ntxt = txt.replace(/\\n{3,}/g, '\\n\\n').trim();\n\nreturn [{ json: { answer: txt } }];\n"
+      },
+      "id": "5cafdadc-a592-447e-827e-b1a42a4a299f",
+      "name": "cleanAnswer",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1232,
+        464
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        704,
+        720
+      ],
+      "id": "acba1a53-466a-44dc-b54a-70aa5cc5bc21",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "3Le2xV0Ol9OeHANo",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/793508627177133/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json['Access Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $('WhatsApp Trigger').first().json.contacts[0].wa_id }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": \"{{ $('cleanAnswer').item.json.answer }}\"\n  }\n}\n",
+        "options": {}
+      },
+      "id": "d793e324-46a1-41a7-a727-f38211e645e5",
+      "name": "Whatsapp 13",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2041211722,
+          "mode": "list",
+          "cachedResultName": "FB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1w-1SC4sSQpFwoJH6ux35UYY4drOtitz0PqV3m5cf7XI/edit#gid=2041211722"
+        },
+        "options": {}
+      },
+      "id": "15888139-66e8-4555-81b4-9f3aecbd7f37",
+      "name": "Google Sheets2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1456,
+        464
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0XbB4tqamwjFQ6RO",
+          "name": "Google Sheets account 6"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        800
+      ],
+      "id": "7ca83a15-d5f4-4fa6-b066-76e0bf1d1ded",
+      "name": "Simple Memory1"
+    }
+  ],
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "cleanAnswer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cleanAnswer": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets2": {
+      "main": [
+        [
+          {
+            "node": "Whatsapp 13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "e2225149-c26b-4ee8-9661-e05f502f8784",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2025-09-23T05:11:29.945Z",
+      "createdAt": "2025-09-23T05:11:29.945Z",
+      "role": "workflow:owner",
+      "workflowId": "v9Dcy21XRG7zFDNb",
+      "projectId": "gobjToOiw1I8NPmQ",
+      "project": {
+        "updatedAt": "2024-09-12T08:05:52.501Z",
+        "createdAt": "2024-09-12T08:03:46.935Z",
+        "id": "gobjToOiw1I8NPmQ",
+        "name": "Anthony Chu <anthony.chu@go24.fitness>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "19a653dc-effa-4220-8b14-8664f3913949"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}
