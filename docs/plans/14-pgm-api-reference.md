@@ -170,16 +170,23 @@ PT log 完成後 call `CompletePersonalTrainingBooking` 通知 PGM「呢堂用�
 
 ---
 
-## ⚠️ 仲要 confirm（你熟 PGM 答到）
+## ✅ Confirmed Configuration (2026-04-28)
 
-- [ ] `codeDestination` enum 真實 value（`Email` / `Sms` / `Phone` / `Both`?）
-- [ ] PGM 你哋 instance 用緊 SMS 定 Email 做 OTP delivery？
-- [ ] `entranceProductId` — 邊度攞？應該係 club / membership type 設定
-- [ ] `OpenGate.deviceId` — 邊度配置？每個閘機一個 ID？
-- [ ] `GeneratePaymentLink` 內部 gateway 用緊咩（係咪 Adyen）？
-- [ ] PGM webhook 機制有冇？（spec 入面冇見到 webhook config endpoint）
-- [ ] 你哋 instance 嘅 base URL（唔係 presentation.perfectgym.pl）
-- [ ] X-Client-Id / X-Client-Secret 點申請
+| Item | Value |
+|---|---|
+| **Base URL** | `https://go24fitness-hk.perfectgym.pl/Api/v2.2` |
+| **Auth credentials** | `X-Client-Id` + `X-Client-Secret` 已有 |
+| **OTP delivery** | **Email**（PGM 自己 send via SMTP）|
+| **Member login identifier** | **Email** |
+| **`entranceProductId`** | 唔需要（可 skip / use default） |
+| **Face check-in** | 用戶已有自己 facial ID n8n workflow — 整合即可，**唔需要 QR fallback**（face 為唯一入閘方法） |
+| **`GeneratePaymentLink`** | **內部用 Adyen** — Phase 1 用 PGM endpoint，唔需要直接駁 Adyen |
+
+## 仲要 confirm
+
+- [ ] PGM webhook 支援？（spec 入面冇見到 webhook config，可能要 polling fallback）
+- [ ] 用戶 facial ID n8n workflow input/output shape — 我哋點 call？
+- [ ] `OpenGate.deviceId` — 5 店每個閘機 ID 點配置？
 
 ---
 

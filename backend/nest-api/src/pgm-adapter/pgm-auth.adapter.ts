@@ -1,0 +1,75 @@
+import { Injectable } from '@nestjs/common';
+import { PgmClient } from './pgm.client';
+import { normalizePgmError } from './error-normalize';
+
+export type PgmCodeDestination = 'Email' | 'Sms';
+
+export interface VerifyMemberCredentialsResult {
+  memberId: number;
+  status: string; // 'Active' | 'Inactive' | 'Frozen' | ...
+}
+
+export interface VerifyOneTimeCodeResult {
+  codeMatches: boolean;
+  memberId: number;
+}
+
+/**
+ * Adapter wrapping PGM /v2.2/MemberAuth/* endpoints.
+ * Stage 1 uses VerifyMemberCredentials (Option A) and SendOneTimeCode + VerifyOneTimeCode (Option B).
+ */
+@Injectable()
+export class PgmAuthAdapter {
+  constructor(private readonly client: PgmClient) {}
+
+  async verifyMemberCredentials(email: string, password: string): Promise<VerifyMemberCredentialsResult> {
+    try {
+      return await this.client.post<VerifyMemberCredentialsResult>(
+        '/MemberAuth/VerifyMemberCredentials',
+        { email, password },
+      );
+    } catch (err) {
+      throw normalizePgmError(err);
+    }
+  }
+
+  async sendOneTimeCode(memberId: number, codeDestination: PgmCodeDestination = 'Email'): Promise<void> {
+    try {
+      await this.client.post<unknown>(
+        '/MemberAuth/SendOneTimeCode',
+        { memberId, codeDestination },
+      );
+    } catch (err) {
+      throw normalizePgmError(err);
+    }
+  }
+
+  async verifyOneTimeCode(memberId: number, code: string): Promise<VerifyOneTimeCodeResult> {
+    try {
+      return await this.client.post<VerifyOneTimeCodeResult>(
+        '/MemberAuth/VerifyOneTimeCode',
+        { memberId, code },
+      );
+    } catch (err) {
+      throw normalizePgmError(err);
+    }
+  }
+
+  /**
+   * Find memberId from email via OData query.
+   * Used for /auth/request-otp where user enters email but we need memberId.
+   */
+  async lookupMemberIdByEmail(email: string): Promise<number | null> {
+    try {
+      // PGM OData: /odata/Members?$filter=Email eq 'foo@bar.com'&$select=Id
+      const safe = email.replace(/'/g, "''");
+      const res = await this.client.get<{ value?: Array<{ Id: number }> }>(
+        '/odata/Members',
+        { $filter: `Email eq '${safe}'`, $select: 'Id', $top: 1 },
+      );
+      return res.value?.[0]?.Id ?? null;
+    } catch (err) {
+      throw normalizePgmError(err);
+    }
+  }
+}
