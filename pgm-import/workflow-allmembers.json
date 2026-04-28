@@ -1,0 +1,425 @@
+{
+  "updatedAt": "2026-04-27T05:27:24.272Z",
+  "createdAt": "2026-04-24T04:45:22.004Z",
+  "id": "CMDozJ5gmbz0Sl1T",
+  "name": "PGM All Members → Postgres (via Droplet)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 10,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "fd4c6af6-cae8-48ec-87b7-f4bc743810bb",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1344,
+        336
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dj7Ln4aTXh0OLprg",
+          "name": "GO24anthony@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const html = item.json.html || '';\n  const regex = /https:\\/\\/go24fitness-hk\\.perfectgym\\.com\\/Api\\/Reports\\/Download\\/[^\"]+/g;\n  const matches = html.match(regex);\n  if (!matches) return null;\n  let url = matches[0].replace(/[>\\]\"')]+$/, '').replace(/\\+/g, '');\n  const parts = url.split('/');\n  const reportName = parts[6] || 'Report';\n  return { json: { downloadUrl: url, reportName } };\n}).filter(Boolean);"
+      },
+      "id": "3546f38a-b60b-42d4-833b-4c4ef5e9b956",
+      "name": "Extract URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "aaa00001",
+              "leftValue": "={{ $json.reportName }}",
+              "rightValue": "All_Members",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "aa36ca67-58ab-4882-9daf-eb59b21e6a2b",
+      "name": "IF: All Members report",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://146.190.87.137:8765/import/members",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "REPLACE_STRONG_SECRET_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ downloadUrl: $json.downloadUrl }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "e6004b94-e3b4-4c10-a7c3-a1a712b51149",
+      "name": "POST to Droplet Importer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -688,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nif (result.status === 'ok') {\n  return [{ json: { success: true, message: 'Imported ' + result.rows_inserted + ' members to Postgres' } }];\n} else {\n  throw new Error('Import failed: ' + (result.message || JSON.stringify(result)));\n}"
+      },
+      "id": "46828582-776f-48cd-b271-a25be3c27390",
+      "name": "Check result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        256
+      ]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract URL": {
+      "main": [
+        [
+          {
+            "node": "IF: All Members report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: All Members report": {
+      "main": [
+        [
+          {
+            "node": "POST to Droplet Importer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to Droplet Importer": {
+      "main": [
+        [
+          {
+            "node": "Check result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:Gmail Trigger": {
+      "lastTimeChecked": 1777263368,
+      "possibleDuplicates": [
+        "19dcd26db65859a8",
+        "19dcba5a2f57a769"
+      ],
+      "Gmail Trigger": {
+        "lastTimeChecked": 1777267644
+      }
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "c3dee5a7-8f85-4e3c-b18f-cde23336568d",
+  "activeVersionId": "c3dee5a7-8f85-4e3c-b18f-cde23336568d",
+  "versionCounter": 43,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-24T04:45:22.004Z",
+      "createdAt": "2026-04-24T04:45:22.004Z",
+      "role": "workflow:owner",
+      "workflowId": "CMDozJ5gmbz0Sl1T",
+      "projectId": "gobjToOiw1I8NPmQ",
+      "project": {
+        "updatedAt": "2024-09-12T08:05:52.501Z",
+        "createdAt": "2024-09-12T08:03:46.935Z",
+        "id": "gobjToOiw1I8NPmQ",
+        "name": "Anthony Chu <anthony.chu@go24.fitness>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "19a653dc-effa-4220-8b14-8664f3913949"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-27T05:27:24.303Z",
+    "createdAt": "2026-04-27T05:27:24.303Z",
+    "versionId": "c3dee5a7-8f85-4e3c-b18f-cde23336568d",
+    "workflowId": "CMDozJ5gmbz0Sl1T",
+    "nodes": [
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyX",
+                "value": 10,
+                "unit": "minutes"
+              }
+            ]
+          },
+          "simple": false,
+          "filters": {
+            "readStatus": "unread"
+          },
+          "options": {
+            "downloadAttachments": true
+          }
+        },
+        "id": "fd4c6af6-cae8-48ec-87b7-f4bc743810bb",
+        "name": "Gmail Trigger",
+        "type": "n8n-nodes-base.gmailTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -1344,
+          336
+        ],
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "dj7Ln4aTXh0OLprg",
+            "name": "GO24anthony@gmail.com"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "return items.map(item => {\n  const html = item.json.html || '';\n  const regex = /https:\\/\\/go24fitness-hk\\.perfectgym\\.com\\/Api\\/Reports\\/Download\\/[^\"]+/g;\n  const matches = html.match(regex);\n  if (!matches) return null;\n  let url = matches[0].replace(/[>\\]\"')]+$/, '').replace(/\\+/g, '');\n  const parts = url.split('/');\n  const reportName = parts[6] || 'Report';\n  return { json: { downloadUrl: url, reportName } };\n}).filter(Boolean);"
+        },
+        "id": "3546f38a-b60b-42d4-833b-4c4ef5e9b956",
+        "name": "Extract URL",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1136,
+          336
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "aaa00001",
+                "leftValue": "={{ $json.reportName }}",
+                "rightValue": "All_Members",
+                "operator": {
+                  "type": "string",
+                  "operation": "contains"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "aa36ca67-58ab-4882-9daf-eb59b21e6a2b",
+        "name": "IF: All Members report",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          -912,
+          336
+        ]
+      },
+      {
+        "parameters": {
+          "url": "http://146.190.87.137:8765/import/members",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-API-Key",
+                "value": "REPLACE_STRONG_SECRET_KEY"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ downloadUrl: $json.downloadUrl }) }}",
+          "options": {
+            "timeout": 300000
+          }
+        },
+        "id": "e6004b94-e3b4-4c10-a7c3-a1a712b51149",
+        "name": "POST to Droplet Importer",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          -688,
+          256
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const result = $input.first().json;\nif (result.status === 'ok') {\n  return [{ json: { success: true, message: 'Imported ' + result.rows_inserted + ' members to Postgres' } }];\n} else {\n  throw new Error('Import failed: ' + (result.message || JSON.stringify(result)));\n}"
+        },
+        "id": "46828582-776f-48cd-b271-a25be3c27390",
+        "name": "Check result",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -464,
+          256
+        ]
+      }
+    ],
+    "connections": {
+      "Gmail Trigger": {
+        "main": [
+          [
+            {
+              "node": "Extract URL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract URL": {
+        "main": [
+          [
+            {
+              "node": "IF: All Members report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF: All Members report": {
+        "main": [
+          [
+            {
+              "node": "POST to Droplet Importer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "POST to Droplet Importer": {
+        "main": [
+          [
+            {
+              "node": "Check result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Anthony Chu",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-27T05:27:24.367Z",
+        "id": 782,
+        "workflowId": "CMDozJ5gmbz0Sl1T",
+        "versionId": "c3dee5a7-8f85-4e3c-b18f-cde23336568d",
+        "event": "deactivated",
+        "userId": "19a653dc-effa-4220-8b14-8664f3913949"
+      },
+      {
+        "createdAt": "2026-04-27T05:27:24.699Z",
+        "id": 783,
+        "workflowId": "CMDozJ5gmbz0Sl1T",
+        "versionId": "c3dee5a7-8f85-4e3c-b18f-cde23336568d",
+        "event": "activated",
+        "userId": "19a653dc-effa-4220-8b14-8664f3913949"
+      }
+    ]
+  }
+}
