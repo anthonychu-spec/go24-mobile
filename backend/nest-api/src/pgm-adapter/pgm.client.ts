@@ -23,9 +23,15 @@ export class PgmClient {
     const baseURL = cfg.get<string>('PGM_API_BASE');
     const clientId = cfg.get<string>('PGM_CLIENT_ID');
     const clientSecret = cfg.get<string>('PGM_CLIENT_SECRET');
+    const isProd = cfg.get<string>('NODE_ENV') === 'production';
 
     if (!baseURL) {
-      this.logger.warn('PGM_API_BASE not set — calls to PGM will fail');
+      throw new Error('PGM_API_BASE not set');
+    }
+    if (!clientId || !clientSecret) {
+      // Dev: warn so devs can still bring up Swagger. Prod: hard fail.
+      if (isProd) throw new Error('PGM_CLIENT_ID / PGM_CLIENT_SECRET not set');
+      this.logger.warn('PGM_CLIENT_ID/SECRET not set — PGM calls will 401 (dev only)');
     }
 
     this.axios = axios.create({

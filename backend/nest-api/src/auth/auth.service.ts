@@ -1,10 +1,9 @@
-import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as bcrypt from 'bcrypt';
 import { randomBytes, randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
-import { LessThan, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { PgmAuthAdapter, PgmCodeDestination } from '../pgm-adapter/pgm-auth.adapter';
 import { AppError } from '../pgm-adapter/error-normalize';
 import { Session } from './entities/session.entity';
@@ -23,6 +22,7 @@ export interface IssueTokenResult {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly jwtSecret: string;
 
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
@@ -30,7 +30,14 @@ export class AuthService {
     private readonly pgm: PgmAuthAdapter,
     private readonly jwt: JwtService,
     private readonly cfg: ConfigService,
-  ) {}
+  ) {
+    // CRITICAL: fail-fast on missing/weak JWT_SECRET
+    const secret = this.cfg.get<string>('JWT_SECRET');
+    if (!secret || secret.length < 32 || secret === 'change-me-to-a-long-random-string') {
+      throw new Error('JWT_SECRET not configured or too weak (need >= 32 chars)');
+    }
+    this.jwtSecret = secret;
+  }
 
   /** Option A — email + password via PGM VerifyMemberCredentials */
   async login(input: {
@@ -42,8 +49,9 @@ export class AuthService {
     const result = await this.pgm.verifyMemberCredentials(input.email, input.password);
     if (!result?.memberId) throw new AppError('INVALID_CREDENTIALS');
 
+    // Strict: any non-Active status (including empty/null) is rejected
     const status = (result.status || '').toLowerCase();
-    if (status && status !== 'active') throw new AppError('MEMBER_INACTIVE');
+    if (status !== 'active') throw new AppError('MEMBER_INACTIVE', `status=${result.status || 'unknown'}`);
 
     const user = await this.upsertUser({
       pgmMemberId: result.memberId,
@@ -79,25 +87,39 @@ export class AuthService {
     return this.issueTokens(user, input.deviceFingerprint);
   }
 
-  /** Refresh + rotate */
+  /**
+   * Refresh + rotate (atomic).
+   * Uses conditional UPDATE-RETURNING to prevent concurrent-refresh race.
+   * If two requests come in with same token, only one UPDATE wins (revoked=true);
+   * the other gets 0 rows → treated as replay attempt → revoke all sessions.
+   */
   async refresh(refreshToken: string): Promise<IssueTokenResult> {
     const hash = this.hashRefresh(refreshToken);
-    const session = await this.sessionRepo.findOne({ where: { refreshTokenHash: hash } });
-    if (!session || session.revoked || session.expiresAt < new Date()) {
-      // If a revoked token is reused → likely theft → revoke all user sessions
-      if (session?.revoked) {
-        await this.sessionRepo.update({ userId: session.userId }, { revoked: true });
-        this.logger.warn({ event: 'refresh_replay_attempt', userId: session.userId });
+
+    // Atomic claim: only one request can flip revoked false→true
+    const claimResult = await this.sessionRepo
+      .createQueryBuilder()
+      .update(Session)
+      .set({ revoked: true })
+      .where('refresh_token_hash = :hash AND revoked = false AND expires_at > NOW()', { hash })
+      .returning(['id', 'userId', 'deviceFingerprint', 'devicePlatform'])
+      .execute();
+
+    const claimed = (claimResult.raw as Array<{ id: string; user_id: string; device_fingerprint: string | null; device_platform: string | null }>)[0];
+
+    if (!claimed) {
+      // No row updated → either token doesn't exist, expired, OR already revoked (replay)
+      const existing = await this.sessionRepo.findOne({ where: { refreshTokenHash: hash } });
+      if (existing?.revoked) {
+        // Token was previously revoked AND someone is using it again → likely theft
+        await this.sessionRepo.update({ userId: existing.userId }, { revoked: true });
+        this.logger.warn({ event: 'refresh_replay_attempt', userId: existing.userId, sessionId: existing.id });
       }
       throw new UnauthorizedException('invalid refresh token');
     }
-    const user = await this.userRepo.findOneOrFail({ where: { id: session.userId } });
 
-    // rotate
-    session.revoked = true;
-    await this.sessionRepo.save(session);
-
-    return this.issueTokens(user, session.deviceFingerprint ?? undefined, session.devicePlatform ?? undefined);
+    const user = await this.userRepo.findOneOrFail({ where: { id: claimed.user_id } });
+    return this.issueTokens(user, claimed.device_fingerprint ?? undefined, claimed.device_platform ?? undefined);
   }
 
   async logout(refreshToken: string): Promise<void> {
@@ -162,8 +184,7 @@ export class AuthService {
       }),
     );
 
-    // Cleanup old expired sessions for this user (housekeeping)
-    void this.sessionRepo.delete({ userId: user.id, expiresAt: LessThan(new Date()) });
+    // (Housekeeping cleanup of expired sessions moved to a scheduled job — Stage 1.5)
 
     return {
       accessToken,
@@ -173,7 +194,7 @@ export class AuthService {
   }
 
   private hashRefresh(raw: string): string {
-    return createHmac('sha256', this.cfg.get<string>('JWT_SECRET') ?? 'fallback')
+    return createHmac('sha256', this.jwtSecret)
       .update(raw)
       .digest('hex');
   }
@@ -216,5 +237,3 @@ export class AuthService {
   }
 }
 
-// avoid unused import warning since bcrypt only used in future password reset flow
-void bcrypt;

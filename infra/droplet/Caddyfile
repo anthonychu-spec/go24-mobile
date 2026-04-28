@@ -1,0 +1,52 @@
+# Caddy reverse proxy with automatic HTTPS via Let's Encrypt
+# Replace API_DOMAIN env var when deploying
+
+{$API_DOMAIN} {
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        # Remove server header
+        -Server
+    }
+
+    # Compress responses
+    encode zstd gzip
+
+    # Rate limit by IP (basic — full per-user rate limit done in Nest)
+    # Caddy 2.x doesn't ship rate_limit by default; using upstream for now
+
+    # API routes → NestJS
+    reverse_proxy api:3000 {
+        # Forward real client IP for rate limiting + audit log
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Health check upstream
+        health_uri /v1/health
+        health_interval 30s
+        health_timeout 5s
+
+        # Timeouts
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 10s
+        }
+    }
+
+    # Logs (sent to stdout — Docker captures)
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+}
+
+# Optional: redirect www → apex (uncomment when domain confirmed)
+# www.{$API_DOMAIN} {
+#     redir https://{$API_DOMAIN}{uri} permanent
+# }

@@ -50,28 +50,30 @@ export function normalizePgmError(err: unknown): AppError {
   if (err instanceof AppError) return err;
 
   if (axios_isAxiosError(err)) {
-    const status = err.response?.status;
-    const data = (err.response?.data ?? {}) as Record<string, unknown>;
+    // Network-class errors (timeout, DNS, ECONNREFUSED) → TEMP_FAIL
+    // These have no `err.response` so must be caught BEFORE status checks
+    if (!err.response || err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED') {
+      return new AppError('TEMP_FAIL', err.message);
+    }
+
+    const status = err.response.status;
+    const data = (err.response.data ?? {}) as Record<string, unknown>;
     const code = String(data.errorCode ?? data.code ?? '');
     const msg = String(data.message ?? data.error ?? err.message ?? '');
 
-    // Structured PGM error code (when available)
     if (code) {
-      // Map known PGM internal codes here as we discover them
       if (/full|capacity/i.test(code)) return new AppError('BOOKING_FULL');
       if (/duplicate/i.test(code)) return new AppError('DUPLICATE_BOOKING');
       if (/credential|invalid.*pass/i.test(code)) return new AppError('INVALID_CREDENTIALS');
       if (/member.*inactive|frozen|suspended/i.test(code)) return new AppError('MEMBER_INACTIVE');
     }
 
-    // HTTP status fallback
     if (status === 401) return new AppError('INVALID_CREDENTIALS', msg);
     if (status === 403) return new AppError('MEMBER_INACTIVE', msg);
     if (status === 404) return new AppError('NOT_FOUND', msg);
     if (status === 408 || status === 504) return new AppError('TEMP_FAIL', msg);
-    if (status && status >= 500) return new AppError('UPSTREAM_ERROR', msg);
+    if (status >= 500) return new AppError('UPSTREAM_ERROR', msg);
 
-    // Regex fallback (last resort — covered by fixture tests)
     if (/full|capacity/i.test(msg)) return new AppError('BOOKING_FULL', msg);
     if (/already.*booked|duplicate/i.test(msg)) return new AppError('DUPLICATE_BOOKING', msg);
     if (/invalid.*credential|wrong.*password/i.test(msg)) return new AppError('INVALID_CREDENTIALS', msg);

@@ -1,0 +1,93 @@
+name: go24
+
+# Production / staging stack on Droplet
+# Run from /opt/go24 on droplet:  docker compose -f infra/droplet/docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: go24-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-go24}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../docker/init:/docker-entrypoint-initdb.d:ro
+    networks: [go24-net]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: go24-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks: [go24-net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: go24/nest-api:latest
+    container_name: go24-api
+    restart: unless-stopped
+    build:
+      context: ../../
+      dockerfile: infra/droplet/Dockerfile.api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-go24}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 30d
+      PGM_API_BASE: ${PGM_API_BASE}
+      PGM_CLIENT_ID: ${PGM_CLIENT_ID}
+      PGM_CLIENT_SECRET: ${PGM_CLIENT_SECRET}
+      PGM_OTP_DESTINATION: ${PGM_OTP_DESTINATION:-Email}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [go24-net]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: go24-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [go24-net]
+    depends_on:
+      - api
+
+networks:
+  go24-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

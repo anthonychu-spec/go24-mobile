@@ -1,0 +1,71 @@
+name: Deploy to Droplet
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/nest-api/**'
+      - 'packages/**'
+      - 'infra/droplet/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch: # allow manual trigger
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+
+      - name: Add droplet to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via SSH
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+        run: |
+          ssh deploy@$DROPLET_HOST << 'EOF'
+            set -euo pipefail
+            cd /opt/go24
+            echo "→ git fetch"
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "→ docker compose pull (cache-friendly)"
+            docker compose -f infra/droplet/docker-compose.prod.yml pull --ignore-buildable
+
+            echo "→ build + up"
+            docker compose -f infra/droplet/docker-compose.prod.yml up -d --build api
+
+            echo "→ wait for API healthy"
+            for i in {1..30}; do
+              if docker exec go24-api wget -q --spider http://localhost:3000/v1/health; then
+                echo "  ✓ API healthy"
+                break
+              fi
+              sleep 2
+            done
+
+            echo "→ prune old images"
+            docker image prune -f
+
+            echo "✓ Deploy done"
+          EOF
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Deploy failed — check logs above and on droplet"

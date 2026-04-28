@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PgmClient } from './pgm.client';
-import { normalizePgmError } from './error-normalize';
+import { AppError, normalizePgmError } from './error-normalize';
 
 export type PgmCodeDestination = 'Email' | 'Sms';
 
@@ -58,18 +58,34 @@ export class PgmAuthAdapter {
   /**
    * Find memberId from email via OData query.
    * Used for /auth/request-otp where user enters email but we need memberId.
+   *
+   * SECURITY: input is validated as RFC-5321-ish email before interpolation
+   * (defense-in-depth on top of DTO @IsEmail). Reject control chars and any
+   * char that could break out of the OData string literal.
    */
   async lookupMemberIdByEmail(email: string): Promise<number | null> {
+    if (!isSafeEmailForOData(email)) {
+      throw new AppError('NOT_FOUND', 'invalid email');
+    }
     try {
       // PGM OData: /odata/Members?$filter=Email eq 'foo@bar.com'&$select=Id
-      const safe = email.replace(/'/g, "''");
+      const escaped = email.replace(/'/g, "''");
       const res = await this.client.get<{ value?: Array<{ Id: number }> }>(
         '/odata/Members',
-        { $filter: `Email eq '${safe}'`, $select: 'Id', $top: 1 },
+        { $filter: `Email eq '${escaped}'`, $select: 'Id', $top: 1 },
       );
       return res.value?.[0]?.Id ?? null;
     } catch (err) {
       throw normalizePgmError(err);
     }
   }
+}
+
+/** Strict email check before interpolation into OData filter. */
+function isSafeEmailForOData(email: string): boolean {
+  if (typeof email !== 'string') return false;
+  if (email.length === 0 || email.length > 254) return false;
+  // No control chars, no whitespace, no backslash, no embedded quote-runs.
+  // Allow the standard email-safe charset only.
+  return /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email);
 }
