@@ -5,40 +5,63 @@
 **目標**：會員 / 教練用現有 PGM credentials 登入；backend 出自己 JWT；零 OTP / 零 WhatsApp dependency
 **狀態**：⚪ 未開
 
-## Auth Flow
+## Auth Flow（confirmed via PGM Swagger v2.2，見 `14-pgm-api-reference.md`）
+
+PGM 用 **B2B API key** (`X-Client-Id` + `X-Client-Secret`) — 我哋 backend 用，唔 issue session 畀會員。我哋認證 OK 後 issue 自己 JWT。
+
+### Option A — Email + Password（簡單，推薦先用）
 
 ```
-Mobile App                NestJS API              PGM API
-   │                         │                       │
-   │ POST /auth/pgm-login    │                       │
-   │ {phone, password}       │                       │
-   ├────────────────────────►│                       │
-   │                         │  POST /pgm/login      │
-   │                         │  {phone, password}    │
-   │                         ├──────────────────────►│
-   │                         │                       │
-   │                         │  200 {pgmToken,       │
-   │                         │       memberId, ...}  │
-   │                         │◄──────────────────────┤
-   │                         │                       │
-   │                         │  upsert users table   │
-   │                         │  (member_code, phone, │
-   │                         │   pgm_member_id, ...) │
-   │                         │                       │
-   │  200 {jwt, refresh,     │                       │
-   │       user}             │                       │
-   │◄────────────────────────┤                       │
-   │                         │                       │
-   │ 之後所有 request:        │                       │
-   │ Authorization: Bearer   │                       │
-   │   <our JWT>             │                       │
+📱 input email + password → POST /auth/login
+
+🟢 backend:
+  1. Rate limit (5/min per IP, 3/min per email)
+  2. POST PGM /v2.2/MemberAuth/VerifyMemberCredentials {email, password}
+     headers: X-Client-Id, X-Client-Secret
+  3. PGM returns {memberId, status}
+  4. if status != Active → throw MEMBER_INACTIVE
+  5. Upsert local users (memberId, email, status)
+  6. Issue our JWT (15min access + 30d refresh rotated)
+  7. Return {access, refresh, user}
+
+📱 store tokens 落 expo-secure-store → enter app
+```
+
+### Option B — OTP（PGM 自帶 send，無需 WhatsApp）
+
+```
+📱 input email or phone → POST /auth/request-otp
+
+🟢 backend:
+  1. Lookup memberId via OData: GET /odata/Members?$filter=Email eq '...'
+     (or PhoneNumber eq '...')
+  2. if not found → 404
+  3. POST PGM /MemberAuth/SendOneTimeCode {memberId, codeDestination: 'Email'|'Sms'}
+     ↑ PGM 自己 send OTP（佢哋自己 SMS gateway / SMTP）
+  4. Return {memberIdToken: HMAC(memberId)} (encrypted, expires 15min)
+
+📱 收 SMS / Email OTP → 輸入 6 碼 → POST /auth/verify-otp {memberIdToken, code}
+
+🟢 backend:
+  1. Decrypt memberIdToken → memberId
+  2. POST PGM /MemberAuth/VerifyOneTimeCode {memberId, code}
+  3. PGM returns {codeMatches: bool, memberId}
+  4. if false → INVALID_OTP
+  5. Upsert local users
+  6. Issue JWT + refresh
+  7. Return {access, refresh, user}
 ```
 
 **關鍵**：
-- 我哋 **唔 cache 用戶密碼**，淨係 forward 去 PGM 一次
-- PGM 認證成功後，issue **我哋自己嘅 JWT**（15 min access + 30 日 refresh）
-- 之後所有 API 用我哋 JWT，唔再 call PGM auth
-- PGM token 由 backend 自己 hold（畀 PgmAdapter 用），唔暴露畀 mobile
+- OTP 15 min expire（PGM doc）
+- `codeDestination` enum 要確認你 instance 用咩（Email / Sms）
+- Option A + B 都可 implement，會員揀（推薦 default A、忘記密碼用 B reset）
+
+### 關鍵 invariants
+- 我哋 **唔 store 會員密碼** — forward 去 PGM 一次就算
+- PGM B2B API key 喺 backend env，**唔暴露畀 mobile**
+- Mobile 永遠經我哋 backend gateway
+- JWT signed with our secret, NOT PGM 嘢
 
 ## Tasks
 
@@ -47,7 +70,9 @@ Mobile App                NestJS API              PGM API
 - [ ] 1.1 DB migration：`users`（id, role, phone, member_code FK, pgm_member_id, last_pgm_sync_at, created_at）
 - [ ] 1.2 DB migration：`sessions`（user_id, refresh_token_hash, device_fingerprint, last_seen, revoked, expires_at）
 - [ ] 1.3 NestJS `AuthModule` skeleton + JWT strategy + `JwtAuthGuard`
-- [ ] 1.4 `POST /auth/pgm-login` — receive {phone, password} → call PGM `/login` via PgmAdapter → upsert local user → issue JWT + refresh
+- [ ] 1.4 `POST /auth/login` — receive {email, password} → call `PgmAdapter.verifyMemberCredentials()` → upsert local user → issue JWT + refresh
+- [ ] 1.4b `POST /auth/request-otp` — lookup memberId via OData → call `SendOneTimeCode` → return memberIdToken
+- [ ] 1.4c `POST /auth/verify-otp` — call `VerifyOneTimeCode` → upsert + issue JWT
 - [ ] 1.5 `POST /auth/refresh` — verify refresh token → rotate (issue new refresh, invalidate old)
 - [ ] 1.6 `POST /auth/logout` — revoke session by refresh token
 - [ ] 1.7 `GET /auth/me` — return current user + role + permissions (decoded from JWT)
