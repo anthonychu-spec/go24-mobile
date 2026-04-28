@@ -5,12 +5,17 @@
 
 set -euo pipefail
 
+# Force non-interactive apt — never prompt for config conflicts.
+# Always keep currently-installed config files.
+export DEBIAN_FRONTEND=noninteractive
+APT_OPTS="-o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef"
+
 echo "=== GO24 droplet provisioning ==="
 
 # --- 1. System update + basics ---
 apt-get update -y
-apt-get upgrade -y
-apt-get install -y \
+apt-get -y $APT_OPTS upgrade
+apt-get -y $APT_OPTS install \
   curl wget git ufw fail2ban htop vim \
   ca-certificates gnupg lsb-release unattended-upgrades
 
@@ -35,7 +40,7 @@ chmod a+r /etc/apt/keyrings/docker.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" \
   > /etc/apt/sources.list.d/docker.list
 apt-get update -y
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt-get -y $APT_OPTS install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # --- 6. Create deploy user ---
 if ! id -u deploy >/dev/null 2>&1; then
