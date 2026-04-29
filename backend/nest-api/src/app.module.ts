@@ -9,6 +9,7 @@ import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { BookingModule } from './booking/booking.module';
 import { BookingsModule } from './bookings/booking.module';
+import { PaymentsModule } from './payments/payments.module';
 import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
@@ -20,6 +21,7 @@ import { MetricsModule } from './metrics/metrics.module';
     HealthModule,
     BookingModule,
     BookingsModule,
+    PaymentsModule,
     MetricsModule,
     DevtoolsModule.register({
       http: process.env.NODE_ENV !== 'production',
