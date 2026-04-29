@@ -17,7 +17,7 @@ COPY packages/config/package.json ./packages/config/
 COPY apps/member-app/package.json ./apps/member-app/
 COPY apps/trainer-app/package.json ./apps/trainer-app/
 
-RUN pnpm install --frozen-lockfile --filter nest-api... --prod=false
+RUN pnpm install --no-frozen-lockfile --filter nest-api... --prod=false
 
 # ─── Build stage ───
 FROM node:20-alpine AS build
