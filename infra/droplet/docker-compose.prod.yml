@@ -60,6 +60,7 @@ services:
       ADYEN_ENVIRONMENT: ${ADYEN_ENVIRONMENT:-LIVE}
       ADYEN_CLIENT_KEY: ${ADYEN_CLIENT_KEY}
       ADYEN_HMAC_KEY: ${ADYEN_HMAC_KEY}
+      BROADCAST_SECRET: ${BROADCAST_SECRET}
     depends_on:
       postgres:
         condition: service_healthy

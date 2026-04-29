@@ -169,6 +169,45 @@ export class NotificationsService {
     });
   }
 
+  // ── Broadcast (urgent announcements) ─────────────────────────────────────
+
+  async broadcast(input: {
+    title: string;
+    body: string;
+    club?: string;    // null = all branches
+    secret: string;
+  }): Promise<{ sent: number }> {
+    const broadcastSecret = process.env.BROADCAST_SECRET ?? '';
+    if (!broadcastSecret || input.secret !== broadcastSecret) {
+      throw new Error('Invalid broadcast secret');
+    }
+
+    // Get all users with device tokens
+    const tokens = await this.tokenRepo.find();
+    const userIds = [...new Set(tokens.map(t => t.userId))];
+
+    if (userIds.length === 0) return { sent: 0 };
+
+    // Create announcement notification for each user
+    const data: Record<string, unknown> = { club: input.club ?? 'all' };
+    const notifications = userIds.map(userId =>
+      this.notiRepo.create({
+        userId,
+        type: 'announcement' as NotificationType,
+        title: input.title,
+        body: input.body,
+        data,
+      }),
+    );
+    await this.notiRepo.save(notifications);
+
+    // Send push to all tokens at once
+    await this.sendPush(tokens.map(t => t.token), input.title, input.body, data);
+
+    this.logger.log(`Broadcast sent to ${userIds.length} users: ${input.title}`);
+    return { sent: userIds.length };
+  }
+
   // ── Internal push ─────────────────────────────────────────────────────────
 
   private async sendPush(tokens: string[], title: string, body: string, data: Record<string, unknown>): Promise<void> {

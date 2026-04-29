@@ -21,6 +21,13 @@ class CheckinFailedDto {
   @IsString() @IsOptional() timestamp?: string;
 }
 
+class BroadcastDto {
+  @IsString() secret: string;          // BROADCAST_SECRET env var
+  @IsString() title: string;
+  @IsString() body: string;
+  @IsString() @IsOptional() club?: string;  // optional: target specific branch
+}
+
 @ApiTags('notifications')
 @Controller('notifications')
 export class NotificationsController {
@@ -74,6 +81,18 @@ export class NotificationsController {
   markAllRead(@Req() req: Request) {
     const user = req.user as AuthedUser;
     return this.svc.markAllRead(user.id);
+  }
+
+  @ApiOperation({ summary: '🚨 Broadcast urgent announcement to all members (requires BROADCAST_SECRET)' })
+  @Post('broadcast')
+  @HttpCode(200)
+  async broadcast(@Body() dto: BroadcastDto) {
+    return this.svc.broadcast({
+      title: dto.title,
+      body: dto.body,
+      club: dto.club,
+      secret: dto.secret,
+    });
   }
 
   @ApiOperation({ summary: 'n8n webhook: member failed to enter gym' })
