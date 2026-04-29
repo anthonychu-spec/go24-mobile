@@ -1,7 +1,8 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BOOKING_REPO, IBookingRepo } from '../booking/booking.interfaces';
+import { BOOKING_REPO } from '../booking/booking.interfaces';
+import type { IBookingRepo } from '../booking/booking.interfaces';
 import { BookingStatus } from './entities/booking.entity';
 import { OutboxEvent } from './entities/outbox-event.entity';
 import { BookingRepository } from './repositories/booking.repo';
@@ -45,7 +46,7 @@ export class BookingsService {
     );
 
     if (claim.kind === 'already_done') {
-      return claim.response as BookResult;
+      return claim.response as unknown as BookResult;
     }
     if (claim.kind === 'in_flight') {
       throw new InProgressError();

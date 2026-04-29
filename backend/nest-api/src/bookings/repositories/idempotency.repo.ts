@@ -47,7 +47,7 @@ export class IdempotencyRepository {
   ): Promise<void> {
     await this.repo.update(
       { userId, key },
-      { status: 'done', response, resultKind, completedAt: new Date() },
+      { status: 'done', response: response as any, resultKind, completedAt: new Date() },
     );
   }
 
