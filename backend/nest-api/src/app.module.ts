@@ -12,6 +12,7 @@ import { BookingsModule } from './bookings/booking.module';
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ActivityModule } from './activity/activity.module';
+import { PtModule } from './pt/pt.module';
 import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
@@ -26,6 +27,7 @@ import { MetricsModule } from './metrics/metrics.module';
     PaymentsModule,
     NotificationsModule,
     ActivityModule,
+    PtModule,
     MetricsModule,
     DevtoolsModule.register({
       http: process.env.NODE_ENV !== 'production',
