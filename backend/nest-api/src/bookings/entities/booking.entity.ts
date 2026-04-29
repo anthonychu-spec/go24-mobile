@@ -15,7 +15,7 @@ export class Booking {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ name: 'class_id' })
+  @Column({ name: 'class_id', type: 'int' })
   classId: number;
 
   @Column({ name: 'external_id', nullable: true, type: 'text' })
@@ -24,22 +24,22 @@ export class Booking {
   @Column({ name: 'pgm_member_id', nullable: true, type: 'int' })
   pgmMemberId: number | null;
 
-  @Column({ default: 'pending' })
+  @Column({ default: 'pending', type: 'varchar', length: 20 })
   status: BookingStatus;
 
-  @Column({ name: 'idempotency_key', unique: true })
+  @Column({ name: 'idempotency_key', unique: true, type: 'text' })
   idempotencyKey: string;
 
-  @Column({ name: 'error_code', nullable: true, length: 50 })
+  @Column({ name: 'error_code', nullable: true, type: 'varchar', length: 50 })
   errorCode: string | null;
 
-  @Column({ name: 'waitlist_position', nullable: true })
+  @Column({ name: 'waitlist_position', nullable: true, type: 'int' })
   waitlistPosition: number | null;
 
-  @Column({ default: 'local', length: 10 })
+  @Column({ default: 'local', type: 'varchar', length: 10 })
   source: string;
 
-  @Column({ default: 1 })
+  @Column({ default: 1, type: 'int' })
   version: number;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

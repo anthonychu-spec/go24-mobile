@@ -8,16 +8,16 @@ export class IdempotencyKey {
   @PrimaryColumn({ type: 'text' })
   key: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   endpoint: string;
 
-  @Column({ default: 'in_flight', length: 12 })
+  @Column({ default: 'in_flight', type: 'varchar', length: 12 })
   status: 'in_flight' | 'done';
 
   @Column({ type: 'jsonb', nullable: true })
   response: Record<string, unknown> | null;
 
-  @Column({ name: 'result_kind', nullable: true, length: 12 })
+  @Column({ name: 'result_kind', nullable: true, type: 'varchar', length: 12 })
   resultKind: 'terminal' | 'transient' | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
