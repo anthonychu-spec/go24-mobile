@@ -21,7 +21,7 @@ export class Booking {
   @Column({ name: 'external_id', nullable: true, type: 'text' })
   externalId: string | null;
 
-  @Column({ name: 'pgm_member_id', nullable: true })
+  @Column({ name: 'pgm_member_id', nullable: true, type: 'int' })
   pgmMemberId: number | null;
 
   @Column({ default: 'pending' })
