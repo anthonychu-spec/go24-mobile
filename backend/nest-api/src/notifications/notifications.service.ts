@@ -1,46 +1,31 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { DeviceToken } from './entities/device-token.entity';
+import { Notification, NotificationType } from './entities/notification.entity';
 import { User } from '../auth/entities/user.entity';
 
-// Reason → Chinese message mapping
 const REASON_MESSAGES: Record<string, { title: string; body: string }> = {
-  'No Active Contract': {
-    title: '⚠️ 入場失敗',
-    body: '你嘅會籍已到期，請於 App 內續會或聯絡前台。',
-  },
-  'Frozen': {
-    title: '⚠️ 入場失敗',
-    body: '你嘅會籍暫時凍結，請聯絡前台查詢。',
-  },
-  'Debit': {
-    title: '⚠️ 入場失敗',
-    body: '帳戶有未付款項，請更新信用卡或聯絡前台。',
-  },
-  'Wrong Club': {
-    title: '⚠️ 入場失敗',
-    body: '你嘅會籍不適用於此分店，請到指定分店。',
-  },
-  'Recovery': {
-    title: '⚠️ 入場失敗',
-    body: '入場驗證失敗，請聯絡前台協助。',
-  },
+  'No Active Contract': { title: '⚠️ 入場失敗', body: '你嘅會籍已到期，請於 App 內續會或聯絡前台。' },
+  'Frozen':            { title: '⚠️ 入場失敗', body: '你嘅會籍暫時凍結，請聯絡前台查詢。' },
+  'Debit':             { title: '⚠️ 入場失敗', body: '帳戶有未付款項，請更新信用卡或聯絡前台。' },
+  'Wrong Club':        { title: '⚠️ 入場失敗', body: '你嘅會籍不適用於此分店，請到指定分店。' },
+  'Recovery':          { title: '⚠️ 入場失敗', body: '入場驗證失敗，請聯絡前台協助。' },
 };
 
-const DEFAULT_MESSAGE = {
-  title: '⚠️ 入場失敗',
-  body: '無法驗證入場資格，請聯絡前台查詢。',
-};
+const DEFAULT_ENTRY_MSG = { title: '⚠️ 入場失敗', body: '無法驗證入場資格，請聯絡前台查詢。' };
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
-    @InjectRepository(DeviceToken) private readonly tokenRepo: Repository<DeviceToken>,
-    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(DeviceToken)   private readonly tokenRepo: Repository<DeviceToken>,
+    @InjectRepository(Notification)  private readonly notiRepo: Repository<Notification>,
+    @InjectRepository(User)          private readonly userRepo: Repository<User>,
   ) {}
+
+  // ── Device token ──────────────────────────────────────────────────────────
 
   async registerToken(userId: string, token: string, platform: string): Promise<void> {
     await this.tokenRepo.upsert(
@@ -49,56 +34,153 @@ export class NotificationsService {
     );
   }
 
+  // ── Inbox ─────────────────────────────────────────────────────────────────
+
+  async list(userId: string, tab: 'personal' | 'announcements' = 'personal') {
+    const types: NotificationType[] = tab === 'announcements'
+      ? ['announcement']
+      : ['booking_confirmed', 'booking_cancelled', 'waitlist_upgraded',
+         'pt_verified', 'entry_denied', 'membership_expiring'];
+
+    const items = await this.notiRepo
+      .createQueryBuilder('n')
+      .where('n.user_id = :userId', { userId })
+      .andWhere('n.type IN (:...types)', { types })
+      .orderBy('n.created_at', 'DESC')
+      .limit(50)
+      .getMany();
+
+    const unread = items.filter(n => !n.readAt).length;
+    return { items, unread };
+  }
+
+  async markRead(userId: string, notificationId: string): Promise<void> {
+    await this.notiRepo.update(
+      { id: notificationId, userId },
+      { readAt: new Date() },
+    );
+  }
+
+  async markAllRead(userId: string): Promise<void> {
+    await this.notiRepo
+      .createQueryBuilder()
+      .update()
+      .set({ readAt: new Date() })
+      .where('user_id = :userId AND read_at IS NULL', { userId })
+      .execute();
+  }
+
+  async unreadCount(userId: string): Promise<number> {
+    return this.notiRepo.count({ where: { userId, readAt: IsNull() } });
+  }
+
+  // ── Create + push ─────────────────────────────────────────────────────────
+
+  async create(input: {
+    userId: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    data?: Record<string, unknown>;
+    push?: boolean;
+  }): Promise<void> {
+    await this.notiRepo.save(this.notiRepo.create({
+      userId: input.userId,
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      data: input.data ?? null,
+    }));
+
+    if (input.push !== false) {
+      const tokens = await this.tokenRepo.find({ where: { userId: input.userId } });
+      if (tokens.length > 0) {
+        await this.sendPush(
+          tokens.map(t => t.token),
+          input.title,
+          input.body,
+          input.data ?? {},
+        );
+      }
+    }
+  }
+
+  // ── n8n webhook: checkin failed ───────────────────────────────────────────
+
   async handleCheckinFailed(input: {
     memberNumber: string;
     reason: string;
     club: string;
     timestamp: string;
   }): Promise<void> {
-    // Find user by PGM member code
     const user = await this.userRepo
       .createQueryBuilder('u')
-      .where('u.pgm_member_id::text = :num OR u.member_code = :num', { num: input.memberNumber })
+      .where('u.pgm_member_id::text = :num', { num: input.memberNumber })
       .getOne();
 
     if (!user) {
-      this.logger.warn(`checkin-failed: no user found for member ${input.memberNumber}`);
+      this.logger.warn(`checkin-failed: no user for member ${input.memberNumber}`);
       return;
     }
 
-    const tokens = await this.tokenRepo.find({ where: { userId: user.id } });
-    if (tokens.length === 0) {
-      this.logger.log(`checkin-failed: user ${user.id} has no device tokens`);
-      return;
-    }
-
-    const msg = REASON_MESSAGES[input.reason] ?? DEFAULT_MESSAGE;
-    await this.sendPush(tokens.map(t => t.token), msg.title, msg.body, {
-      reason: input.reason,
-      club: input.club,
-      timestamp: input.timestamp,
+    const msg = REASON_MESSAGES[input.reason] ?? DEFAULT_ENTRY_MSG;
+    await this.create({
+      userId: user.id,
+      type: 'entry_denied',
+      title: msg.title,
+      body: msg.body,
+      data: { reason: input.reason, club: input.club },
     });
   }
 
-  private async sendPush(
-    tokens: string[],
-    title: string,
-    body: string,
-    data: Record<string, string>,
-  ): Promise<void> {
-    // Use Expo Push API directly (no SDK needed on server)
-    const messages = tokens.map(to => ({ to, title, body, data, sound: 'default' }));
+  // ── Event helpers (called by BookingsService, PtService etc.) ─────────────
 
+  async notifyBookingConfirmed(userId: string, bookingId: string, classId: number): Promise<void> {
+    await this.create({
+      userId,
+      type: 'booking_confirmed',
+      title: '✅ 預約確認',
+      body: `Class #${classId} 預約成功！`,
+      data: { bookingId, classId: String(classId) },
+    });
+  }
+
+  async notifyBookingCancelled(userId: string, bookingId: string): Promise<void> {
+    await this.create({
+      userId, type: 'booking_cancelled',
+      title: '❌ 預約取消', body: '你嘅預約已成功取消。',
+      data: { bookingId },
+    });
+  }
+
+  async notifyWaitlistUpgraded(userId: string, bookingId: string, classId: number): Promise<void> {
+    await this.create({
+      userId, type: 'waitlist_upgraded',
+      title: '🎉 候補成功！', body: `Class #${classId} 有位空出，你已自動確認！`,
+      data: { bookingId, classId: String(classId) },
+    });
+  }
+
+  async notifyPtVerified(userId: string, sessionId: string): Promise<void> {
+    await this.create({
+      userId, type: 'pt_verified',
+      title: '💪 PT 堂確認', body: '今日 PT session 已成功簽名確認。',
+      data: { sessionId }, push: false,
+    });
+  }
+
+  // ── Internal push ─────────────────────────────────────────────────────────
+
+  private async sendPush(tokens: string[], title: string, body: string, data: Record<string, unknown>): Promise<void> {
+    const messages = tokens.map(to => ({ to, title, body, data, sound: 'default' }));
     try {
-      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+      await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(messages),
       });
-      const json = await res.json() as any;
-      this.logger.log(`Push sent to ${tokens.length} device(s)`, json?.data?.[0]?.status);
     } catch (err) {
-      this.logger.error('Push notification failed', err);
+      this.logger.error('Push failed', err);
     }
   }
 }
