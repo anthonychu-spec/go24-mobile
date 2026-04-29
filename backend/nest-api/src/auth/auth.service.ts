@@ -49,9 +49,13 @@ export class AuthService {
     const result = await this.pgm.verifyMemberCredentials(input.email, input.password);
     if (!result?.memberId) throw new AppError('INVALID_CREDENTIALS');
 
-    // Strict: any non-Active status (including empty/null) is rejected
+    // PGM returns status='Success' for a successful credential check,
+    // or status='Active' if it exposes the member account status directly.
+    // Either value means the member is allowed to log in.
     const status = (result.status || '').toLowerCase();
-    if (status !== 'active') throw new AppError('MEMBER_INACTIVE', `status=${result.status || 'unknown'}`);
+    if (status !== 'active' && status !== 'success') {
+      throw new AppError('MEMBER_INACTIVE', `status=${result.status || 'unknown'}`);
+    }
 
     const user = await this.upsertUser({
       pgmMemberId: result.memberId,
