@@ -1,8 +1,21 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
-const config = getDefaultConfig(__dirname);
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, '../..');
 
-// Standalone mode — only watch this app's directory, not the pnpm workspace root
-config.watchFolders = [__dirname];
+const config = getDefaultConfig(projectRoot);
+
+// pnpm workspace: watch monorepo root + all packages
+config.watchFolders = [workspaceRoot];
+
+// Resolve modules from workspace root first, then project
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+];
+
+// Enable symlinks for pnpm
+config.resolver.unstable_enableSymlinks = true;
 
 module.exports = config;

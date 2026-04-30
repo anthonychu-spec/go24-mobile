@@ -14,6 +14,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ActivityModule } from './activity/activity.module';
 import { PtModule } from './pt/pt.module';
 import { ReferralModule } from './referral/referral.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { MetricsModule } from './metrics/metrics.module';
     ActivityModule,
     PtModule,
     ReferralModule,
+    DashboardModule,
     MetricsModule,
     DevtoolsModule.register({
       http: process.env.NODE_ENV !== 'production',
