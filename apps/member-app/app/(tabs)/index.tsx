@@ -285,7 +285,7 @@ const s = StyleSheet.create({
   },
   nextHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nextLabel:  { fontSize: 12, color: colors.textMuted, fontWeight: '700', letterSpacing: 1 },
-  nextCountdown: { fontSize: 13, color: colors.primary, fontWeight: '800' },
+  nextCountdown: { fontSize: 13, color: colors.cta, fontWeight: '800' },
   nextClassName: { fontSize: 22, fontWeight: '900', color: colors.text, marginTop: 2 },
   nextClassTime: { fontSize: 14, color: colors.textMuted },
 
@@ -328,7 +328,7 @@ const s = StyleSheet.create({
   actionBtn: {
     width: (SCREEN_W - 50) / 2, backgroundColor: colors.card, borderRadius: 14,
     paddingVertical: 18, alignItems: 'center', gap: 6,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: colors.primary + '44',
   },
   actionIcon:  { fontSize: 26 },
   actionLabel: { fontSize: 13, fontWeight: '700', color: colors.text },

@@ -279,10 +279,10 @@ const s = StyleSheet.create({
   instructor:  { fontSize: 13, color: colors.textMuted },
   spotsRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
   barBg: { flex: 1, height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
-  barFill:     { height: '100%', borderRadius: 2 },
+  barFill:     { height: '100%', borderRadius: 2, backgroundColor: colors.cta },
   spotsText:   { fontSize: 12, color: colors.textMuted, width: 60, textAlign: 'right' },
   bookBtn: {
-    backgroundColor: colors.primary, borderRadius: 10,
+    backgroundColor: colors.cta, borderRadius: 10,
     paddingVertical: 10, alignItems: 'center', marginTop: 4, minHeight: 40,
   },
   bookBtnWaitlist:  { backgroundColor: colors.border },
