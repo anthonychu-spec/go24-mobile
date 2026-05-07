@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  ActivityIndicator, Alert, FlatList, Modal, Pressable,
+  ActivityIndicator, FlatList, Modal, Pressable,
   RefreshControl, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,25 +8,12 @@ import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
 
 interface GymClass {
-  id: number;
-  name: string;
-  startTime: string;
-  endTime: string;
-  clubId: number;
-  clubName: string | null;
-  instructorName: string | null;
-  maxParticipants: number;
-  participantsCount: number;
-  isWaitlist: boolean;
-  isCancelled: boolean;
+  id: number; name: string; startTime: string; endTime: string;
+  clubId: number; clubName: string | null; instructorName: string | null;
+  maxParticipants: number; participantsCount: number;
+  isWaitlist: boolean; isCancelled: boolean;
 }
-
-interface BookResult {
-  success: boolean;
-  bookingId: string;
-  status: 'confirmed' | 'waitlist' | string;
-  waitlistPosition?: number;
-}
+interface BookResult { success: boolean; bookingId: string; status: string; waitlistPosition?: number; }
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -35,116 +22,80 @@ function generateUUID() {
   });
 }
 
-function formatTime(iso: string) {
+function fmt(iso: string, type: 'time' | 'date') {
   try {
-    return new Date(iso).toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return type === 'time'
+      ? new Date(iso).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false })
+      : new Date(iso).toLocaleDateString('zh-HK', { weekday: 'short', month: 'short', day: 'numeric' });
   } catch { return iso; }
 }
 
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString('en-HK', { weekday: 'short', month: 'short', day: 'numeric' });
-  } catch { return iso; }
-}
+function ClassCard({ item, onBook, isBooking }: { item: GymClass; onBook: (id: number, waitlist: boolean) => void; isBooking: boolean }) {
+  const full = item.participantsCount >= item.maxParticipants;
+  const pct = item.maxParticipants > 0 ? Math.min(item.participantsCount / item.maxParticipants, 1) : 0;
+  const spotsLeft = item.maxParticipants - item.participantsCount;
 
-function SpotsBar({ current, max }: { current: number; max: number }) {
-  const pct = max > 0 ? Math.min(current / max, 1) : 0;
-  const full = pct >= 1;
   return (
-    <View style={s.spotsRow}>
-      <View style={s.barBg}>
-        <View style={[s.barFill, { width: `${pct * 100}%` as any, backgroundColor: full ? colors.error : colors.primary }]} />
+    <View style={s.card}>
+      {/* Time badge */}
+      <View style={s.timeBadge}>
+        <Text style={s.timeText}>{fmt(item.startTime, 'time')}</Text>
+        <Text style={s.timeDash}>—</Text>
+        <Text style={s.timeEnd}>{fmt(item.endTime, 'time')}</Text>
       </View>
-      <Text style={[s.spotsText, full && { color: colors.error }]}>
-        {full ? 'Full' : `${max - current} spots`}
-      </Text>
+
+      {/* Class info */}
+      <View style={s.cardBody}>
+        <Text style={s.className}>{item.name}</Text>
+        <Text style={s.classDate}>{fmt(item.startTime, 'date')}</Text>
+        {item.instructorName && <Text style={s.instructor}>👤 {item.instructorName}</Text>}
+
+        {/* Capacity */}
+        <View style={s.capacityRow}>
+          <View style={s.progressBg}>
+            <View style={[s.progressFill, { width: `${pct * 100}%` as any, backgroundColor: full ? colors.primary : colors.cta }]} />
+          </View>
+          <Text style={[s.spots, full && { color: colors.primary }]}>
+            {full ? '已滿' : `剩 ${spotsLeft} 位`}
+          </Text>
+        </View>
+
+        {/* Book button */}
+        <Pressable
+          style={[s.bookBtn, full && s.bookBtnWaitlist, isBooking && s.bookBtnDisabled]}
+          onPress={() => onBook(item.id, full)}
+          disabled={isBooking}
+        >
+          {isBooking
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={s.bookBtnText}>{full ? '加入候補' : '立即 Book'}</Text>
+          }
+        </Pressable>
+      </View>
     </View>
   );
 }
 
-function SuccessModal({
-  result,
-  onClose,
-}: {
-  result: BookResult | null;
-  onClose: () => void;
-}) {
+function SuccessModal({ result, onClose }: { result: BookResult | null; onClose: () => void }) {
   if (!result) return null;
   const isWaitlist = result.status === 'waitlist';
-
   return (
-    <Modal transparent animationType="fade" visible={!!result}>
-      <View style={s.modalOverlay}>
+    <Modal transparent animationType="slide" visible={!!result}>
+      <View style={s.modalBg}>
         <View style={s.modalCard}>
           <Text style={s.modalIcon}>{isWaitlist ? '⏳' : '✅'}</Text>
-          <Text style={s.modalTitle}>
-            {isWaitlist ? 'Added to Waitlist' : 'Spot Reserved!'}
+          <Text style={s.modalTitle}>{isWaitlist ? '已加入候補！' : '預約成功！'}</Text>
+          <Text style={s.modalSub}>
+            {isWaitlist ? '有位空出時會通知你' : '我哋已為你保留位置'}
           </Text>
-          {isWaitlist && result.waitlistPosition != null && (
-            <Text style={s.modalSub}>You are #{result.waitlistPosition} on the waitlist</Text>
-          )}
-          {!isWaitlist && (
-            <Text style={s.modalSub}>Your booking is confirmed.</Text>
-          )}
-
-          <Text style={s.modalTip}>
-            {isWaitlist
-              ? 'You will be notified via WhatsApp if a spot opens up.'
-              : 'A reminder will be sent before the class starts.'}
-          </Text>
-
           <View style={s.modalActions}>
-            <Pressable style={s.modalBtnPrimary} onPress={onClose}>
-              <Text style={s.modalBtnPrimaryText}>View My Bookings</Text>
-            </Pressable>
-            <Pressable style={s.modalBtnSecondary} onPress={onClose}>
-              <Text style={s.modalBtnSecondaryText}>OK</Text>
+            <Pressable style={s.modalBtn} onPress={onClose}>
+              <Text style={s.modalBtnText}>確認</Text>
             </Pressable>
           </View>
         </View>
       </View>
     </Modal>
-  );
-}
-
-function ClassCard({
-  item,
-  onBook,
-  isBooking,
-}: {
-  item: GymClass;
-  onBook: (id: number, acceptWaitlist: boolean) => void;
-  isBooking: boolean;
-}) {
-  const full = item.participantsCount >= item.maxParticipants;
-  return (
-    <View style={s.card}>
-      <View style={s.cardHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.className}>{item.name}</Text>
-          <Text style={s.classDate}>{formatDate(item.startTime)}</Text>
-        </View>
-        <View style={s.timeBadge}>
-          <Text style={s.timeText}>{formatTime(item.startTime)}</Text>
-          <Text style={s.timeSep}>–</Text>
-          <Text style={s.timeText}>{formatTime(item.endTime)}</Text>
-        </View>
-      </View>
-      {item.instructorName && (
-        <Text style={s.instructor}>👤 {item.instructorName}</Text>
-      )}
-      <SpotsBar current={item.participantsCount} max={item.maxParticipants} />
-      <Pressable
-        style={[s.bookBtn, full && s.bookBtnWaitlist, isBooking && s.bookBtnDisabled]}
-        onPress={() => onBook(item.id, full)}
-        disabled={isBooking}
-      >
-        {isBooking
-          ? <ActivityIndicator color={colors.bg} size="small" />
-          : <Text style={s.bookBtnText}>{full ? 'Join Waitlist' : 'Book'}</Text>
-        }
-      </Pressable>
-    </View>
   );
 }
 
@@ -154,173 +105,121 @@ export default function ClassesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [bookingId, setBookingId] = useState<number | null>(null);
-  const [successResult, setSuccessResult] = useState<BookResult | null>(null);
+  const [result, setResult] = useState<BookResult | null>(null);
   const [errorToast, setErrorToast] = useState('');
-
-  const today = new Date().toISOString().slice(0, 10);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
+      const today = new Date().toISOString().slice(0, 10);
       const { data } = await apiClient.get<GymClass[]>('/booking/classes', { params: { date: today } });
       setClasses(data);
-    } catch {
-      setError('Failed to load classes');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [today]);
+    } catch { setError('無法載入堂表'); }
+    finally { setLoading(false); setRefreshing(false); }
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   async function handleBook(classId: number, acceptWaitlist: boolean) {
-    if (acceptWaitlist) {
-      const confirmed = await new Promise<boolean>(resolve =>
-        Alert.alert(
-          '加入候補？',
-          '有位空出時會用 WhatsApp 通知你，你有 5 分鐘確認。',
-          [
-            { text: '取消', style: 'cancel', onPress: () => resolve(false) },
-            { text: '加入候補', onPress: () => resolve(true) },
-          ],
-        )
-      );
-      if (!confirmed) return;
-    }
-
-    setBookingId(classId);
-    setErrorToast('');
+    setBookingId(classId); setErrorToast('');
     try {
-      const { data } = await apiClient.post<BookResult>(
-        '/bookings',
-        { classId, acceptWaitlist },
-        { headers: { 'idempotency-key': generateUUID() } },
-      );
-      setSuccessResult(data);
-      load();
+      const { data } = await apiClient.post<BookResult>('/bookings', { classId, acceptWaitlist }, { headers: { 'idempotency-key': generateUUID() } });
+      setResult(data); load();
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Booking failed';
-      setErrorToast(msg);
+      setErrorToast(err?.response?.data?.message ?? '預約失敗，請再試');
       setTimeout(() => setErrorToast(''), 4000);
-    } finally {
-      setBookingId(null);
-    }
+    } finally { setBookingId(null); }
   }
 
-  if (loading) {
-    return (
-      <SafeAreaView style={s.safe}>
-        <View style={s.center}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (loading) return (
+    <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View></SafeAreaView>
+  );
 
   return (
     <SafeAreaView style={s.safe}>
+      {/* Header */}
       <View style={s.header}>
-        <Text style={s.title}>Classes</Text>
-        <Text style={s.subtitle}>
-          {new Date().toLocaleDateString('en-HK', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </Text>
+        <View>
+          <Text style={s.headerSub}>TODAY</Text>
+          <Text style={s.title}>堂表</Text>
+        </View>
+        <Text style={s.dateText}>{new Date().toLocaleDateString('zh-HK', { month: 'long', day: 'numeric', weekday: 'long' })}</Text>
       </View>
 
-      {errorToast ? (
-        <View style={s.errorBar}><Text style={s.errorText}>{errorToast}</Text></View>
-      ) : null}
-      {error ? (
-        <View style={s.errorBar}><Text style={s.errorText}>{error}</Text></View>
-      ) : null}
+      {errorToast ? <View style={s.toast}><Text style={s.toastText}>{errorToast}</Text></View> : null}
+      {error ? <View style={s.errorBar}><Text style={s.errorText}>{error}</Text></View> : null}
 
       <FlatList
         data={classes}
         keyExtractor={item => String(item.id)}
         renderItem={({ item }) => (
-          <ClassCard
-            item={item}
-            onBook={handleBook}
-            isBooking={bookingId === item.id}
-          />
+          <ClassCard item={item} onBook={handleBook} isBooking={bookingId === item.id} />
         )}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
-        }
-        contentContainerStyle={{ padding: 16, gap: 12 }}
-        ListEmptyComponent={<Text style={s.empty}>No classes today</Text>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
+        contentContainerStyle={{ padding: 16, gap: 10 }}
+        ListEmptyComponent={<Text style={s.empty}>今日未有堂</Text>}
+        showsVerticalScrollIndicator={false}
       />
-
-      <SuccessModal result={successResult} onClose={() => setSuccessResult(null)} />
+      <SuccessModal result={result} onClose={() => setResult(null)} />
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: colors.bg },
-  center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:      { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  title:       { fontSize: 28, fontWeight: '800', color: colors.text },
-  subtitle:    { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  safe:   { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  header:    { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  headerSub: { fontSize: 11, color: colors.primary, fontWeight: '700', letterSpacing: 2 },
+  title:     { fontSize: 32, fontWeight: '900', color: colors.text },
+  dateText:  { fontSize: 12, color: colors.textMuted, textAlign: 'right', lineHeight: 18 },
+
   card: {
-    backgroundColor: colors.card, borderRadius: 16,
-    padding: 16, borderWidth: 1, borderColor: colors.border, gap: 8,
+    backgroundColor: colors.card, borderRadius: 18,
+    flexDirection: 'row', overflow: 'hidden',
+    borderWidth: 1, borderColor: colors.border,
   },
-  cardHeader:  { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  className:   { fontSize: 16, fontWeight: '700', color: colors.text },
-  classDate:   { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   timeBadge: {
-    backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 10,
-    paddingVertical: 6, alignItems: 'center',
+    width: 68, backgroundColor: colors.primary + '15',
+    alignItems: 'center', justifyContent: 'center',
+    borderRightWidth: 1, borderRightColor: colors.primary + '30',
+    paddingVertical: 18, gap: 2,
   },
-  timeText:    { fontSize: 13, fontWeight: '700', color: colors.primary },
-  timeSep:     { fontSize: 10, color: colors.textMuted },
-  instructor:  { fontSize: 13, color: colors.textMuted },
-  spotsRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  barBg: { flex: 1, height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
-  barFill:     { height: '100%', borderRadius: 2, backgroundColor: colors.cta },
-  spotsText:   { fontSize: 12, color: colors.textMuted, width: 60, textAlign: 'right' },
+  timeText:   { fontSize: 14, fontWeight: '900', color: colors.primary },
+  timeDash:   { fontSize: 10, color: colors.primary + '60' },
+  timeEnd:    { fontSize: 11, fontWeight: '600', color: colors.primary + '90' },
+
+  cardBody:   { flex: 1, padding: 14, gap: 6 },
+  className:  { fontSize: 17, fontWeight: '800', color: colors.text },
+  classDate:  { fontSize: 12, color: colors.textMuted },
+  instructor: { fontSize: 12, color: colors.textMuted },
+
+  capacityRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  progressBg:  { flex: 1, height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2 },
+  spots:       { fontSize: 11, color: colors.textMuted, width: 50, textAlign: 'right', fontWeight: '600' },
+
   bookBtn: {
     backgroundColor: colors.cta, borderRadius: 10,
-    paddingVertical: 10, alignItems: 'center', marginTop: 4, minHeight: 40,
+    paddingVertical: 10, alignItems: 'center', marginTop: 4,
   },
   bookBtnWaitlist:  { backgroundColor: colors.border },
   bookBtnDisabled:  { opacity: 0.6 },
-  bookBtnText:      { fontSize: 14, fontWeight: '700', color: colors.bg },
-  errorBar: {
-    margin: 16, backgroundColor: colors.error + '22', borderRadius: 10,
-    padding: 12, alignItems: 'center',
-  },
-  errorText:   { color: colors.error, fontSize: 13 },
-  empty:       { textAlign: 'center', color: colors.textMuted, marginTop: 60, fontSize: 15 },
+  bookBtnText:      { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 },
 
-  // Modal
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center', justifyContent: 'center', padding: 24,
-  },
-  modalCard: {
-    backgroundColor: colors.card, borderRadius: 20, padding: 28,
-    width: '100%', alignItems: 'center', gap: 8,
-  },
-  modalIcon:            { fontSize: 52 },
-  modalTitle:           { fontSize: 22, fontWeight: '800', color: colors.text, textAlign: 'center' },
-  modalSub:             { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
-  modalTip: {
-    fontSize: 13, color: colors.textMuted, textAlign: 'center',
-    borderTopWidth: 1, borderTopColor: colors.border,
-    paddingTop: 12, marginTop: 4,
-  },
-  modalActions:         { width: '100%', gap: 8, marginTop: 8 },
-  modalBtnPrimary: {
-    backgroundColor: colors.primary, borderRadius: 12,
-    paddingVertical: 14, alignItems: 'center',
-  },
-  modalBtnPrimaryText:  { color: colors.bg, fontWeight: '700', fontSize: 15 },
-  modalBtnSecondary: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: 12,
-    paddingVertical: 12, alignItems: 'center',
-  },
-  modalBtnSecondaryText: { color: colors.textMuted, fontSize: 14 },
+  toast:    { margin: 16, backgroundColor: colors.primary + '22', borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '44' },
+  toastText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  errorBar: { margin: 16, backgroundColor: colors.primary + '18', borderRadius: 10, padding: 12, alignItems: 'center' },
+  errorText: { color: colors.primary, fontSize: 13 },
+  empty:    { textAlign: 'center', color: colors.textMuted, marginTop: 60, fontSize: 15 },
+
+  modalBg:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 32, width: '100%', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  modalIcon:  { fontSize: 52 },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
+  modalSub:   { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
+  modalActions: { width: '100%', marginTop: 8 },
+  modalBtn:  { backgroundColor: colors.cta, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });
