@@ -1,5 +1,7 @@
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
+import { Text } from 'react-native';
+import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
 import { AuthProvider, useAuth } from '../src/auth/context';
 import { registerPushToken } from '../src/notifications/push';
 
@@ -15,7 +17,6 @@ function RouteGuard() {
     if (user && inAuth) router.replace('/(tabs)/');
   }, [user, loading, segments]);
 
-  // Register push token after login
   useEffect(() => {
     if (user) void registerPushToken();
   }, [user]);
@@ -24,5 +25,14 @@ function RouteGuard() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_900Black,
+  });
+
+  if (!fontsLoaded) return null;
+
   return <AuthProvider><RouteGuard /></AuthProvider>;
 }

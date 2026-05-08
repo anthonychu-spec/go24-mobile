@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Dimensions, FlatList, Image, Linking,
-  Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
+  Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, View,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/context';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 
 const { width: W } = Dimensions.get('window');
 
@@ -24,29 +26,78 @@ interface DashboardData {
 }
 
 function countdown(min: number) {
-  if (min <= 0) return '進行中';
-  if (min < 60) return `${min}分鐘後`;
+  if (min <= 0) return 'In progress';
+  if (min < 60) return `${min}m`;
   const h = Math.floor(min / 60); const m = min % 60;
-  if (h < 24) return `${h}小時${m > 0 ? `${m}分` : ''}後`;
-  return `${Math.floor(h / 24)}日後`;
+  if (h < 24) return `${h}h${m > 0 ? `${m}m` : ''}`;
+  return `${Math.floor(h / 24)}d`;
 }
 
-function GradientCard({ children, style }: { children: React.ReactNode; style?: any }) {
-  if (Platform.OS === 'web') {
+function NextClassHero({ next, onBook }: {
+  next: DashboardData['nextClass'] | null;
+  onBook: () => void;
+}) {
+  if (!next) {
     return (
-      <View style={[{ backgroundColor: colors.primary, borderRadius: 20 }, style]}>
-        {children}
+      <View style={s.emptyHero}>
+        <View style={s.emptyHeroIcon}>
+          <Ionicons name="calendar" size={28} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.emptyHeroTitle}>No upcoming classes</Text>
+          <Text style={s.emptyHeroSub}>Ready to book your first class?</Text>
+        </View>
+        <Pressable style={s.emptyHeroBtn} onPress={onBook}>
+          <Text style={s.emptyHeroBtnText}>Book</Text>
+        </Pressable>
       </View>
     );
   }
+
+  const time = new Date(next.startTime).toLocaleTimeString('en-HK', {
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const date = new Date(next.startTime).toLocaleDateString('en-HK', {
+    weekday: 'short', month: 'short', day: 'numeric',
+  });
+
+  const content = (
+    <View style={s.heroInner}>
+      <Text style={s.heroEyebrow}>NEXT CLASS</Text>
+      <Text style={s.heroClassName}>Class #{next.classId}</Text>
+      <View style={s.heroMeta}>
+        <View style={s.heroMetaItem}>
+          <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.7)" />
+          <Text style={s.heroMetaText}>{time}</Text>
+        </View>
+        <Text style={s.heroMetaDot}>·</Text>
+        <View style={s.heroMetaItem}>
+          <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.7)" />
+          <Text style={s.heroMetaText}>{date}</Text>
+        </View>
+      </View>
+      {next.clubName && (
+        <View style={s.heroMetaItem}>
+          <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.7)" />
+          <Text style={s.heroMetaText}>{next.clubName}</Text>
+        </View>
+      )}
+      <View style={s.heroBadge}>
+        <Text style={s.heroBadgeText}>in {countdown(next.minutesUntil)}</Text>
+      </View>
+    </View>
+  );
+
+  if (Platform.OS === 'web') {
+    return <View style={[s.heroCard, { backgroundColor: colors.primary }]}>{content}</View>;
+  }
   return (
     <LinearGradient
-      colors={['#B5001E', '#7A0012']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[{ borderRadius: 20 }, style]}
+      colors={['#C8001A', '#820012']}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      style={s.heroCard}
     >
-      {children}
+      {content}
     </LinearGradient>
   );
 }
@@ -57,11 +108,10 @@ export default function HomeScreen() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [bannerIdx, setBannerIdx] = useState(0);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true); else setLoading(true);
+    if (isRefresh) setRefreshing(true);
     try {
       const [d, b] = await Promise.allSettled([
         apiClient.get<DashboardData>('/me/dashboard'),
@@ -69,124 +119,127 @@ export default function HomeScreen() {
       ]);
       if (d.status === 'fulfilled') setData(d.value.data);
       if (b.status === 'fulfilled') setBanners(b.value.data);
-    } finally { setLoading(false); setRefreshing(false); }
+    } finally { setRefreshing(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const hour = new Date().getHours();
-  const greet = hour < 12 ? '早晨' : hour < 18 ? '下午好' : '夜晚好';
-  const name = data?.user?.name ?? data?.user?.email?.split('@')[0] ?? '';
+  const name = data?.user?.name?.split(' ')[0] ?? '';
   const m = data?.membership;
   const pt = data?.pt;
-  const next = data?.nextClass;
+  const unread = data?.unreadNotifications ?? 0;
+
+  const ACTIONS: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; to: string; }[] = [
+    { icon: 'calendar',        label: 'Book a class',   to: '/(tabs)/classes' },
+    { icon: 'bookmark',        label: 'My Bookings',    to: '/(tabs)/bookings' },
+    { icon: 'barbell',         label: 'PT Sessions',    to: '/(tabs)/pt' },
+    { icon: 'pulse',           label: 'Activity',       to: '/(tabs)/activity' },
+    { icon: 'card',            label: 'Update Card',    to: '/payment/update-card' },
+    { icon: 'gift',            label: 'Refer a Friend', to: '/referral' },
+  ];
 
   return (
     <SafeAreaView style={s.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
+
+      {/* Header */}
+      <View style={s.header}>
+        <View>
+          <Text style={s.greeting}>{name ? `Hello, ${name}` : 'Hello'}</Text>
+          <Text style={s.brand}>GO24 <Text style={s.brandSub}>FITNESS</Text></Text>
+        </View>
+        <Pressable style={s.bellWrap} onPress={() => router.push('/(tabs)/notifications')} hitSlop={8}>
+          <Ionicons name="notifications-outline" size={22} color={colors.text} />
+          {unread > 0 && (
+            <View style={s.badge}>
+              <Text style={s.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+            </View>
+          )}
+        </Pressable>
+      </View>
+
       <ScrollView
         contentContainerStyle={s.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header ── */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.greet}>{greet}{name ? `，${name}` : ''}</Text>
-            <Text style={s.brand}>GO24</Text>
-          </View>
-          <Pressable style={s.bell} onPress={() => router.push('/(tabs)/notifications')}>
-            <Text style={s.bellIcon}>🔔</Text>
-            {(data?.unreadNotifications ?? 0) > 0 && (
-              <View style={s.badge}>
-                <Text style={s.badgeText}>{data!.unreadNotifications}</Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
-
-        {/* ── Membership expiry alert ── */}
+        {/* Expiry alert */}
         {m && m.daysRemaining != null && m.daysRemaining <= 30 && (
           <Pressable style={s.alert} onPress={() => router.push('/payment/update-card')}>
-            <Text style={s.alertIcon}>{m.daysRemaining <= 0 ? '🚨' : '⚠️'}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={s.alertTitle}>{m.daysRemaining <= 0 ? '會籍已到期' : `會籍剩 ${m.daysRemaining} 日`}</Text>
-              <Text style={s.alertSub}>點擊更新信用卡</Text>
-            </View>
-            <Text style={{ color: colors.textMuted, fontSize: 20 }}>›</Text>
+            <Ionicons name={m.daysRemaining <= 0 ? 'alert-circle' : 'warning'} size={18} color={colors.primary} />
+            <Text style={s.alertText}>
+              {m.daysRemaining <= 0
+                ? 'Membership expired — tap to renew'
+                : `Membership expires in ${m.daysRemaining} days`}
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.primary} />
           </Pressable>
         )}
 
-        {/* ── Next class hero card ── */}
-        <GradientCard style={s.heroCard}>
-          <Text style={s.heroLabel}>下一堂</Text>
-          {next ? (
-            <>
-              <Text style={s.heroClass}>Class #{next.classId}</Text>
-              <View style={s.heroBottom}>
-                <Text style={s.heroTime}>
-                  {new Date(next.startTime).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                  {next.clubName ? ` · ${next.clubName}` : ''}
-                </Text>
-                <View style={s.heroBadge}>
-                  <Text style={s.heroBadgeText}>⏱ {countdown(next.minutesUntil)}</Text>
-                </View>
-              </View>
-            </>
-          ) : (
-            <Pressable onPress={() => router.push('/(tabs)/classes')}>
-              <Text style={s.heroEmpty}>未有預約 — 立即 Book 堂</Text>
-              <Text style={s.heroEmptyArrow}>→</Text>
-            </Pressable>
-          )}
-        </GradientCard>
+        {/* Membership status card */}
+        <View style={s.memberCard}>
+          <View style={s.memberLeft}>
+            <View style={s.memberIconBox}>
+              <Ionicons name="location" size={16} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={s.memberClub}>{m?.planName?.toUpperCase() ?? 'ONYX BY GO24'}</Text>
+              <Text style={s.memberStatus}>
+                {m?.active ? '● Active' : '● Inactive'}
+                {m?.daysRemaining != null ? `  ·  ${m.daysRemaining} days left` : ''}
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.border} />
+        </View>
 
-        {/* ── Stats ── */}
+        {/* Next class hero */}
+        <NextClassHero next={data?.nextClass ?? null} onBook={() => router.push('/(tabs)/classes')} />
+
+        {/* Stats */}
         <View style={s.statsRow}>
           <View style={s.statCard}>
-            <Text style={[s.statNum, { color: (m?.daysRemaining ?? 99) < 30 ? colors.cta : '#fff' }]}>
+            <Text style={[s.statNum, { color: (m?.daysRemaining ?? 99) < 30 ? colors.cta : colors.primary }]}>
               {m?.daysRemaining ?? '—'}
             </Text>
-            <Text style={s.statLabel}>會籍剩餘日</Text>
+            <Text style={s.statLabel}>Days Left</Text>
           </View>
-          <View style={[s.statCard, { borderColor: colors.primary + '60' }]}>
+          <View style={[s.statCard, s.statCardMid]}>
             <Text style={s.statNum}>{pt?.remainingSessions ?? 0}</Text>
-            <Text style={s.statLabel}>PT 餘堂</Text>
+            <Text style={s.statLabel}>PT Sessions</Text>
           </View>
-          <View style={[s.statCard, { borderColor: colors.primary + '60' }]}>
+          <View style={s.statCard}>
             <Text style={[s.statNum, { color: colors.cta }]}>{data?.thisMonth.visits ?? 0}</Text>
-            <Text style={s.statLabel}>本月入場 🔥</Text>
+            <Text style={s.statLabel}>This Month</Text>
           </View>
         </View>
 
-        {/* ── Quick actions ── */}
-        <Text style={s.sectionTitle}>快速操作</Text>
-        <View style={s.actionsGrid}>
-          {[
-            { icon: '📅', label: 'Book 堂',    to: '/(tabs)/classes',    accent: colors.cta },
-            { icon: '💪', label: 'PT Sessions', to: '/(tabs)/pt',         accent: colors.primary },
-            { icon: '📋', label: '我的預約',    to: '/(tabs)/bookings',   accent: colors.primary },
-            { icon: '📊', label: '活動記錄',    to: '/(tabs)/activity',   accent: colors.primary },
-            { icon: '💳', label: '更新信用卡',  to: '/payment/update-card', accent: colors.textMuted },
-            { icon: '🎁', label: '介紹朋友',    to: '/referral',          accent: colors.cta },
-          ].map(a => (
-            <Pressable key={a.label} style={s.actionCard} onPress={() => router.push(a.to as any)}>
-              <View style={[s.actionIconWrap, { backgroundColor: a.accent + '20', borderColor: a.accent + '40' }]}>
-                <Text style={s.actionIcon}>{a.icon}</Text>
+        {/* Quick actions list */}
+        <View style={s.actionsCard}>
+          {ACTIONS.map((a, i) => (
+            <Pressable
+              key={a.label}
+              style={[s.actionRow, i < ACTIONS.length - 1 && s.actionRowDivider]}
+              onPress={() => router.push(a.to as any)}
+            >
+              <View style={s.actionIconCircle}>
+                <Ionicons name={a.icon} size={18} color={colors.primary} />
               </View>
               <Text style={s.actionLabel}>{a.label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.border} />
             </Pressable>
           ))}
         </View>
 
-        {/* ── Banners ── */}
+        {/* Banners */}
         {banners.length > 0 && (
           <>
-            <Text style={s.sectionTitle}>推廣優惠</Text>
+            <Text style={s.sectionLabel}>Promotions</Text>
             <FlatList
               data={banners}
               horizontal pagingEnabled showsHorizontalScrollIndicator={false}
               keyExtractor={b => b.id}
-              onMomentumScrollEnd={e => setBannerIdx(Math.round(e.nativeEvent.contentOffset.x / (W - 40)))}
+              onMomentumScrollEnd={e => setBannerIdx(Math.round(e.nativeEvent.contentOffset.x / (W - 32)))}
               renderItem={({ item }) => (
                 <Pressable style={s.banner} onPress={() => item.linkUrl && Linking.openURL(item.linkUrl)}>
                   <Image source={{ uri: item.imageUrl }} style={s.bannerImg} resizeMode="cover" />
@@ -206,80 +259,142 @@ export default function HomeScreen() {
           </>
         )}
 
-        {/* ── Logout ── */}
-        <Pressable style={s.logout} onPress={logout}>
-          <Text style={s.logoutText}>登出</Text>
+        {/* Logout */}
+        <Pressable style={s.logoutRow} onPress={logout}>
+          <Ionicons name="log-out-outline" size={18} color={colors.textMuted} />
+          <Text style={s.logoutText}>Log Out</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: 20, gap: 18, paddingBottom: 48 },
+const CARD_SHADOW = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.07,
+  shadowRadius: 8,
+  elevation: 3,
+} as const;
 
-  header:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  greet:    { fontSize: 13, color: colors.textMuted, letterSpacing: 0.5 },
-  brand:    { fontSize: 38, fontWeight: '900', color: colors.primary, letterSpacing: 5, marginTop: 2 },
-  bell:     { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  bellIcon: { fontSize: 20 },
-  badge: {
-    position: 'absolute', top: 4, right: 4,
-    minWidth: 18, height: 18, borderRadius: 9,
-    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.bg },
+
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+    backgroundColor: colors.card,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  greeting: { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
+  brand:    { fontSize: 22, fontFamily: fonts.black, color: colors.primary, letterSpacing: 1 },
+  brandSub: { fontSize: 14, fontFamily: fonts.bold,  color: colors.textMuted, letterSpacing: 2 },
+  bellWrap: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  badge: {
+    position: 'absolute', top: 3, right: 3,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: colors.cta, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  badgeText: { color: '#fff', fontSize: 9, fontFamily: fonts.black },
+
+  scroll: { paddingTop: 12, paddingBottom: 40, gap: 12 },
 
   alert: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.primary + '18',
-    borderWidth: 1, borderColor: colors.primary + '50',
-    borderRadius: 14, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, backgroundColor: '#FFF5F5',
+    borderLeftWidth: 3, borderLeftColor: colors.primary,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
   },
-  alertIcon:  { fontSize: 22 },
-  alertTitle: { fontSize: 14, fontWeight: '800', color: '#fff' },
-  alertSub:   { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  alertText: { flex: 1, fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
 
-  heroCard:   { padding: 22, gap: 6, minHeight: 130 },
-  heroLabel:  { fontSize: 11, color: 'rgba(255,255,255,0.65)', letterSpacing: 2, fontWeight: '700', textTransform: 'uppercase' },
-  heroClass:  { fontSize: 28, fontWeight: '900', color: '#fff', marginTop: 4 },
-  heroBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  heroTime:   { fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
-  heroBadge:  { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  heroBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  heroEmpty:  { fontSize: 18, fontWeight: '700', color: 'rgba(255,255,255,0.9)', marginTop: 8 },
-  heroEmptyArrow: { fontSize: 24, color: 'rgba(255,255,255,0.6)', marginTop: 8 },
-
-  statsRow:   { flexDirection: 'row', gap: 10 },
-  statCard: {
-    flex: 1, backgroundColor: colors.card, borderRadius: 16,
-    paddingVertical: 16, paddingHorizontal: 10, alignItems: 'center', gap: 4,
-    borderWidth: 1, borderColor: colors.border,
+  memberCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, backgroundColor: colors.card,
+    borderRadius: 14, padding: 16, ...CARD_SHADOW,
   },
-  statNum:    { fontSize: 28, fontWeight: '900', color: '#fff' },
-  statLabel:  { fontSize: 10, color: colors.textMuted, textAlign: 'center', fontWeight: '600', letterSpacing: 0.3 },
-
-  sectionTitle: { fontSize: 12, color: colors.textMuted, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' },
-
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  actionCard: {
-    width: (W - 50) / 3, backgroundColor: colors.card,
-    borderRadius: 16, padding: 14, alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: colors.border,
+  memberLeft:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  memberIconBox: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: colors.primary + '12',
+    alignItems: 'center', justifyContent: 'center',
   },
-  actionIconWrap: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  actionIcon:  { fontSize: 22 },
-  actionLabel: { fontSize: 11, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  memberClub:   { fontSize: 13, fontFamily: fonts.bold, color: colors.primary, letterSpacing: 0.3 },
+  memberStatus: { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 2 },
 
-  banner:      { width: W - 40, height: 150, borderRadius: 16, overflow: 'hidden' },
-  bannerImg:   { width: '100%', height: '100%' },
-  bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end', padding: 14 },
-  bannerTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  dots:        { flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  dot:         { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.border },
-  dotActive:   { backgroundColor: colors.primary, width: 16 },
+  emptyHero: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    marginHorizontal: 16, backgroundColor: colors.card,
+    borderRadius: 14, padding: 18, ...CARD_SHADOW,
+  },
+  emptyHeroIcon: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: colors.primary + '10',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyHeroTitle: { fontSize: 15, fontFamily: fonts.bold,    color: colors.text },
+  emptyHeroSub:   { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 2 },
+  emptyHeroBtn: {
+    borderWidth: 1.5, borderColor: colors.cta, borderRadius: 8,
+    paddingHorizontal: 16, paddingVertical: 7,
+  },
+  emptyHeroBtnText: { fontSize: 13, fontFamily: fonts.bold, color: colors.cta },
 
-  logout:     { alignItems: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
-  logoutText: { color: colors.textMuted, fontSize: 13 },
+  heroCard:   { marginHorizontal: 16, borderRadius: 18, overflow: 'hidden', ...CARD_SHADOW },
+  heroInner:  { padding: 22, gap: 4 },
+  heroEyebrow:{ fontSize: 10, fontFamily: fonts.bold, color: 'rgba(255,255,255,0.5)', letterSpacing: 2 },
+  heroClassName:{ fontSize: 26, fontFamily: fonts.black, color: '#fff', marginTop: 2 },
+  heroMeta:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  heroMetaItem:{ flexDirection: 'row', alignItems: 'center', gap: 4 },
+  heroMetaText:{ fontSize: 12, fontFamily: fonts.regular, color: 'rgba(255,255,255,0.8)' },
+  heroMetaDot: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
+  heroBadge: {
+    alignSelf: 'flex-start', marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+  },
+  heroBadgeText: { fontSize: 12, fontFamily: fonts.bold, color: '#fff' },
+
+  statsRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10 },
+  statCard:  {
+    flex: 1, backgroundColor: colors.card, borderRadius: 14,
+    paddingVertical: 16, alignItems: 'center', gap: 4, ...CARD_SHADOW,
+  },
+  statCardMid: {
+    borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.border, borderRightColor: colors.border,
+  },
+  statNum:   { fontSize: 30, fontFamily: fonts.black, color: colors.primary },
+  statLabel: { fontSize: 10, fontFamily: fonts.semibold, color: colors.textMuted, letterSpacing: 0.3 },
+
+  actionsCard: {
+    marginHorizontal: 16, backgroundColor: colors.card,
+    borderRadius: 14, overflow: 'hidden', ...CARD_SHADOW,
+  },
+  actionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 16, paddingVertical: 15,
+  },
+  actionRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  actionIconCircle: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: colors.primary + '10',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  actionLabel: { flex: 1, fontSize: 15, fontFamily: fonts.regular, color: colors.text },
+
+  sectionLabel: { fontSize: 13, fontFamily: fonts.semibold, color: colors.text, paddingHorizontal: 20 },
+
+  banner:        { width: W - 32, height: 160, borderRadius: 16, overflow: 'hidden', marginHorizontal: 16 },
+  bannerImg:     { width: '100%', height: '100%' },
+  bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end', padding: 14 },
+  bannerTitle:   { color: '#fff', fontFamily: fonts.bold, fontSize: 15 },
+  dots:          { flexDirection: 'row', justifyContent: 'center', gap: 5 },
+  dot:           { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.border },
+  dotActive:     { backgroundColor: colors.primary, width: 14 },
+
+  logoutRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 14,
+  },
+  logoutText: { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted },
 });

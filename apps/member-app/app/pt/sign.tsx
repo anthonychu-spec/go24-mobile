@@ -1,11 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Pressable,
+  ActivityIndicator, Alert, Platform, Pressable,
   StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import SignatureCanvas from 'react-native-signature-canvas';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
 
@@ -19,8 +18,16 @@ export default function PtSignScreen() {
 
   const sigRef = useRef<any>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [signed, setSigned] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [SignatureCanvas, setSignatureCanvas] = useState<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      import('react-native-signature-canvas')
+        .then(mod => setSignatureCanvas(() => mod.default))
+        .catch(() => {});
+    }
+  }, []);
 
   const handleSignature = async (sig: string) => {
     if (!sig || submitting) return;
@@ -34,10 +41,7 @@ export default function PtSignScreen() {
       });
       setSuccess(true);
     } catch (err: any) {
-      Alert.alert(
-        'Error',
-        err?.response?.data?.message ?? 'Failed to submit signature',
-      );
+      Alert.alert('Error', err?.response?.data?.message ?? 'Failed to submit signature');
     } finally {
       setSubmitting(false);
     }
@@ -54,6 +58,29 @@ export default function PtSignScreen() {
             <Text style={s.doneBtnText}>Done</Text>
           </Pressable>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaView style={s.safe}>
+        <View style={s.center}>
+          <Text style={s.icon}>✍️</Text>
+          <Text style={s.successTitle}>PT Sign-off</Text>
+          <Text style={s.successSub}>Please use the mobile app to sign and confirm your PT session.</Text>
+          <Pressable style={s.doneBtn} onPress={() => router.back()}>
+            <Text style={s.doneBtnText}>Back</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!SignatureCanvas) {
+    return (
+      <SafeAreaView style={s.safe}>
+        <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
       </SafeAreaView>
     );
   }
@@ -76,29 +103,9 @@ export default function PtSignScreen() {
         <SignatureCanvas
           ref={sigRef}
           onOK={handleSignature}
-          onBegin={() => setSigned(true)}
           descriptionText=""
           clearText="清除"
           confirmText="確認簽名"
-          webStyle={`
-            .m-signature-pad { box-shadow: none; border: none; }
-            .m-signature-pad--body { border: none; }
-            .m-signature-pad--footer { background: #1A1A1A; padding: 12px; }
-            .m-signature-pad--footer .button {
-              background: ${colors.primary};
-              color: #0A0A0A;
-              font-weight: 700;
-              border-radius: 8px;
-              padding: 10px 20px;
-              font-size: 15px;
-            }
-            .m-signature-pad--footer .button.clear {
-              background: #2A2A2A;
-              color: #888;
-            }
-            body { background: #1A1A1A; }
-            canvas { background: #2A2A2A; border-radius: 12px; }
-          `}
           backgroundColor="#2A2A2A"
           penColor={colors.primary}
           minWidth={2}
@@ -127,9 +134,10 @@ const s = StyleSheet.create({
   instructions: { paddingHorizontal: 20, paddingBottom: 12 },
   instructText: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
   canvasWrapper: { flex: 1, marginHorizontal: 16, marginBottom: 16 },
+  icon:         { fontSize: 52 },
   successIcon:  { fontSize: 64 },
   successTitle: { fontSize: 22, fontWeight: '800', color: colors.text },
-  successSub:   { fontSize: 14, color: colors.textMuted },
+  successSub:   { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
   doneBtn: {
     backgroundColor: colors.primary, borderRadius: 12,
     paddingHorizontal: 40, paddingVertical: 14, marginTop: 8,

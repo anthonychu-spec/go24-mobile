@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator, FlatList, Modal, Pressable,
-  RefreshControl, StyleSheet, Text, View,
+  RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 
 interface GymClass {
   id: number; name: string; startTime: string; endTime: string;
@@ -15,6 +17,8 @@ interface GymClass {
 }
 interface BookResult { success: boolean; bookingId: string; status: string; waitlistPosition?: number; }
 
+const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = (Math.random() * 16) | 0;
@@ -22,56 +26,78 @@ function generateUUID() {
   });
 }
 
-function fmt(iso: string, type: 'time' | 'date') {
-  try {
-    return type === 'time'
-      ? new Date(iso).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false })
-      : new Date(iso).toLocaleDateString('zh-HK', { weekday: 'short', month: 'short', day: 'numeric' });
-  } catch { return iso; }
+function fmtTime(iso: string) {
+  try { return new Date(iso).toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', hour12: false }); }
+  catch { return iso; }
 }
 
-function ClassCard({ item, onBook, isBooking }: { item: GymClass; onBook: (id: number, waitlist: boolean) => void; isBooking: boolean }) {
+function durationMin(start: string, end: string) {
+  return Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+}
+
+function buildDays(count = 7) {
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() + i); return d;
+  });
+}
+
+function InstructorAvatar({ name }: { name: string }) {
+  const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  return (
+    <View style={s.avatar}>
+      <Text style={s.avatarText}>{initials}</Text>
+    </View>
+  );
+}
+
+function ClassRow({ item, onBook, isBooking }: { item: GymClass; onBook: (id: number, waitlist: boolean) => void; isBooking: boolean }) {
   const full = item.participantsCount >= item.maxParticipants;
-  const pct = item.maxParticipants > 0 ? Math.min(item.participantsCount / item.maxParticipants, 1) : 0;
   const spotsLeft = item.maxParticipants - item.participantsCount;
+  const dur = durationMin(item.startTime, item.endTime);
 
   return (
-    <View style={s.card}>
-      {/* Time badge */}
-      <View style={s.timeBadge}>
-        <Text style={s.timeText}>{fmt(item.startTime, 'time')}</Text>
-        <Text style={s.timeDash}>—</Text>
-        <Text style={s.timeEnd}>{fmt(item.endTime, 'time')}</Text>
+    <View style={s.classRow}>
+      {/* Time */}
+      <View style={s.timeCol}>
+        <Text style={s.timeMain}>{fmtTime(item.startTime)}</Text>
+        <Text style={s.timeDur}>{dur}min</Text>
       </View>
 
-      {/* Class info */}
-      <View style={s.cardBody}>
-        <Text style={s.className}>{item.name}</Text>
-        <Text style={s.classDate}>{fmt(item.startTime, 'date')}</Text>
-        {item.instructorName && <Text style={s.instructor}>👤 {item.instructorName}</Text>}
-
-        {/* Capacity */}
-        <View style={s.capacityRow}>
-          <View style={s.progressBg}>
-            <View style={[s.progressFill, { width: `${pct * 100}%` as any, backgroundColor: full ? colors.primary : colors.cta }]} />
+      {/* Info */}
+      <View style={s.infoCol}>
+        <Text style={s.className} numberOfLines={1}>{item.name}</Text>
+        {item.instructorName && (
+          <View style={s.metaRow}>
+            <InstructorAvatar name={item.instructorName} />
+            <Text style={s.metaText}>{item.instructorName}</Text>
           </View>
-          <Text style={[s.spots, full && { color: colors.primary }]}>
-            {full ? '已滿' : `剩 ${spotsLeft} 位`}
-          </Text>
-        </View>
-
-        {/* Book button */}
-        <Pressable
-          style={[s.bookBtn, full && s.bookBtnWaitlist, isBooking && s.bookBtnDisabled]}
-          onPress={() => onBook(item.id, full)}
-          disabled={isBooking}
-        >
-          {isBooking
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={s.bookBtnText}>{full ? '加入候補' : '立即 Book'}</Text>
-          }
-        </Pressable>
+        )}
+        {item.clubName && (
+          <View style={s.metaRow}>
+            <Ionicons name="location" size={12} color={colors.primary} />
+            <Text style={s.metaText}>{item.clubName}</Text>
+          </View>
+        )}
+        {!full && spotsLeft <= 5 && (
+          <View style={s.metaRow}>
+            <Ionicons name="people-outline" size={12} color={colors.cta} />
+            <Text style={[s.metaText, { color: colors.cta }]}>{spotsLeft} spots left</Text>
+          </View>
+        )}
       </View>
+
+      {/* Book button */}
+      <Pressable
+        style={[s.bookBtn, full ? s.bookBtnFull : s.bookBtnAvail, isBooking && s.bookBtnLoading]}
+        onPress={() => onBook(item.id, full)}
+        disabled={isBooking}
+        hitSlop={8}
+      >
+        {isBooking
+          ? <ActivityIndicator color={full ? colors.textMuted : '#fff'} size="small" />
+          : <Ionicons name="add" size={20} color={full ? colors.textMuted : '#fff'} />
+        }
+      </Pressable>
     </View>
   );
 }
@@ -82,17 +108,16 @@ function SuccessModal({ result, onClose }: { result: BookResult | null; onClose:
   return (
     <Modal transparent animationType="slide" visible={!!result}>
       <View style={s.modalBg}>
-        <View style={s.modalCard}>
-          <Text style={s.modalIcon}>{isWaitlist ? '⏳' : '✅'}</Text>
-          <Text style={s.modalTitle}>{isWaitlist ? '已加入候補！' : '預約成功！'}</Text>
+        <View style={s.modalSheet}>
+          <View style={s.modalHandle} />
+          <Ionicons name={isWaitlist ? 'time' : 'checkmark-circle'} size={52} color={isWaitlist ? colors.textMuted : colors.success} />
+          <Text style={s.modalTitle}>{isWaitlist ? 'Added to Waitlist' : 'Booking Confirmed!'}</Text>
           <Text style={s.modalSub}>
-            {isWaitlist ? '有位空出時會通知你' : '我哋已為你保留位置'}
+            {isWaitlist ? "We'll notify you when a spot opens up" : 'Your spot has been reserved'}
           </Text>
-          <View style={s.modalActions}>
-            <Pressable style={s.modalBtn} onPress={onClose}>
-              <Text style={s.modalBtnText}>確認</Text>
-            </Pressable>
-          </View>
+          <Pressable style={s.modalBtn} onPress={onClose}>
+            <Text style={s.modalBtnText}>Done</Text>
+          </Pressable>
         </View>
       </View>
     </Modal>
@@ -100,126 +125,222 @@ function SuccessModal({ result, onClose }: { result: BookResult | null; onClose:
 }
 
 export default function ClassesScreen() {
+  const days = buildDays(7);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [search, setSearch] = useState('');
   const [classes, setClasses] = useState<GymClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [bookingId, setBookingId] = useState<number | null>(null);
   const [result, setResult] = useState<BookResult | null>(null);
-  const [errorToast, setErrorToast] = useState('');
+  const [toast, setToast] = useState('');
 
-  const load = useCallback(async (isRefresh = false) => {
+  const load = useCallback(async (isRefresh = false, idx = selectedIdx) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      const { data } = await apiClient.get<GymClass[]>('/booking/classes', { params: { date: today } });
+      const d = days[idx];
+      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const { data } = await apiClient.get<GymClass[]>('/booking/classes', { params: { date } });
       setClasses(data);
-    } catch { setError('無法載入堂表'); }
+    } catch { setError('Unable to load classes'); }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [selectedIdx]);
 
   useEffect(() => { load(); }, [load]);
 
+  function selectDay(idx: number) { setSelectedIdx(idx); load(false, idx); }
+
   async function handleBook(classId: number, acceptWaitlist: boolean) {
-    setBookingId(classId); setErrorToast('');
+    setBookingId(classId); setToast('');
     try {
-      const { data } = await apiClient.post<BookResult>('/bookings', { classId, acceptWaitlist }, { headers: { 'idempotency-key': generateUUID() } });
+      const { data } = await apiClient.post<BookResult>('/bookings', { classId, acceptWaitlist }, {
+        headers: { 'idempotency-key': generateUUID() },
+      });
       setResult(data); load();
     } catch (err: any) {
-      setErrorToast(err?.response?.data?.message ?? '預約失敗，請再試');
-      setTimeout(() => setErrorToast(''), 4000);
+      setToast(err?.response?.data?.message ?? 'Booking failed. Please try again.');
+      setTimeout(() => setToast(''), 4000);
     } finally { setBookingId(null); }
   }
 
-  if (loading) return (
-    <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View></SafeAreaView>
-  );
+  const filtered = search
+    ? classes.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+    : classes;
+
+  const selectedDay = days[selectedIdx];
+  const dateLabel = (selectedIdx === 0 ? 'Today ' : selectedIdx === 1 ? 'Tomorrow ' : '') +
+    selectedDay.toLocaleDateString('en-HK', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <SafeAreaView style={s.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
+
       {/* Header */}
       <View style={s.header}>
-        <View>
-          <Text style={s.headerSub}>TODAY</Text>
-          <Text style={s.title}>堂表</Text>
-        </View>
-        <Text style={s.dateText}>{new Date().toLocaleDateString('zh-HK', { month: 'long', day: 'numeric', weekday: 'long' })}</Text>
+        <Text style={s.title}>Book classes</Text>
+        <Pressable hitSlop={12}>
+          <Ionicons name="options-outline" size={22} color={colors.text} />
+        </Pressable>
       </View>
 
-      {errorToast ? <View style={s.toast}><Text style={s.toastText}>{errorToast}</Text></View> : null}
-      {error ? <View style={s.errorBar}><Text style={s.errorText}>{error}</Text></View> : null}
-
-      <FlatList
-        data={classes}
-        keyExtractor={item => String(item.id)}
-        renderItem={({ item }) => (
-          <ClassCard item={item} onBook={handleBook} isBooking={bookingId === item.id} />
+      {/* Search */}
+      <View style={s.searchWrap}>
+        <Ionicons name="search" size={16} color={colors.textMuted} />
+        <TextInput
+          style={s.searchInput}
+          placeholder="Search for classes"
+          placeholderTextColor={colors.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <Pressable onPress={() => setSearch('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+          </Pressable>
         )}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
-        contentContainerStyle={{ padding: 16, gap: 10 }}
-        ListEmptyComponent={<Text style={s.empty}>今日未有堂</Text>}
-        showsVerticalScrollIndicator={false}
-      />
+      </View>
+
+      {/* Day picker */}
+      <View style={s.dayPickerWrap}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dayPicker}>
+          {days.map((d, i) => (
+            <Pressable
+              key={i}
+              style={[s.dayCell, i === selectedIdx && s.dayCellActive]}
+              onPress={() => selectDay(i)}
+            >
+              <Text style={[s.dayLabel, i === selectedIdx && s.dayLabelActive]}>{DAYS[d.getDay()]}</Text>
+              <Text style={[s.dayNum,   i === selectedIdx && s.dayNumActive]}>{d.getDate()}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Toast */}
+      {toast ? (
+        <View style={s.toast}><Text style={s.toastText}>{toast}</Text></View>
+      ) : null}
+      {error ? (
+        <View style={s.toast}><Text style={s.toastText}>{error}</Text></View>
+      ) : null}
+
+      {loading ? (
+        <View style={s.center}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={item => String(item.id)}
+          renderItem={({ item }) => (
+            <ClassRow item={item} onBook={handleBook} isBooking={bookingId === item.id} />
+          )}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
+          ListHeaderComponent={
+            <View style={s.dateHeader}>
+              <Text style={s.dateHeaderText}>{dateLabel}</Text>
+            </View>
+          }
+          ItemSeparatorComponent={() => <View style={s.separator} />}
+          ListEmptyComponent={
+            <View style={s.empty}>
+              <Ionicons name="calendar-outline" size={40} color={colors.border} />
+              <Text style={s.emptyText}>No classes available</Text>
+            </View>
+          }
+          contentContainerStyle={{ paddingBottom: 20, backgroundColor: colors.card }}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
       <SuccessModal result={result} onClose={() => setResult(null)} />
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  safe:   { flex: 1, backgroundColor: colors.card },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
 
-  header:    { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  headerSub: { fontSize: 11, color: colors.primary, fontWeight: '700', letterSpacing: 2 },
-  title:     { fontSize: 32, fontWeight: '900', color: colors.text },
-  dateText:  { fontSize: 12, color: colors.textMuted, textAlign: 'right', lineHeight: 18 },
-
-  card: {
-    backgroundColor: colors.card, borderRadius: 18,
-    flexDirection: 'row', overflow: 'hidden',
-    borderWidth: 1, borderColor: colors.border,
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4,
+    backgroundColor: colors.card,
   },
-  timeBadge: {
-    width: 68, backgroundColor: colors.primary + '15',
-    alignItems: 'center', justifyContent: 'center',
-    borderRightWidth: 1, borderRightColor: colors.primary + '30',
-    paddingVertical: 18, gap: 2,
+  title: { fontSize: 30, fontFamily: fonts.black, color: colors.text },
+
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginVertical: 10,
+    backgroundColor: colors.bg, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 9,
   },
-  timeText:   { fontSize: 14, fontWeight: '900', color: colors.primary },
-  timeDash:   { fontSize: 10, color: colors.primary + '60' },
-  timeEnd:    { fontSize: 11, fontWeight: '600', color: colors.primary + '90' },
+  searchInput: { flex: 1, fontSize: 15, fontFamily: fonts.regular, color: colors.text, padding: 0 },
 
-  cardBody:   { flex: 1, padding: 14, gap: 6 },
-  className:  { fontSize: 17, fontWeight: '800', color: colors.text },
-  classDate:  { fontSize: 12, color: colors.textMuted },
-  instructor: { fontSize: 12, color: colors.textMuted },
+  dayPickerWrap: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  dayPicker:     { paddingHorizontal: 12, paddingBottom: 10, paddingTop: 6, gap: 2 },
+  dayCell: {
+    width: 46, height: 64, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center', gap: 3,
+  },
+  dayCellActive:  { backgroundColor: colors.primary },
+  dayLabel:       { fontSize: 11, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1 },
+  dayLabelActive: { color: 'rgba(255,255,255,0.8)' },
+  dayNum:         { fontSize: 22, fontFamily: fonts.black, color: '#C7C7CC' },
+  dayNumActive:   { color: '#fff' },
 
-  capacityRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  progressBg:  { flex: 1, height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 2 },
-  spots:       { fontSize: 11, color: colors.textMuted, width: 50, textAlign: 'right', fontWeight: '600' },
+  dateHeader:     { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.bg },
+  dateHeaderText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.text },
+
+  classRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: colors.card,
+  },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 },
+
+  timeCol:  { width: 58 },
+  timeMain: { fontSize: 16, fontFamily: fonts.black, color: colors.primary },
+  timeDur:  { fontSize: 11, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 2 },
+
+  infoCol: { flex: 1, gap: 5 },
+  className: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
+
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaText: { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
+
+  avatar: {
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: { fontSize: 8, fontFamily: fonts.bold, color: colors.textMuted },
 
   bookBtn: {
-    backgroundColor: colors.cta, borderRadius: 10,
-    paddingVertical: 10, alignItems: 'center', marginTop: 4,
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
   },
-  bookBtnWaitlist:  { backgroundColor: colors.border },
-  bookBtnDisabled:  { opacity: 0.6 },
-  bookBtnText:      { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 },
+  bookBtnAvail:   { backgroundColor: colors.cta },
+  bookBtnFull:    { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
+  bookBtnLoading: { opacity: 0.6 },
 
-  toast:    { margin: 16, backgroundColor: colors.primary + '22', borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.primary + '44' },
-  toastText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
-  errorBar: { margin: 16, backgroundColor: colors.primary + '18', borderRadius: 10, padding: 12, alignItems: 'center' },
-  errorText: { color: colors.primary, fontSize: 13 },
-  empty:    { textAlign: 'center', color: colors.textMuted, marginTop: 60, fontSize: 15 },
+  toast:    { marginHorizontal: 16, marginBottom: 4, backgroundColor: '#FFF0F0', borderRadius: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary },
+  toastText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
 
-  modalBg:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 32, width: '100%', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  modalIcon:  { fontSize: 52 },
-  modalTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-  modalSub:   { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
-  modalActions: { width: '100%', marginTop: 8 },
-  modalBtn:  { backgroundColor: colors.cta, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  empty:     { alignItems: 'center', paddingTop: 60, gap: 10 },
+  emptyText: { fontSize: 15, fontFamily: fonts.regular, color: colors.textMuted },
+
+  modalBg:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 28, alignItems: 'center', gap: 8, paddingBottom: 36,
+  },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 8 },
+  modalTitle:  { fontSize: 20, fontFamily: fonts.black, color: colors.text },
+  modalSub:    { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center' },
+  modalBtn:    { backgroundColor: colors.cta, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 48, marginTop: 10 },
+  modalBtnText:{ color: '#fff', fontFamily: fonts.bold, fontSize: 16 },
 });

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 
 interface Agreement {
   id: number;
@@ -30,7 +31,7 @@ interface PtSession {
 
 function formatDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString('zh-HK', {
+    return new Date(iso).toLocaleDateString('en-HK', {
       month: 'short', day: 'numeric', weekday: 'short',
     });
   } catch { return iso; }
@@ -48,20 +49,20 @@ function AgreementCard({ a }: { a: Agreement }) {
       <View style={s.agreementHeader}>
         <Text style={s.agreementTitle}>PT Agreement #{a.id}</Text>
         <Text style={[s.daysLeft, daysLeft < 30 && { color: colors.error }]}>
-          {daysLeft > 0 ? `剩 ${daysLeft} 日` : '已到期'}
+          {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
         </Text>
       </View>
 
       <View style={s.sessionsRow}>
         <Text style={s.remaining}>{a.remainingSessions}</Text>
-        <Text style={s.sessionLabel}>/ {a.totalSessions} 堂剩餘</Text>
+        <Text style={s.sessionLabel}>/ {a.totalSessions} sessions left</Text>
       </View>
 
       <View style={s.progressBg}>
         <View style={[s.progressFill, { width: `${pct}%` as any }]} />
       </View>
 
-      <Text style={s.expiry}>到期：{formatDate(a.endDate)}</Text>
+      <Text style={s.expiry}>Expires: {formatDate(a.endDate)}</Text>
     </View>
   );
 }
@@ -81,11 +82,11 @@ function SessionRow({
       </View>
       {session.verified ? (
         <View style={s.verifiedBadge}>
-          <Text style={s.verifiedText}>✅ 已簽名</Text>
+          <Text style={s.verifiedText}>✅ Signed</Text>
         </View>
       ) : (
         <Pressable style={s.signBtn} onPress={() => onSign(session)}>
-          <Text style={s.signBtnText}>簽名確認</Text>
+          <Text style={s.signBtnText}>Sign</Text>
         </Pressable>
       )}
     </View>
@@ -149,13 +150,13 @@ export default function PtScreen() {
           style={[s.tabBtn, tab === 'agreements' && s.tabBtnActive]}
           onPress={() => setTab('agreements')}
         >
-          <Text style={[s.tabText, tab === 'agreements' && s.tabTextActive]}>Agreement</Text>
+          <Text style={[s.tabText, tab === 'agreements' && s.tabTextActive]}>Agreements</Text>
         </Pressable>
         <Pressable
           style={[s.tabBtn, tab === 'sessions' && s.tabBtnActive]}
           onPress={() => setTab('sessions')}
         >
-          <Text style={[s.tabText, tab === 'sessions' && s.tabTextActive]}>歷史</Text>
+          <Text style={[s.tabText, tab === 'sessions' && s.tabTextActive]}>History</Text>
         </Pressable>
       </View>
 
@@ -168,7 +169,7 @@ export default function PtScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
           }
           contentContainerStyle={{ padding: 16, gap: 12 }}
-          ListEmptyComponent={<Text style={s.empty}>未有 PT Agreement</Text>}
+          ListEmptyComponent={<Text style={s.empty}>No PT agreements</Text>}
         />
       ) : (
         <FlatList
@@ -181,7 +182,7 @@ export default function PtScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
           }
           contentContainerStyle={{ padding: 16, gap: 8 }}
-          ListEmptyComponent={<Text style={s.empty}>未有 PT 記錄</Text>}
+          ListEmptyComponent={<Text style={s.empty}>No PT sessions yet</Text>}
         />
       )}
     </SafeAreaView>
@@ -189,53 +190,55 @@ export default function PtScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: colors.bg },
-  center:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:   { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  title:    { fontSize: 28, fontWeight: '800', color: colors.text },
+  safe:   { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: {
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+    backgroundColor: colors.card,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+  },
+  title: { fontSize: 28, fontFamily: fonts.black, color: colors.text },
 
-  tabRow:         { flexDirection: 'row', marginHorizontal: 16, marginBottom: 4, gap: 8 },
+  tabRow: { flexDirection: 'row', marginHorizontal: 16, marginVertical: 12, gap: 8 },
   tabBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
-    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.card,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
-  tabBtnActive:   { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText:        { fontSize: 14, fontWeight: '700', color: colors.textMuted },
-  tabTextActive:  { color: colors.bg },
+  tabBtnActive:  { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabText:       { fontSize: 14, fontFamily: fonts.bold, color: colors.textMuted },
+  tabTextActive: { color: '#fff' },
 
   agreementCard: {
-    backgroundColor: colors.card, borderRadius: 16,
-    padding: 16, borderWidth: 1, borderColor: colors.border, gap: 8,
+    backgroundColor: colors.card, borderRadius: 14, marginHorizontal: 16,
+    padding: 16, gap: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   agreementHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  agreementTitle:  { fontSize: 15, fontWeight: '700', color: colors.text },
-  daysLeft:        { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+  agreementTitle:  { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
+  daysLeft:        { fontSize: 13, fontFamily: fonts.semibold, color: colors.textMuted },
   sessionsRow:     { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  remaining:       { fontSize: 36, fontWeight: '900', color: colors.primary },
-  sessionLabel:    { fontSize: 14, color: colors.textMuted },
-  progressBg: {
-    height: 6, backgroundColor: colors.border,
-    borderRadius: 3, overflow: 'hidden',
-  },
+  remaining:       { fontSize: 36, fontFamily: fonts.black, color: colors.primary },
+  sessionLabel:    { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted },
+  progressBg:      { height: 5, backgroundColor: colors.bg, borderRadius: 3, overflow: 'hidden' },
   progressFill:    { height: '100%', backgroundColor: colors.primary, borderRadius: 3 },
-  expiry:          { fontSize: 12, color: colors.textMuted },
+  expiry:          { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
 
   sessionRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.card, borderRadius: 12,
-    padding: 14, borderWidth: 1, borderColor: colors.border, gap: 12,
+    backgroundColor: colors.card, paddingHorizontal: 16, paddingVertical: 14, gap: 12,
   },
-  sessionDate:    { fontSize: 14, fontWeight: '700', color: colors.text },
-  sessionSub:     { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  sessionDate: { fontSize: 14, fontFamily: fonts.bold, color: colors.text },
+  sessionSub:  { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 2 },
   verifiedBadge: {
-    backgroundColor: colors.success + '22',
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: colors.success + '18',
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
   },
-  verifiedText:   { color: colors.success, fontWeight: '700', fontSize: 12 },
+  verifiedText: { color: colors.success, fontFamily: fonts.bold, fontSize: 12 },
   signBtn: {
     backgroundColor: colors.primary, borderRadius: 8,
     paddingHorizontal: 14, paddingVertical: 8,
   },
-  signBtnText:    { color: colors.bg, fontWeight: '700', fontSize: 13 },
-  empty:          { textAlign: 'center', color: colors.textMuted, marginTop: 40, fontSize: 15 },
+  signBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 13 },
+  empty:       { textAlign: 'center', fontFamily: fonts.regular, color: colors.textMuted, marginTop: 40, fontSize: 15 },
 });

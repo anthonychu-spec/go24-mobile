@@ -4,8 +4,10 @@ import {
   RefreshControl, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 
 type ActivityType = 'class' | 'pt' | 'checkin';
 type Filter = 'all' | ActivityType;
@@ -39,21 +41,21 @@ const TYPE_ICON: Record<ActivityType, string> = {
 };
 
 const TYPE_LABEL: Record<ActivityType, string> = {
-  class:   '堂',
+  class:   'Class',
   pt:      'PT',
-  checkin: '入場',
+  checkin: 'Check-in',
 };
 
 const FILTER_LABELS: { key: Filter; label: string }[] = [
-  { key: 'all',     label: '全部' },
-  { key: 'class',   label: '堂' },
+  { key: 'all',     label: 'All' },
+  { key: 'class',   label: 'Classes' },
   { key: 'pt',      label: 'PT' },
-  { key: 'checkin', label: '入場' },
+  { key: 'checkin', label: 'Check-ins' },
 ];
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString('zh-HK', { month: 'short', day: 'numeric', weekday: 'short' });
+  return d.toLocaleDateString('en-HK', { month: 'short', day: 'numeric', weekday: 'short' });
 }
 
 function formatTime(iso: string) {
@@ -66,31 +68,31 @@ function SummaryCard({ summary }: { summary: Summary }) {
       <View style={s.summaryRow}>
         <View style={s.summaryItem}>
           <Text style={s.summaryNum}>{summary.thisMonth.checkins}</Text>
-          <Text style={s.summaryLabel}>本月入場 🚪</Text>
+          <Text style={s.summaryLabel}>Check-ins 🚪</Text>
         </View>
         <View style={s.summaryDivider} />
         <View style={s.summaryItem}>
           <Text style={s.summaryNum}>{summary.thisMonth.classes}</Text>
-          <Text style={s.summaryLabel}>本月堂數 🏋️</Text>
+          <Text style={s.summaryLabel}>Classes 🏋️</Text>
         </View>
         <View style={s.summaryDivider} />
         <View style={s.summaryItem}>
           <Text style={s.summaryNum}>{summary.thisMonth.pt}</Text>
-          <Text style={s.summaryLabel}>本月 PT 💪</Text>
+          <Text style={s.summaryLabel}>PT Sessions 💪</Text>
         </View>
       </View>
 
       {summary.streakDays > 0 && (
         <View style={s.streakBar}>
           <Text style={s.streakText}>
-            🔥 連續 {summary.streakDays} 日出席
+            🔥 {summary.streakDays}-day streak
           </Text>
         </View>
       )}
 
       <View style={s.totalRow}>
         <Text style={s.totalText}>
-          過去3個月：{summary.checkinsTotal} 次入場・{summary.classesTotal} 堂・{summary.ptTotal} PT
+          Last 3 months: {summary.checkinsTotal} check-ins · {summary.classesTotal} classes · {summary.ptTotal} PT
         </Text>
       </View>
     </View>
@@ -129,7 +131,7 @@ export default function ActivityScreen() {
       const { data: res } = await apiClient.get<ActivityResponse>('/activity');
       setData(res);
     } catch {
-      setError('無法載入活動記錄');
+      setError('Unable to load activity');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -155,11 +157,16 @@ export default function ActivityScreen() {
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
-        <Text style={s.title}>活動記錄</Text>
-        <Text style={s.subtitle}>最近 3 個月</Text>
+        <Text style={s.title}>Activity</Text>
+        <Text style={s.subtitle}>Last 3 months</Text>
       </View>
 
-      {error ? <View style={s.errorBar}><Text style={s.errorText}>{error}</Text></View> : null}
+      {error ? (
+        <View style={s.errorBar}>
+          <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
+          <Text style={s.errorText}>{error}</Text>
+        </View>
+      ) : null}
 
       <FlatList
         data={filtered}
@@ -186,10 +193,12 @@ export default function ActivityScreen() {
             </View>
           </>
         }
-        contentContainerStyle={{ padding: 16, gap: 8 }}
+        ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 }} />}
+        contentContainerStyle={{ backgroundColor: colors.card }}
         ListEmptyComponent={
           <View style={s.empty}>
-            <Text style={s.emptyText}>未有記錄</Text>
+            <Ionicons name="pulse-outline" size={40} color={colors.border} />
+            <Text style={s.emptyText}>No records yet</Text>
           </View>
         }
       />
@@ -198,62 +207,65 @@ export default function ActivityScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: colors.bg },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:       { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  title:        { fontSize: 28, fontWeight: '800', color: colors.text },
-  subtitle:     { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  safe:     { flex: 1, backgroundColor: colors.bg },
+  center:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header:   {
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+    backgroundColor: colors.card,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+  },
+  title:    { fontSize: 28, fontFamily: fonts.black, color: colors.text },
+  subtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 2 },
 
   summaryCard: {
-    backgroundColor: colors.card, borderRadius: 16,
-    padding: 16, borderWidth: 1, borderColor: colors.border,
-    marginBottom: 8, gap: 10,
+    backgroundColor: colors.card, marginHorizontal: 16, borderRadius: 14,
+    padding: 16, gap: 10, marginBottom: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   summaryRow:   { flexDirection: 'row', alignItems: 'center' },
   summaryItem:  { flex: 1, alignItems: 'center', gap: 4 },
-  summaryNum:   { fontSize: 28, fontWeight: '900', color: colors.primary },
-  summaryLabel: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },
-  summaryDivider: { width: 1, height: 40, backgroundColor: colors.border },
+  summaryNum:   { fontSize: 28, fontFamily: fonts.black, color: colors.primary },
+  summaryLabel: { fontSize: 11, fontFamily: fonts.semibold, color: colors.textMuted, textAlign: 'center' },
+  summaryDivider: { width: StyleSheet.hairlineWidth, height: 40, backgroundColor: colors.border },
   streakBar: {
-    backgroundColor: colors.primary + '18', borderRadius: 8,
+    backgroundColor: '#FFF5F5', borderRadius: 8,
     paddingVertical: 8, alignItems: 'center',
   },
-  streakText:   { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  streakText:   { color: colors.primary, fontFamily: fonts.bold, fontSize: 14 },
   totalRow:     { alignItems: 'center' },
-  totalText:    { fontSize: 12, color: colors.textMuted },
+  totalText:    { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
 
-  filterRow:    { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  filterRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginVertical: 8 },
   filterChip: {
     paddingHorizontal: 14, paddingVertical: 7,
     borderRadius: 20, borderWidth: 1, borderColor: colors.border,
     backgroundColor: colors.card,
   },
   filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText:       { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
-  filterTextActive: { color: colors.bg },
+  filterText:       { fontSize: 13, fontFamily: fonts.semibold, color: colors.textMuted },
+  filterTextActive: { color: '#fff' },
 
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.card, borderRadius: 12,
-    padding: 14, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.card, paddingHorizontal: 16, paddingVertical: 14,
   },
   cardIcon: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center',
   },
-  icon:         { fontSize: 18 },
-  cardBody:     { flex: 1, gap: 2 },
-  cardTitle:    { fontSize: 14, fontWeight: '700', color: colors.text },
-  cardSub:      { fontSize: 12, color: colors.textMuted },
-  cardTime:     { alignItems: 'flex-end', gap: 2 },
-  timeDate:     { fontSize: 12, color: colors.textMuted },
-  timeHour:     { fontSize: 12, fontWeight: '600', color: colors.text },
+  icon:      { fontSize: 18 },
+  cardBody:  { flex: 1, gap: 2 },
+  cardTitle: { fontSize: 14, fontFamily: fonts.bold,    color: colors.text },
+  cardSub:   { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
+  cardTime:  { alignItems: 'flex-end', gap: 2 },
+  timeDate:  { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
+  timeHour:  { fontSize: 12, fontFamily: fonts.semibold, color: colors.text },
 
   errorBar: {
-    margin: 16, backgroundColor: colors.error + '22',
-    borderRadius: 10, padding: 12, alignItems: 'center',
+    margin: 16, backgroundColor: '#FFF0F0', borderRadius: 8, padding: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  errorText:    { color: colors.error, fontSize: 13 },
-  empty:        { alignItems: 'center', paddingTop: 40 },
-  emptyText:    { color: colors.textMuted, fontSize: 15 },
+  errorText: { color: colors.error, fontFamily: fonts.regular, fontSize: 13 },
+  empty:     { alignItems: 'center', paddingTop: 40, gap: 8 },
+  emptyText: { color: colors.textMuted, fontFamily: fonts.regular, fontSize: 15 },
 });

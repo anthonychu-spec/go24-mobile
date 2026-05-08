@@ -4,8 +4,10 @@ import {
   RefreshControl, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 
 type Tab = 'personal' | 'announcements';
 
@@ -111,11 +113,11 @@ export default function NotificationsScreen() {
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
         <Text style={s.title}>
-          通知{unread > 0 ? ` (${unread})` : ''}
+          Notifications{unread > 0 ? ` (${unread})` : ''}
         </Text>
         {unread > 0 && (
           <Pressable onPress={handleMarkAll}>
-            <Text style={s.markAll}>全部已讀</Text>
+            <Text style={s.markAll}>Mark all read</Text>
           </Pressable>
         )}
       </View>
@@ -128,7 +130,7 @@ export default function NotificationsScreen() {
             onPress={() => setTab(t)}
           >
             <Text style={[s.tabText, tab === t && s.tabTextActive]}>
-              {t === 'personal' ? '我的' : '公告'}
+              {t === 'personal' ? 'Personal' : 'Announcements'}
             </Text>
           </Pressable>
         ))}
@@ -141,10 +143,12 @@ export default function NotificationsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
         }
-        contentContainerStyle={{ padding: 16, gap: 8 }}
+        ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 }} />}
+        contentContainerStyle={{ backgroundColor: colors.card }}
         ListEmptyComponent={
           <View style={s.empty}>
-            <Text style={s.emptyText}>未有通知</Text>
+            <Ionicons name="notifications-outline" size={40} color={colors.border} />
+            <Text style={s.emptyText}>No notifications</Text>
           </View>
         }
       />
@@ -156,38 +160,40 @@ const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+    backgroundColor: colors.card,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
   },
-  title:   { fontSize: 28, fontWeight: '800', color: colors.text },
-  markAll: { fontSize: 14, color: colors.primary, fontWeight: '600' },
+  title:   { fontSize: 28, fontFamily: fonts.black, color: colors.text },
+  markAll: { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
 
-  tabRow: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 4, gap: 8 },
+  tabRow: { flexDirection: 'row', marginHorizontal: 16, marginVertical: 12, gap: 8 },
   tabBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
-    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.card,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
   tabBtnActive:  { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText:       { fontSize: 14, fontWeight: '700', color: colors.textMuted },
-  tabTextActive: { color: colors.bg },
+  tabText:       { fontSize: 14, fontFamily: fonts.bold, color: colors.textMuted },
+  tabTextActive: { color: '#fff' },
 
   card: {
-    flexDirection: 'row', gap: 10,
-    backgroundColor: colors.card, borderRadius: 12,
-    padding: 14, borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', gap: 12,
+    backgroundColor: colors.card,
+    paddingHorizontal: 16, paddingVertical: 14,
   },
-  cardUnread: { borderColor: colors.primary + '55' },
+  cardUnread: { borderLeftWidth: 3, borderLeftColor: colors.primary },
   dot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: colors.primary, marginTop: 5,
+    width: 8, height: 8, borderRadius: 4, marginTop: 6,
+    backgroundColor: colors.primary,
   },
-  cardBody:      { flex: 1, gap: 4 },
-  cardTitle:     { fontSize: 14, fontWeight: '800', color: colors.text },
-  cardTitleRead: { fontWeight: '600', color: colors.textMuted },
-  cardText:      { fontSize: 13, color: colors.textMuted, lineHeight: 18 },
-  cardTime:      { fontSize: 11, color: colors.textMuted },
+  cardBody:      { flex: 1, gap: 3 },
+  cardTitle:     { fontSize: 14, fontFamily: fonts.bold,    color: colors.text },
+  cardTitleRead: { fontFamily: fonts.semibold, color: colors.textMuted },
+  cardText:      { fontSize: 13, fontFamily: fonts.regular, color: colors.textMuted, lineHeight: 19 },
+  cardTime:      { fontSize: 11, fontFamily: fonts.regular, color: colors.textMuted },
 
-  empty:     { alignItems: 'center', paddingTop: 60 },
-  emptyText: { fontSize: 15, color: colors.textMuted },
+  empty:     { alignItems: 'center', paddingTop: 60, gap: 8 },
+  emptyText: { fontSize: 15, fontFamily: fonts.regular, color: colors.textMuted },
 });

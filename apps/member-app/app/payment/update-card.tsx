@@ -1,12 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  ActivityIndicator, Alert, Pressable, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-// @adyen/react-native requires a custom dev build (EAS Build) — not available in Expo Go
-// Run: eas build --profile development --platform ios (or android)
-import AdyenCheckout from '@adyen/react-native';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
 
@@ -23,6 +20,16 @@ export default function UpdateCardScreen() {
   const [session, setSession] = useState<CardSession | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [AdyenComponent, setAdyenComponent] = useState<any>(null);
+
+  // Lazy load Adyen SDK only on native platforms
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      import('@adyen/react-native')
+        .then(mod => setAdyenComponent(() => mod.default))
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     apiClient.post<CardSession>('/payments/card-session', {})
@@ -84,6 +91,31 @@ export default function UpdateCardScreen() {
     );
   }
 
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaView style={s.safe}>
+        <View style={s.center}>
+          <Text style={s.successIcon}>💳</Text>
+          <Text style={s.successTitle}>Update Credit Card</Text>
+          <Text style={s.successSub}>Please use the mobile app to update your credit card.</Text>
+          <Pressable style={s.btn} onPress={() => router.back()}>
+            <Text style={s.btnText}>Back</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!AdyenComponent) {
+    return (
+      <SafeAreaView style={s.safe}>
+        <View style={s.center}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
@@ -94,10 +126,10 @@ export default function UpdateCardScreen() {
         <Text style={s.subtitle}>Secured by Adyen</Text>
       </View>
 
-      <AdyenCheckout
+      <AdyenComponent
         session={{ id: session.sessionId, sessionData: session.sessionData }}
         clientKey={session.clientKey}
-        environment={session.environment.toLowerCase() as 'test' | 'live'}
+        environment={session.environment.toLowerCase()}
         onComplete={handleComplete}
         onError={handleError}
       />
