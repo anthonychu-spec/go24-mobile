@@ -18,6 +18,22 @@ interface RawClass {
   isDeleted: boolean;
 }
 
+interface RawClassType {
+  id: number;
+  name: string;
+}
+
+interface RawClub {
+  id: number;
+  name: string;
+}
+
+interface RawInstructor {
+  id: number;
+  firstName: string;
+  lastName: string;
+}
+
 interface RawBooking {
   id: number;
   classId: number;
@@ -34,12 +50,41 @@ export class PgmBookingAdapter implements IBookingRepo {
 
   async listClasses(params: { date: string; clubId?: number }): Promise<PgmClass[]> {
     try {
-      // PGM OData does not support server-side $filter — fetch all and filter client-side
-      const res = await this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-        $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
-      });
+      // Fetch classes + lookup tables in parallel
+      const [classesRes, typesRes, clubsRes, instructorsRes] = await Promise.allSettled([
+        this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
+          $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
+        }),
+        this.pgm.get<{ value: RawClassType[] }>('/odata/ClassTypes', { $select: 'id,name' }),
+        this.pgm.get<{ value: RawClub[] }>('/odata/Clubs', { $select: 'id,name' }),
+        this.pgm.get<{ value: RawInstructor[] }>('/odata/Instructors', { $select: 'id,firstName,lastName' }),
+      ]);
 
-      const allClasses = res.value ?? [];
+      const allClasses = classesRes.status === 'fulfilled' ? (classesRes.value.value ?? []) : [];
+
+      // Build lookup maps — fall back gracefully if endpoint fails
+      const classTypeMap = new Map<number, string>();
+      if (typesRes.status === 'fulfilled') {
+        for (const t of (typesRes.value.value ?? [])) {
+          classTypeMap.set(t.id, t.name);
+        }
+      }
+
+      const clubMap = new Map<number, string>();
+      if (clubsRes.status === 'fulfilled') {
+        for (const c of (clubsRes.value.value ?? [])) {
+          clubMap.set(c.id, c.name);
+        }
+      }
+
+      const instructorMap = new Map<number, string>();
+      if (instructorsRes.status === 'fulfilled') {
+        for (const i of (instructorsRes.value.value ?? [])) {
+          const fullName = [i.firstName, i.lastName].filter(Boolean).join(' ');
+          if (fullName) instructorMap.set(i.id, fullName);
+        }
+      }
+
       const target = new Date(params.date);
       const dayStart = new Date(target); dayStart.setHours(0, 0, 0, 0);
       const dayEnd   = new Date(target); dayEnd.setHours(23, 59, 59, 999);
@@ -63,7 +108,7 @@ export class PgmBookingAdapter implements IBookingRepo {
       }
 
       if (params.clubId) filtered = filtered.filter(c => c.clubId === params.clubId);
-      return filtered.map(c => this.mapClass(c));
+      return filtered.map(c => this.mapClass(c, classTypeMap, clubMap, instructorMap));
     } catch (err) {
       throw normalizePgmError(err);
     }
@@ -71,12 +116,33 @@ export class PgmBookingAdapter implements IBookingRepo {
 
   async getClass(classId: number): Promise<PgmClass> {
     try {
-      const res = await this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-        $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
-      });
-      const item = (res.value ?? []).find(c => c.id === classId);
+      const [classesRes, typesRes, clubsRes, instructorsRes] = await Promise.allSettled([
+        this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
+          $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
+        }),
+        this.pgm.get<{ value: RawClassType[] }>('/odata/ClassTypes', { $select: 'id,name' }),
+        this.pgm.get<{ value: RawClub[] }>('/odata/Clubs', { $select: 'id,name' }),
+        this.pgm.get<{ value: RawInstructor[] }>('/odata/Instructors', { $select: 'id,firstName,lastName' }),
+      ]);
+
+      const item = (classesRes.status === 'fulfilled' ? classesRes.value.value ?? [] : []).find(c => c.id === classId);
       if (!item) throw new AppError('CLASS_NOT_FOUND');
-      return this.mapClass(item);
+
+      const classTypeMap = new Map<number, string>();
+      if (typesRes.status === 'fulfilled') for (const t of (typesRes.value.value ?? [])) classTypeMap.set(t.id, t.name);
+
+      const clubMap = new Map<number, string>();
+      if (clubsRes.status === 'fulfilled') for (const c of (clubsRes.value.value ?? [])) clubMap.set(c.id, c.name);
+
+      const instructorMap = new Map<number, string>();
+      if (instructorsRes.status === 'fulfilled') {
+        for (const i of (instructorsRes.value.value ?? [])) {
+          const fullName = [i.firstName, i.lastName].filter(Boolean).join(' ');
+          if (fullName) instructorMap.set(i.id, fullName);
+        }
+      }
+
+      return this.mapClass(item, classTypeMap, clubMap, instructorMap);
     } catch (err) {
       throw normalizePgmError(err);
     }
@@ -119,15 +185,20 @@ export class PgmBookingAdapter implements IBookingRepo {
     }
   }
 
-  private mapClass(c: RawClass): PgmClass {
+  private mapClass(
+    c: RawClass,
+    classTypeMap: Map<number, string> = new Map(),
+    clubMap: Map<number, string> = new Map(),
+    instructorMap: Map<number, string> = new Map(),
+  ): PgmClass {
     return {
       id: c.id,
-      name: 'ClassType ' + String(c.classTypeId),
+      name: classTypeMap.get(c.classTypeId) ?? `Class Type ${c.classTypeId}`,
       startTime: c.startDate,
       endTime: c.endDate,
       clubId: c.clubId,
-      clubName: null,
-      instructorName: null,
+      clubName: clubMap.get(c.clubId) ?? null,
+      instructorName: c.instructorId ? (instructorMap.get(c.instructorId) ?? null) : null,
       maxParticipants: c.attendeesLimit,
       participantsCount: c.attendeesCount,
       isWaitlist: false,
