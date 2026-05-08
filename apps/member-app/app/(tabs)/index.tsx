@@ -176,14 +176,14 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {/* Membership status card */}
-        <View style={s.memberCard}>
+        {/* Membership status card — tappable → /membership */}
+        <Pressable style={s.memberCard} onPress={() => router.push('/membership')}>
           <View style={s.memberLeft}>
             <View style={s.memberIconBox}>
-              <Ionicons name="location" size={16} color={colors.primary} />
+              <Ionicons name="card" size={16} color={colors.primary} />
             </View>
             <View>
-              <Text style={s.memberClub}>{m?.planName?.toUpperCase() ?? 'ONYX BY GO24'}</Text>
+              <Text style={s.memberClub}>{m?.planName?.toUpperCase() ?? 'MEMBERSHIP'}</Text>
               <Text style={s.memberStatus}>
                 {m?.active ? '● Active' : '● Inactive'}
                 {m?.daysRemaining != null ? `  ·  ${m.daysRemaining} days left` : ''}
@@ -191,7 +191,7 @@ export default function HomeScreen() {
             </View>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.border} />
-        </View>
+        </Pressable>
 
         {/* Next class hero */}
         <NextClassHero next={data?.nextClass ?? null} onBook={() => router.push('/(tabs)/classes')} />

@@ -89,6 +89,43 @@ export class DashboardService {
     };
   }
 
+  async getMemberships(pgmMemberId: number) {
+    const [contractsRes, plansRes, clubsRes] = await Promise.allSettled([
+      this.pgm.get<{ value: any[] }>('/odata/Contracts', {
+        $filter: `memberId eq ${pgmMemberId} and isDeleted eq false`,
+        $orderby: 'startDate desc',
+        $select: 'id,status,isActive,startDate,endDate,signUpDate,cancelDate,paymentPlanId,clubId,automaticRenew',
+      }),
+      this.pgm.get<{ value: any[] }>('/odata/PaymentPlans', { $select: 'id,name' }),
+      this.pgm.get<{ value: any[] }>('/odata/Clubs', { $select: 'id,name' }),
+    ]);
+
+    const contracts = contractsRes.status === 'fulfilled' ? (contractsRes.value.value ?? []) : [];
+
+    // Build lookup maps
+    const planMap = new Map<number, string>();
+    if (plansRes.status === 'fulfilled') {
+      for (const p of (plansRes.value.value ?? [])) planMap.set(p.id, p.name);
+    }
+    const clubMap = new Map<number, string>();
+    if (clubsRes.status === 'fulfilled') {
+      for (const c of (clubsRes.value.value ?? [])) clubMap.set(c.id, c.name);
+    }
+
+    return contracts.map(c => ({
+      id: c.id,
+      planName:      planMap.get(c.paymentPlanId) ?? null,
+      clubName:      clubMap.get(c.clubId) ?? null,
+      status:        c.status as string,
+      isActive:      c.isActive as boolean,
+      startDate:     c.startDate as string,
+      endDate:       c.endDate as string | null,
+      signUpDate:    c.signUpDate as string,
+      cancelDate:    c.cancelDate as string | null,
+      automaticRenew: c.automaticRenew as boolean,
+    }));
+  }
+
   private async fetchActiveContract(pgmMemberId: number): Promise<{ planName: string | null; endDate: string } | null> {
     try {
       const res = await this.pgm.get<{ value: any[] }>('/odata/Contracts', {

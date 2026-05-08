@@ -18,4 +18,11 @@ export class DashboardController {
     const user = req.user as AuthedUser;
     return this.svc.getDashboard(user.id, user.pgmId, null);
   }
+
+  @ApiOperation({ summary: 'All memberships (current + ended) with plan names' })
+  @Get('memberships')
+  memberships(@Req() req: Request) {
+    const user = req.user as AuthedUser;
+    return this.svc.getMemberships(user.pgmId);
+  }
 }
