@@ -22,9 +22,16 @@ type TimeSlot = 'all' | 'morning' | 'afternoon' | 'evening';
 interface Filters {
   availableOnly: boolean;
   timeSlot: TimeSlot;
+  classType: string | null;   // null = all class types
+  clubId: number | null;      // null = all clubs
 }
 
-const DEFAULT_FILTERS: Filters = { availableOnly: false, timeSlot: 'all' };
+const DEFAULT_FILTERS: Filters = {
+  availableOnly: false,
+  timeSlot: 'all',
+  classType: null,
+  clubId: null,
+};
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const LIVE_REFRESH_MS = 30_000; // refresh capacity every 30s
 
@@ -56,6 +63,8 @@ function applyFilters(classes: GymClass[], search: string, filters: Filters): Gy
   return classes.filter(c => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (filters.availableOnly && c.participantsCount >= c.maxParticipants) return false;
+    if (filters.classType && c.name !== filters.classType) return false;
+    if (filters.clubId !== null && c.clubId !== filters.clubId) return false;
     if (filters.timeSlot !== 'all') {
       const h = getHour(c.startTime);
       if (filters.timeSlot === 'morning'   && h >= 12) return false;
@@ -70,7 +79,23 @@ function activeFilterCount(f: Filters) {
   let n = 0;
   if (f.availableOnly) n++;
   if (f.timeSlot !== 'all') n++;
+  if (f.classType) n++;
+  if (f.clubId !== null) n++;
   return n;
+}
+
+// Extract unique class types and clubs from loaded classes
+function getClassOptions(classes: GymClass[]) {
+  const typeSet = new Map<string, string>();       // name → name
+  const clubSet = new Map<number, string>();       // id → name
+  for (const c of classes) {
+    if (c.name) typeSet.set(c.name, c.name);
+    if (c.clubId && c.clubName) clubSet.set(c.clubId, c.clubName);
+  }
+  return {
+    classTypes: Array.from(typeSet.values()).sort(),
+    clubs: Array.from(clubSet.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+  };
 }
 
 /* ── Capacity bar ── */
@@ -101,21 +126,24 @@ const cb = StyleSheet.create({
 
 /* ── Filter sheet ── */
 function FilterSheet({
-  visible, filters, onApply, onClose,
+  visible, filters, allClasses, onApply, onClose,
 }: {
   visible: boolean;
   filters: Filters;
+  allClasses: GymClass[];
   onApply: (f: Filters) => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(filters);
   useEffect(() => { if (visible) setDraft(filters); }, [visible]);
 
+  const { classTypes, clubs } = getClassOptions(allClasses);
+
   const TIME_SLOTS: { key: TimeSlot; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
-    { key: 'all',       label: 'All day',    icon: 'time-outline' },
-    { key: 'morning',   label: 'Morning',    icon: 'sunny-outline' },
-    { key: 'afternoon', label: 'Afternoon',  icon: 'partly-sunny-outline' },
-    { key: 'evening',   label: 'Evening',    icon: 'moon-outline' },
+    { key: 'all',       label: 'All day',   icon: 'time-outline' },
+    { key: 'morning',   label: 'Morning',   icon: 'sunny-outline' },
+    { key: 'afternoon', label: 'Afternoon', icon: 'partly-sunny-outline' },
+    { key: 'evening',   label: 'Evening',   icon: 'moon-outline' },
   ];
 
   return (
@@ -126,47 +154,99 @@ function FilterSheet({
         <View style={fs.header}>
           <Text style={fs.title}>Filter Classes</Text>
           <Pressable onPress={() => { setDraft(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS); onClose(); }}>
-            <Text style={fs.reset}>Reset</Text>
+            <Text style={fs.reset}>Reset all</Text>
           </Pressable>
         </View>
 
-        {/* Available only */}
-        <View style={fs.row}>
-          <View style={fs.rowLeft}>
-            <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />
-            <Text style={fs.rowLabel}>Available spots only</Text>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Available only */}
+          <View style={fs.row}>
+            <View style={fs.rowLeft}>
+              <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />
+              <Text style={fs.rowLabel}>Available spots only</Text>
+            </View>
+            <Switch
+              value={draft.availableOnly}
+              onValueChange={v => setDraft(d => ({ ...d, availableOnly: v }))}
+              trackColor={{ true: colors.primary, false: colors.border }}
+              thumbColor="#fff"
+            />
           </View>
-          <Switch
-            value={draft.availableOnly}
-            onValueChange={v => setDraft(d => ({ ...d, availableOnly: v }))}
-            trackColor={{ true: colors.primary, false: colors.border }}
-            thumbColor="#fff"
-          />
-        </View>
 
-        {/* Time slot */}
-        <Text style={fs.sectionLabel}>Time of day</Text>
-        <View style={fs.chips}>
-          {TIME_SLOTS.map(ts => (
-            <Pressable
-              key={ts.key}
-              style={[fs.chip, draft.timeSlot === ts.key && fs.chipActive]}
-              onPress={() => setDraft(d => ({ ...d, timeSlot: ts.key }))}
-            >
-              <Ionicons
-                name={ts.icon}
-                size={16}
-                color={draft.timeSlot === ts.key ? '#fff' : colors.textMuted}
-              />
-              <Text style={[fs.chipText, draft.timeSlot === ts.key && fs.chipTextActive]}>
-                {ts.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+          {/* Time of day */}
+          <Text style={fs.sectionLabel}>Time of day</Text>
+          <View style={fs.chips}>
+            {TIME_SLOTS.map(ts => (
+              <Pressable
+                key={ts.key}
+                style={[fs.chip, draft.timeSlot === ts.key && fs.chipActive]}
+                onPress={() => setDraft(d => ({ ...d, timeSlot: ts.key }))}
+              >
+                <Ionicons name={ts.icon} size={15} color={draft.timeSlot === ts.key ? '#fff' : colors.textMuted} />
+                <Text style={[fs.chipText, draft.timeSlot === ts.key && fs.chipTextActive]}>{ts.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Club filter */}
+          {clubs.length > 0 && (
+            <>
+              <Text style={fs.sectionLabel}>Club</Text>
+              <View style={fs.chips}>
+                <Pressable
+                  style={[fs.chip, draft.clubId === null && fs.chipActive]}
+                  onPress={() => setDraft(d => ({ ...d, clubId: null }))}
+                >
+                  <Text style={[fs.chipText, draft.clubId === null && fs.chipTextActive]}>All clubs</Text>
+                </Pressable>
+                {clubs.map(club => (
+                  <Pressable
+                    key={club.id}
+                    style={[fs.chip, draft.clubId === club.id && fs.chipActive]}
+                    onPress={() => setDraft(d => ({ ...d, clubId: d.clubId === club.id ? null : club.id }))}
+                  >
+                    <Ionicons name="location-outline" size={13} color={draft.clubId === club.id ? '#fff' : colors.textMuted} />
+                    <Text style={[fs.chipText, draft.clubId === club.id && fs.chipTextActive]} numberOfLines={1}>
+                      {club.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* Class type filter */}
+          {classTypes.length > 0 && (
+            <>
+              <Text style={fs.sectionLabel}>Class type</Text>
+              <View style={fs.chips}>
+                <Pressable
+                  style={[fs.chip, draft.classType === null && fs.chipActive]}
+                  onPress={() => setDraft(d => ({ ...d, classType: null }))}
+                >
+                  <Text style={[fs.chipText, draft.classType === null && fs.chipTextActive]}>All types</Text>
+                </Pressable>
+                {classTypes.map(ct => (
+                  <Pressable
+                    key={ct}
+                    style={[fs.chip, draft.classType === ct && fs.chipActive]}
+                    onPress={() => setDraft(d => ({ ...d, classType: d.classType === ct ? null : ct }))}
+                  >
+                    <Text style={[fs.chipText, draft.classType === ct && fs.chipTextActive]} numberOfLines={1}>
+                      {ct}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+        </ScrollView>
 
         <Pressable style={fs.applyBtn} onPress={() => { onApply(draft); onClose(); }}>
-          <Text style={fs.applyText}>Show Results</Text>
+          <Text style={fs.applyText}>
+            Show Results
+            {activeFilterCount(draft) > 0 ? ` · ${activeFilterCount(draft)} active` : ''}
+          </Text>
         </Pressable>
       </View>
     </Modal>
@@ -180,6 +260,7 @@ const fs = StyleSheet.create({
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 24, paddingBottom: 36,
     position: 'absolute', bottom: 0, left: 0, right: 0,
+    maxHeight: '80%',
   },
   handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -454,6 +535,7 @@ export default function ClassesScreen() {
       <FilterSheet
         visible={showFilter}
         filters={filters}
+        allClasses={classes}
         onApply={setFilters}
         onClose={() => setShowFilter(false)}
       />
