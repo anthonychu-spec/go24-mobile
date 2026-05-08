@@ -120,8 +120,13 @@ export class PgmBookingAdapter implements IBookingRepo {
   /** Fetch raw classes from PGM with 30s cache (live capacity) */
   private async getRawClasses(): Promise<RawClass[]> {
     if (this.isFresh(this.rawClassCache)) return this.rawClassCache.data;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const windowEnd = new Date(today); windowEnd.setDate(today.getDate() + 8);
+    const from = today.toISOString().slice(0, 10);
+    const to   = windowEnd.toISOString().slice(0, 10);
     const res = await this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
       $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
+      $filter: `startDate ge ${from}T00:00:00Z and startDate le ${to}T23:59:59Z`,
     });
     const classes = res.value ?? [];
     this.rawClassCache = { data: classes, expiresAt: Date.now() + CLASSES_CACHE_TTL };

@@ -36,7 +36,7 @@ export class PgmClient {
 
     this.axios = axios.create({
       baseURL,
-      timeout: 3000,
+      timeout: 8000,
       headers: {
         'Content-Type': 'application/json',
         ...(clientId ? { 'X-Client-Id': clientId } : {}),
@@ -55,7 +55,7 @@ export class PgmClient {
     this.breaker = new CircuitBreaker(
       async (config: AxiosRequestConfig) => this.axios.request(config),
       {
-        timeout: 4000,
+        timeout: 10000,
         errorThresholdPercentage: 50,
         resetTimeout: 30_000,
         rollingCountTimeout: 30_000,
