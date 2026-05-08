@@ -31,6 +31,7 @@ export interface BookClassResult {
 
 export interface IBookingRepo {
   listClasses(params: { date: string; clubId?: number }): Promise<PgmClass[]>;
+  listWeekClasses(params: { clubId?: number; days?: number }): Promise<Record<string, PgmClass[]>>;
   getClass(classId: number): Promise<PgmClass>;
   listMyBookings(memberId: number): Promise<PgmBooking[]>;
   bookClass(memberId: number, classId: number): Promise<BookClassResult>;

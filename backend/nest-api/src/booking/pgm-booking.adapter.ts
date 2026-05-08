@@ -5,7 +5,8 @@ import {
   BookClassResult, IBookingRepo, PgmBooking, PgmClass,
 } from './booking.interfaces';
 
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL_MS       = 60 * 60 * 1000; // 1 hour  — lookup tables
+const CLASSES_CACHE_TTL  = 30 * 1000;      // 30s     — raw class list (live capacity)
 
 interface CacheEntry<T> {
   data: T;
@@ -56,9 +57,11 @@ export class PgmBookingAdapter implements IBookingRepo {
   private readonly logger = new Logger(PgmBookingAdapter.name);
 
   // In-memory cache for lookup tables (class types, clubs, instructors)
-  private classTypeCache: CacheEntry<Map<number, string>> | null = null;
-  private clubCache:      CacheEntry<Map<number, string>> | null = null;
-  private instructorCache: CacheEntry<Map<number, string>> | null = null;
+  private classTypeCache:   CacheEntry<Map<number, string>> | null = null;
+  private clubCache:        CacheEntry<Map<number, string>> | null = null;
+  private instructorCache:  CacheEntry<Map<number, string>> | null = null;
+  // Short-lived cache for raw PGM class list (live capacity, 30s)
+  private rawClassCache:    CacheEntry<RawClass[]> | null = null;
 
   constructor(private readonly pgm: PgmClient) {}
 
@@ -114,20 +117,70 @@ export class PgmBookingAdapter implements IBookingRepo {
     }
   }
 
-  async listClasses(params: { date: string; clubId?: number }): Promise<PgmClass[]> {
+  /** Fetch raw classes from PGM with 30s cache (live capacity) */
+  private async getRawClasses(): Promise<RawClass[]> {
+    if (this.isFresh(this.rawClassCache)) return this.rawClassCache.data;
+    const res = await this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
+      $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
+    });
+    const classes = res.value ?? [];
+    this.rawClassCache = { data: classes, expiresAt: Date.now() + CLASSES_CACHE_TTL };
+    return classes;
+  }
+
+  /** Return classes for the next N days (default 7), grouped by ISO date string */
+  async listWeekClasses(params: { clubId?: number; days?: number } = {}): Promise<Record<string, PgmClass[]>> {
     try {
-      // Fetch classes + cached lookup tables in parallel
-      const [classesRes, classTypeMap, clubMap, instructorMap] = await Promise.all([
-        this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-          $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
-        }),
+      const days = params.days ?? 7;
+      const [allClasses, classTypeMap, clubMap, instructorMap] = await Promise.all([
+        this.getRawClasses(),
         this.getClassTypeMap(),
         this.getClubMap(),
         this.getInstructorMap(),
       ]);
 
-      const allClasses = classesRes.value ?? [];
+      // Build date window: today through today+(days-1)
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const windowEnd = new Date(today); windowEnd.setDate(today.getDate() + days);
+      windowEnd.setHours(23, 59, 59, 999);
 
+      const result: Record<string, PgmClass[]> = {};
+
+      // Pre-populate all days so empty days still have an array
+      for (let i = 0; i < days; i++) {
+        const d = new Date(today); d.setDate(today.getDate() + i);
+        result[d.toISOString().slice(0, 10)] = [];
+      }
+
+      for (const c of allClasses) {
+        if (c.isDeleted) continue;
+        const start = new Date(c.startDate);
+        if (isNaN(start.getTime()) || start < today || start > windowEnd) continue;
+        if (params.clubId && c.clubId !== params.clubId) continue;
+        const key = start.toISOString().slice(0, 10);
+        if (key in result) result[key].push(this.mapClass(c, classTypeMap, clubMap, instructorMap));
+      }
+
+      // Sort each day's classes by start time
+      for (const key of Object.keys(result)) {
+        result[key].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      }
+
+      return result;
+    } catch (err) {
+      throw normalizePgmError(err);
+    }
+  }
+
+  async listClasses(params: { date: string; clubId?: number }): Promise<PgmClass[]> {
+    try {
+      // Fetch classes (cached 30s) + lookup tables in parallel
+      const [allClasses, classTypeMap, clubMap, instructorMap] = await Promise.all([
+        this.getRawClasses(),
+        this.getClassTypeMap(),
+        this.getClubMap(),
+        this.getInstructorMap(),
+      ]);
       const target = new Date(params.date);
       const dayStart = new Date(target); dayStart.setHours(0, 0, 0, 0);
       const dayEnd   = new Date(target); dayEnd.setHours(23, 59, 59, 999);
@@ -159,15 +212,13 @@ export class PgmBookingAdapter implements IBookingRepo {
 
   async getClass(classId: number): Promise<PgmClass> {
     try {
-      const [res, classTypeMap, clubMap, instructorMap] = await Promise.all([
-        this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-          $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
-        }),
+      const [allClasses, classTypeMap, clubMap, instructorMap] = await Promise.all([
+        this.getRawClasses(),
         this.getClassTypeMap(),
         this.getClubMap(),
         this.getInstructorMap(),
       ]);
-      const item = (res.value ?? []).find(c => c.id === classId);
+      const item = allClasses.find(c => c.id === classId);
       if (!item) throw new AppError('CLASS_NOT_FOUND');
       return this.mapClass(item, classTypeMap, clubMap, instructorMap);
     } catch (err) {

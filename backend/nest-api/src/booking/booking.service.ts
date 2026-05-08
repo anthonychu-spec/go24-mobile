@@ -8,11 +8,14 @@ export class BookingService {
   constructor(@Inject(BOOKING_REPO) private readonly repo: IBookingRepo) {}
 
   listClasses(params: { date: string; clubId?: number }) {
-    // Validate date format
     if (!/^\d{4}-\d{2}-\d{2}$/.test(params.date)) {
       params.date = new Date().toISOString().slice(0, 10);
     }
     return this.repo.listClasses(params);
+  }
+
+  listWeekClasses(params: { clubId?: number; days?: number }) {
+    return this.repo.listWeekClasses(params);
   }
 
   getClass(id: number) { return this.repo.getClass(id); }

@@ -376,7 +376,8 @@ export default function ClassesScreen() {
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [showFilter, setShowFilter] = useState(false);
-  const [classes, setClasses] = useState<GymClass[]>([]);
+  // weekClasses: map of "YYYY-MM-DD" → GymClass[]
+  const [weekClasses, setWeekClasses] = useState<Record<string, GymClass[]>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -386,29 +387,35 @@ export default function ClassesScreen() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchClasses = useCallback(async (silent = false, idx = selectedIdx) => {
+  const fetchWeek = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const d = days[idx];
-      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const { data } = await apiClient.get<GymClass[]>('/booking/classes', { params: { date } });
-      setClasses(data);
+      const { data } = await apiClient.get<Record<string, GymClass[]>>('/booking/classes/week');
+      setWeekClasses(data);
       setLastUpdated(new Date());
     } catch { if (!silent) setError('Unable to load classes'); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [selectedIdx]);
+  }, []);
 
-  // Initial load
-  useEffect(() => { fetchClasses(); }, [fetchClasses]);
+  // Initial load — fetches all 7 days at once
+  useEffect(() => { fetchWeek(); }, [fetchWeek]);
 
-  // Live refresh every 30s
+  // Live refresh every 30s — silently updates capacity for all days
   useEffect(() => {
-    liveRef.current = setInterval(() => fetchClasses(true), LIVE_REFRESH_MS);
+    liveRef.current = setInterval(() => fetchWeek(true), LIVE_REFRESH_MS);
     return () => { if (liveRef.current) clearInterval(liveRef.current); };
-  }, [fetchClasses]);
+  }, [fetchWeek]);
 
-  function selectDay(idx: number) { setSelectedIdx(idx); fetchClasses(false, idx); }
+  // Day switching is instant — no API call needed
+  function selectDay(idx: number) { setSelectedIdx(idx); }
+
+  // Get classes for the selected day
+  const dayKey = (() => {
+    const d = days[selectedIdx];
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const classes = weekClasses[dayKey] ?? [];
 
   async function handleBook(classId: number, acceptWaitlist: boolean) {
     setBookingId(classId); setToast('');
@@ -417,7 +424,7 @@ export default function ClassesScreen() {
         headers: { 'idempotency-key': generateUUID() },
       });
       setResult(data);
-      fetchClasses(true); // silent refresh after booking
+      fetchWeek(true); // silent refresh after booking
     } catch (err: any) {
       setToast(err?.response?.data?.message ?? 'Booking failed. Please try again.');
       setTimeout(() => setToast(''), 4000);
@@ -502,7 +509,7 @@ export default function ClassesScreen() {
           renderItem={({ item }) => (
             <ClassRow item={item} onBook={handleBook} isBooking={bookingId === item.id} />
           )}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchClasses(false); }} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchWeek(false); }} tintColor={colors.primary} />}
           ListHeaderComponent={
             <View style={s.dateHeader}>
               <Text style={s.dateHeaderText}>{dateLabel}</Text>

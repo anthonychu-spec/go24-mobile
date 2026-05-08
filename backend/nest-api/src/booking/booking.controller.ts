@@ -27,6 +27,20 @@ export class BookingController {
     return this.svc.listClasses({ date, clubId: clubId ? Number(clubId) : undefined });
   }
 
+  @ApiOperation({ summary: 'List classes for next 7 days (live capacity, 30s cache)' })
+  @ApiQuery({ name: 'clubId', required: false, type: Number })
+  @ApiQuery({ name: 'days', required: false, type: Number, example: 7 })
+  @Get('classes/week')
+  listWeekClasses(
+    @Query('clubId') clubId?: string,
+    @Query('days') days?: string,
+  ) {
+    return this.svc.listWeekClasses({
+      clubId: clubId ? Number(clubId) : undefined,
+      days: days ? Number(days) : 7,
+    });
+  }
+
   @ApiOperation({ summary: 'Get single class by ID' })
   @Get('classes/:id')
   getClass(@Param('id', ParseIntPipe) id: number) {
