@@ -11,6 +11,9 @@ import { fonts } from '../../src/theme/fonts';
 
 interface Booking {
   id: string; classId: number; status: string;
+  className?: string | null; clubName?: string | null;
+  startTime?: string | null; endTime?: string | null;
+  instructorName?: string | null;
   waitlistPosition?: number; errorCode?: string; createdAt: string;
 }
 
@@ -32,15 +35,23 @@ function generateUUID() {
   });
 }
 
+function fmtTime(iso: string) {
+  try { return new Date(iso).toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', hour12: false }); }
+  catch { return ''; }
+}
+
 function BookingRow({ item, onCancel, cancelling }: {
   item: Booking; onCancel: (id: string) => void; cancelling: boolean;
 }) {
   const canCancel = ['confirmed', 'waitlist', 'pending'].includes(item.status);
   const cfg = STATUS_CONFIG[item.status] ?? { label: item.status, color: colors.textMuted, icon: 'ellipse-outline' as const };
-  const date = new Date(item.createdAt).toLocaleDateString('en-HK', {
+  const displayTime = item.startTime ?? item.createdAt;
+  const date = new Date(displayTime).toLocaleDateString('en-HK', {
     weekday: 'short', month: 'short', day: 'numeric',
   });
-  const time = new Date(item.createdAt).toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const time = item.startTime
+    ? `${fmtTime(item.startTime)}${item.endTime ? ' – ' + fmtTime(item.endTime) : ''}`
+    : fmtTime(item.createdAt);
 
   return (
     <View style={s.row}>
@@ -48,8 +59,20 @@ function BookingRow({ item, onCancel, cancelling }: {
         <Ionicons name={cfg.icon} size={18} color={cfg.color} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={s.rowTitle}>Class #{item.classId}</Text>
+        <Text style={s.rowTitle}>{item.className ?? `Class #${item.classId}`}</Text>
         <Text style={s.rowSub}>{date}  ·  {time}</Text>
+        {item.clubName ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <Ionicons name="location" size={11} color={colors.primary} />
+            <Text style={s.rowSub}>{item.clubName}</Text>
+          </View>
+        ) : null}
+        {item.instructorName ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+            <Ionicons name="person" size={11} color={colors.textMuted} />
+            <Text style={s.rowSub}>{item.instructorName}</Text>
+          </View>
+        ) : null}
         {item.waitlistPosition != null && (
           <Text style={s.rowWaitlist}>Waitlist position #{item.waitlistPosition}</Text>
         )}

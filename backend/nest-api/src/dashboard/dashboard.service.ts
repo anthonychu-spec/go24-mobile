@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { Booking } from '../bookings/entities/booking.entity';
+import { BOOKING_REPO, IBookingRepo } from '../booking/booking.interfaces';
 
 export interface DashboardData {
   user: { name: string | null; email: string | null };
@@ -20,6 +21,7 @@ export interface DashboardData {
   nextClass: {
     bookingId: string;
     classId: number;
+    className: string | null;
     startTime: string;
     minutesUntil: number;
     clubName: string | null;
@@ -37,6 +39,7 @@ export class DashboardService {
   constructor(
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     private readonly pgm: PgmClient,
+    @Inject(BOOKING_REPO) private readonly bookingAdapter: IBookingRepo,
   ) {}
 
   async getDashboard(userId: string, pgmMemberId: number, email: string | null): Promise<DashboardData> {
@@ -162,22 +165,35 @@ export class DashboardService {
   }
 
   private async fetchNextBooking(userId: string): Promise<DashboardData['nextClass']> {
-    const next = await this.bookingRepo
+    // Get all confirmed bookings
+    const confirmed = await this.bookingRepo
       .createQueryBuilder('b')
       .where('b.user_id = :userId', { userId })
       .andWhere('b.status = :status', { status: 'confirmed' })
       .orderBy('b.created_at', 'DESC')
-      .limit(1)
-      .getOne();
+      .limit(10)
+      .getMany();
 
-    if (!next) return null;
+    if (confirmed.length === 0) return null;
 
-    return {
-      bookingId: next.id,
-      classId: next.classId,
-      startTime: next.createdAt.toISOString(),
-      minutesUntil: Math.max(0, Math.floor((next.createdAt.getTime() - Date.now()) / 60000)),
-      clubName: null,
-    };
+    // Find the nearest upcoming class by checking PGM start times
+    for (const booking of confirmed) {
+      try {
+        const cls = await this.bookingAdapter.getClass(booking.classId);
+        const startMs = new Date(cls.startTime).getTime();
+        if (startMs > Date.now()) {
+          return {
+            bookingId: booking.id,
+            classId: booking.classId,
+            className: cls.name,
+            startTime: cls.startTime,
+            minutesUntil: Math.max(0, Math.floor((startMs - Date.now()) / 60000)),
+            clubName: cls.clubName,
+          };
+        }
+      } catch { /* class not in cache window, skip */ }
+    }
+
+    return null;
   }
 }

@@ -14,5 +14,6 @@ import { BookingController } from './booking.controller';
     BookingService,
   ],
   controllers: [BookingController],
+  exports: [BOOKING_REPO, PgmBookingAdapter],
 })
 export class BookingModule {}

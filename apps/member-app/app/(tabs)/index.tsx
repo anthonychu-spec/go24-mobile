@@ -20,7 +20,7 @@ interface DashboardData {
   user: { name: string | null; email: string | null };
   membership: { active: boolean; planName: string | null; daysRemaining: number | null; expiresAt: string | null };
   pt: { remainingSessions: number; totalSessions: number; expiresAt: string | null };
-  nextClass: { bookingId: string; classId: number; startTime: string; minutesUntil: number; clubName: string | null } | null;
+  nextClass: { bookingId: string; classId: number; className?: string | null; startTime: string; minutesUntil: number; clubName: string | null } | null;
   thisMonth: { visits: number; classes: number; pt: number };
   unreadNotifications: number;
 }
@@ -64,7 +64,7 @@ function NextClassHero({ next, onBook }: {
   const content = (
     <View style={s.heroInner}>
       <Text style={s.heroEyebrow}>NEXT CLASS</Text>
-      <Text style={s.heroClassName}>Class #{next.classId}</Text>
+      <Text style={s.heroClassName}>{next.className ?? `Class #${next.classId}`}</Text>
       <View style={s.heroMeta}>
         <View style={s.heroMetaItem}>
           <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.7)" />

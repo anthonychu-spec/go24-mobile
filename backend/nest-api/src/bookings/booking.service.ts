@@ -154,7 +154,25 @@ export class BookingsService {
 
   async listMine(userId: string, status?: string): Promise<object[]> {
     const bookings = await this.bookingRepo.findByUser(userId, status);
-    return bookings;
+    // Enrich with PGM class details (name, club, times)
+    const enriched = await Promise.all(
+      bookings.map(async (b) => {
+        try {
+          const cls = await this.pgm.getClass(b.classId);
+          return {
+            ...b,
+            className: cls.name,
+            clubName: cls.clubName,
+            startTime: cls.startTime,
+            endTime: cls.endTime,
+            instructorName: cls.instructorName,
+          };
+        } catch {
+          return { ...b, className: null, clubName: null, startTime: null, endTime: null, instructorName: null };
+        }
+      }),
+    );
+    return enriched;
   }
 
   private async shadowRead(bookingId: string, pgmId: number, externalBookingId: number): Promise<void> {

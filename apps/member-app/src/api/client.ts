@@ -2,7 +2,7 @@ import axios from 'axios';
 import { tokenStorage } from '../auth/storage';
 
 export const API_BASE = 'https://api-staging.go24fitness.com/v1';
-export const apiClient = axios.create({ baseURL: API_BASE, timeout: 15000 });
+export const apiClient = axios.create({ baseURL: API_BASE, timeout: 30000 });
 
 apiClient.interceptors.request.use(async (config) => {
   const token = await tokenStorage.getAccess();

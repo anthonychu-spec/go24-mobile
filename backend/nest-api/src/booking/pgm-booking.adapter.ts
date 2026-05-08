@@ -233,14 +233,36 @@ export class PgmBookingAdapter implements IBookingRepo {
 
   async listMyBookings(memberId: number): Promise<PgmBooking[]> {
     try {
-      const res = await this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
-        $select: 'id,classId,startDate,endDate,memberId,isStandby,isCancelled',
-      });
-      return (res.value ?? [])
-        .filter(b => b.memberId === memberId && !b.isCancelled)
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-        .slice(0, 50)
-        .map(b => this.mapBooking(b));
+      const [bookingsRes, classTypeMap, clubMap] = await Promise.all([
+        this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
+          $filter: `memberId eq ${memberId}`,
+          $select: 'id,classId,startDate,endDate,memberId,isStandby,isCancelled',
+          $orderby: 'startDate desc',
+          $top: 50,
+        }),
+        this.getClassTypeMap(),
+        this.getClubMap(),
+      ]);
+
+      const allClasses = await this.getRawClasses();
+      const classMap = new Map<number, RawClass>();
+      for (const c of allClasses) classMap.set(c.id, c);
+
+      return (bookingsRes.value ?? [])
+        .filter(b => !b.isCancelled)
+        .map(b => {
+          const cls = classMap.get(b.classId);
+          return {
+            bookingId: b.id,
+            classId: b.classId,
+            className: cls ? (classTypeMap.get(cls.classTypeId) ?? `Class ${b.classId}`) : `Class ${b.classId}`,
+            startTime: b.startDate,
+            endTime: b.endDate,
+            clubName: cls ? (clubMap.get(cls.clubId) ?? null) : null,
+            isStandby: b.isStandby ?? false,
+            isCancelled: b.isCancelled ?? false,
+          };
+        });
     } catch (err) {
       throw normalizePgmError(err);
     }
