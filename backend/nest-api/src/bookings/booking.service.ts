@@ -39,7 +39,16 @@ export class BookingsService {
     @InjectRepository(OutboxEvent) private readonly outbox: Repository<OutboxEvent>,
   ) {}
 
+  private static readonly BOOKING_WINDOW_MS = 168 * 3600_000; // 168 hours
+
   async book(input: BookInput): Promise<BookResult> {
+    // 0. Enforce 168-hour booking window
+    const cls = await this.pgm.getClass(input.classId);
+    const startMs = new Date(cls.startTime).getTime();
+    if (startMs > Date.now() + BookingsService.BOOKING_WINDOW_MS) {
+      throw new BadRequestException('Class is outside the 168-hour booking window');
+    }
+
     // 1. Atomic idempotency claim
     const claim = await this.idempotencyRepo.tryClaim(
       input.userId, input.idempotencyKey, 'POST /bookings',

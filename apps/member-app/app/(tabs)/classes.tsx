@@ -34,6 +34,7 @@ const DEFAULT_FILTERS: Filters = {
 };
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const LIVE_REFRESH_MS = 30_000; // refresh capacity every 30s
+const BOOKING_WINDOW_H = 168;  // members can book up to 168 hours ahead
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -52,6 +53,15 @@ function durationMin(start: string, end: string) {
 }
 
 function getHour(iso: string) { return new Date(iso).getHours(); }
+
+function bookingWindowStatus(startTime: string): { bookable: boolean; opensIn?: string } {
+  const now = Date.now();
+  const start = new Date(startTime).getTime();
+  const cutoff = now + BOOKING_WINDOW_H * 3600_000;
+  if (start <= cutoff) return { bookable: true };
+  const diffH = Math.ceil((start - cutoff) / 3600_000);
+  return { bookable: false, opensIn: diffH >= 24 ? `${Math.floor(diffH / 24)}d` : `${diffH}h` };
+}
 
 function buildDays(count = 7) {
   return Array.from({ length: count }, (_, i) => {
@@ -299,6 +309,7 @@ function ClassRow({ item, onBook, isBooking }: {
 }) {
   const full = item.participantsCount >= item.maxParticipants;
   const dur = durationMin(item.startTime, item.endTime);
+  const { bookable, opensIn } = bookingWindowStatus(item.startTime);
 
   return (
     <View style={s.classRow}>
@@ -328,17 +339,24 @@ function ClassRow({ item, onBook, isBooking }: {
         <CapacityBar filled={item.participantsCount} total={item.maxParticipants} />
       </View>
 
-      <Pressable
-        style={[s.bookBtn, full ? s.bookBtnFull : s.bookBtnAvail, isBooking && s.bookBtnLoading]}
-        onPress={() => onBook(item.id, full)}
-        disabled={isBooking}
-        hitSlop={8}
-      >
-        {isBooking
-          ? <ActivityIndicator color={full ? colors.textMuted : '#fff'} size="small" />
-          : <Ionicons name={full ? 'time-outline' : 'add'} size={20} color={full ? colors.textMuted : '#fff'} />
-        }
-      </Pressable>
+      {bookable ? (
+        <Pressable
+          style={[s.bookBtn, full ? s.bookBtnFull : s.bookBtnAvail, isBooking && s.bookBtnLoading]}
+          onPress={() => onBook(item.id, full)}
+          disabled={isBooking}
+          hitSlop={8}
+        >
+          {isBooking
+            ? <ActivityIndicator color={full ? colors.textMuted : '#fff'} size="small" />
+            : <Ionicons name={full ? 'time-outline' : 'add'} size={20} color={full ? colors.textMuted : '#fff'} />
+          }
+        </Pressable>
+      ) : (
+        <View style={s.bookBtnLocked}>
+          <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
+          <Text style={s.lockedText}>{opensIn}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -628,6 +646,12 @@ const s = StyleSheet.create({
   bookBtnAvail:   { backgroundColor: colors.cta },
   bookBtnFull:    { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   bookBtnLoading: { opacity: 0.6 },
+  bookBtnLocked: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border,
+  },
+  lockedText: { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted, marginTop: 1 },
 
   toast:    { marginHorizontal: 16, marginBottom: 4, backgroundColor: '#FFF0F0', borderRadius: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary },
   toastText:{ fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
