@@ -33,7 +33,7 @@ const DEFAULT_FILTERS: Filters = {
   clubId: null,
 };
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-const LIVE_REFRESH_MS = 10_000; // refresh capacity every 10s
+const LIVE_REFRESH_MS = 30_000; // refresh capacity every 30s
 const BOOKING_WINDOW_H = 168;  // members can book up to 168 hours ahead
 
 function generateUUID() {

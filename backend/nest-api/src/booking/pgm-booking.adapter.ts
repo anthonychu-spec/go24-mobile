@@ -6,7 +6,7 @@ import {
 } from './booking.interfaces';
 
 const CACHE_TTL_MS       = 60 * 60 * 1000; // 1 hour  — lookup tables
-const CLASSES_CACHE_TTL  = 10 * 1000;      // 10s     — raw class list (live capacity)
+const CLASSES_CACHE_TTL  = 30 * 1000;      // 30s     — raw class list (live capacity)
 
 interface CacheEntry<T> {
   data: T;
