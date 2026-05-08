@@ -68,8 +68,14 @@ function BookingRow({ item, onCancel, cancelling }: {
   );
 }
 
+type BookingTab = 'upcoming' | 'past';
+
+const UPCOMING_STATUSES = ['confirmed', 'pending', 'waitlist', 'pending_verify'];
+const PAST_STATUSES     = ['attended', 'no_show', 'cancelled', 'failed'];
+
 export default function BookingsScreen() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [activeTab, setActiveTab] = useState<BookingTab>('upcoming');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -111,10 +117,31 @@ export default function BookingsScreen() {
     </SafeAreaView>
   );
 
+  const displayed = bookings.filter(b =>
+    activeTab === 'upcoming'
+      ? UPCOMING_STATUSES.includes(b.status)
+      : PAST_STATUSES.includes(b.status)
+  );
+
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
         <Text style={s.title}>My Bookings</Text>
+      </View>
+
+      {/* Tabs */}
+      <View style={s.tabRow}>
+        {(['upcoming', 'past'] as BookingTab[]).map(t => (
+          <Pressable
+            key={t}
+            style={[s.tabBtn, activeTab === t && s.tabBtnActive]}
+            onPress={() => setActiveTab(t)}
+          >
+            <Text style={[s.tabText, activeTab === t && s.tabTextActive]}>
+              {t === 'upcoming' ? 'Upcoming' : 'Past'}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {error ? (
@@ -125,7 +152,7 @@ export default function BookingsScreen() {
       ) : null}
 
       <FlatList
-        data={bookings}
+        data={displayed}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <BookingRow item={item} onCancel={handleCancel} cancelling={cancelling === item.id} />
@@ -136,8 +163,12 @@ export default function BookingsScreen() {
         ListEmptyComponent={
           <View style={s.empty}>
             <Ionicons name="bookmark-outline" size={40} color={colors.border} />
-            <Text style={s.emptyTitle}>No bookings yet</Text>
-            <Text style={s.emptySub}>Book a class from the Classes tab</Text>
+            <Text style={s.emptyTitle}>
+              {activeTab === 'upcoming' ? 'No upcoming bookings' : 'No past bookings'}
+            </Text>
+            <Text style={s.emptySub}>
+              {activeTab === 'upcoming' ? 'Book a class from the Classes tab' : 'Your completed classes will appear here'}
+            </Text>
           </View>
         }
       />
@@ -170,6 +201,19 @@ const s = StyleSheet.create({
   badge:     { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: 11, fontFamily: fonts.bold },
   cancelText:{ fontSize: 12, fontFamily: fonts.semibold, color: colors.error },
+
+  tabRow: {
+    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 8,
+    backgroundColor: colors.card,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+  },
+  tabBtn: {
+    flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center',
+    backgroundColor: colors.bg,
+  },
+  tabBtnActive:  { backgroundColor: colors.primary },
+  tabText:       { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMuted },
+  tabTextActive: { color: '#fff' },
 
   errorBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

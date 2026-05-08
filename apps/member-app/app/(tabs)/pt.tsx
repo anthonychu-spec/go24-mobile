@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
@@ -169,7 +170,13 @@ export default function PtScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
           }
           contentContainerStyle={{ padding: 16, gap: 12 }}
-          ListEmptyComponent={<Text style={s.empty}>No PT agreements</Text>}
+          ListEmptyComponent={
+            <View style={s.emptyState}>
+              <Ionicons name="barbell-outline" size={40} color={colors.border} />
+              <Text style={s.emptyTitle}>No PT agreements</Text>
+              <Text style={s.emptySub}>Contact the gym to set up a PT package</Text>
+            </View>
+          }
         />
       ) : (
         <FlatList
@@ -182,7 +189,13 @@ export default function PtScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
           }
           contentContainerStyle={{ padding: 16, gap: 8 }}
-          ListEmptyComponent={<Text style={s.empty}>No PT sessions yet</Text>}
+          ListEmptyComponent={
+            <View style={s.emptyState}>
+              <Ionicons name="time-outline" size={40} color={colors.border} />
+              <Text style={s.emptyTitle}>No PT sessions yet</Text>
+              <Text style={s.emptySub}>Your completed sessions will appear here</Text>
+            </View>
+          }
         />
       )}
     </SafeAreaView>
@@ -240,5 +253,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8,
   },
   signBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 13 },
-  empty:       { textAlign: 'center', fontFamily: fonts.regular, color: colors.textMuted, marginTop: 40, fontSize: 15 },
+  empty:      { textAlign: 'center', fontFamily: fonts.regular, color: colors.textMuted, marginTop: 40, fontSize: 15 },
+  emptyState: { alignItems: 'center', paddingTop: 60, gap: 8 },
+  emptyTitle: { fontSize: 16, fontFamily: fonts.bold,    color: colors.textMuted },
+  emptySub:   { fontSize: 13, fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 32 },
 });

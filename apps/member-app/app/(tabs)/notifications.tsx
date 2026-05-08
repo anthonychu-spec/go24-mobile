@@ -63,14 +63,18 @@ export default function NotificationsScreen() {
   const [data, setData] = useState<NotifResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
+    setError('');
     try {
       const { data: res } = await apiClient.get<NotifResponse>('/notifications', {
         params: { tab },
       });
       setData(res);
+    } catch {
+      setError('Unable to load notifications');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -97,15 +101,27 @@ export default function NotificationsScreen() {
     } : null);
   }, []);
 
-  if (loading) {
-    return (
-      <SafeAreaView style={s.safe}>
-        <View style={s.center}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (loading) return (
+    <SafeAreaView style={s.safe}>
+      <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
+    </SafeAreaView>
+  );
+
+  if (error) return (
+    <SafeAreaView style={s.safe}>
+      <View style={s.header}>
+        <Text style={s.title}>Notifications</Text>
+      </View>
+      <View style={s.errorState}>
+        <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
+        <Text style={s.errorStateTitle}>Unable to load</Text>
+        <Text style={s.errorStateSub}>{error}</Text>
+        <Pressable style={s.retryBtn} onPress={() => load()}>
+          <Text style={s.retryText}>Try Again</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
 
   const unread = data?.unread ?? 0;
 
@@ -196,4 +212,13 @@ const s = StyleSheet.create({
 
   empty:     { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyText: { fontSize: 15, fontFamily: fonts.regular, color: colors.textMuted },
+
+  errorState:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 40 },
+  errorStateTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.textMuted },
+  errorStateSub:   { fontSize: 13, fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center' },
+  retryBtn: {
+    marginTop: 8, borderWidth: 1, borderColor: colors.primary,
+    borderRadius: 20, paddingHorizontal: 24, paddingVertical: 9,
+  },
+  retryText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
 });
