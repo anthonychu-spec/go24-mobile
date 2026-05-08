@@ -18,6 +18,7 @@ export class BookingRepository {
     userId: string;
     pgmMemberId: number;
     classId: number;
+    classDate?: string;
     idempotencyKey: string;
     status: BookingStatus;
   }): Promise<Booking> {
@@ -25,6 +26,7 @@ export class BookingRepository {
       userId: input.userId,
       pgmMemberId: input.pgmMemberId,
       classId: input.classId,
+      classDate: input.classDate ?? null,
       idempotencyKey: input.idempotencyKey,
       status: input.status,
       source: 'local',

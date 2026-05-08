@@ -30,6 +30,9 @@ export class Booking {
   @Column({ name: 'idempotency_key', unique: true, type: 'text' })
   idempotencyKey: string;
 
+  @Column({ name: 'class_date', type: 'date', nullable: true })
+  classDate: string | null;
+
   @Column({ name: 'error_code', nullable: true, type: 'varchar', length: 50 })
   errorCode: string | null;
 
