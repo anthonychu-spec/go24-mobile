@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { Booking } from '../bookings/entities/booking.entity';
-import { BOOKING_REPO, IBookingRepo } from '../booking/booking.interfaces';
+import { BOOKING_REPO } from '../booking/booking.interfaces';
+import type { IBookingRepo } from '../booking/booking.interfaces';
 
 export interface DashboardData {
   user: { name: string | null; email: string | null };
