@@ -302,10 +302,11 @@ const fs = StyleSheet.create({
 });
 
 /* ── Class row ── */
-function ClassRow({ item, onBook, isBooking }: {
+function ClassRow({ item, onBook, isBooking, dayBooked }: {
   item: GymClass;
   onBook: (id: number, waitlist: boolean) => void;
   isBooking: boolean;
+  dayBooked: boolean;
 }) {
   const full = item.participantsCount >= item.maxParticipants;
   const dur = durationMin(item.startTime, item.endTime);
@@ -339,7 +340,17 @@ function ClassRow({ item, onBook, isBooking }: {
         <CapacityBar filled={item.participantsCount} total={item.maxParticipants} />
       </View>
 
-      {bookable ? (
+      {!bookable ? (
+        <View style={s.bookBtnLocked}>
+          <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
+          <Text style={s.lockedText}>{opensIn}</Text>
+        </View>
+      ) : dayBooked ? (
+        <View style={s.bookBtnLocked}>
+          <Ionicons name="checkmark" size={14} color={colors.success} />
+          <Text style={[s.lockedText, { color: colors.success }]}>1/1</Text>
+        </View>
+      ) : (
         <Pressable
           style={[s.bookBtn, full ? s.bookBtnFull : s.bookBtnAvail, isBooking && s.bookBtnLoading]}
           onPress={() => onBook(item.id, full)}
@@ -351,11 +362,6 @@ function ClassRow({ item, onBook, isBooking }: {
             : <Ionicons name={full ? 'time-outline' : 'add'} size={20} color={full ? colors.textMuted : '#fff'} />
           }
         </Pressable>
-      ) : (
-        <View style={s.bookBtnLocked}>
-          <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
-          <Text style={s.lockedText}>{opensIn}</Text>
-        </View>
       )}
     </View>
   );
@@ -396,6 +402,7 @@ export default function ClassesScreen() {
   const [showFilter, setShowFilter] = useState(false);
   // weekClasses: map of "YYYY-MM-DD" → GymClass[]
   const [weekClasses, setWeekClasses] = useState<Record<string, GymClass[]>>({});
+  const [bookedDays, setBookedDays] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -405,16 +412,32 @@ export default function ClassesScreen() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const fetchBookedDays = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<any[]>('/bookings');
+      const days = new Set<string>();
+      for (const b of data) {
+        if (!['confirmed', 'pending', 'waitlist', 'pending_verify'].includes(b.status)) continue;
+        const st = b.startTime ?? b.createdAt;
+        if (st) days.add(new Date(st).toISOString().slice(0, 10));
+      }
+      setBookedDays(days);
+    } catch { /* ignore */ }
+  }, []);
+
   const fetchWeek = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const { data } = await apiClient.get<Record<string, GymClass[]>>('/booking/classes/week');
-      setWeekClasses(data);
+      const [classesRes] = await Promise.all([
+        apiClient.get<Record<string, GymClass[]>>('/booking/classes/week'),
+        fetchBookedDays(),
+      ]);
+      setWeekClasses(classesRes.data);
       setLastUpdated(new Date());
     } catch { if (!silent) setError('Unable to load classes'); }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [fetchBookedDays]);
 
   // Initial load — fetches all 7 days at once
   useEffect(() => { fetchWeek(); }, [fetchWeek]);
@@ -442,6 +465,7 @@ export default function ClassesScreen() {
         headers: { 'idempotency-key': generateUUID() },
       });
       setResult(data);
+      fetchBookedDays(); // refresh daily limit state
       fetchWeek(true); // silent refresh after booking
     } catch (err: any) {
       setToast(err?.response?.data?.message ?? 'Booking failed. Please try again.');
@@ -525,7 +549,7 @@ export default function ClassesScreen() {
           data={filtered}
           keyExtractor={item => String(item.id)}
           renderItem={({ item }) => (
-            <ClassRow item={item} onBook={handleBook} isBooking={bookingId === item.id} />
+            <ClassRow item={item} onBook={handleBook} isBooking={bookingId === item.id} dayBooked={bookedDays.has(dayKey)} />
           )}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchWeek(false); }} tintColor={colors.primary} />}
           ListHeaderComponent={

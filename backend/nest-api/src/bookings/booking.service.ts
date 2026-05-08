@@ -49,6 +49,21 @@ export class BookingsService {
       throw new BadRequestException('Class is outside the 168-hour booking window');
     }
 
+    // 0b. Enforce 1 class per day limit
+    const classDate = new Date(cls.startTime).toISOString().slice(0, 10);
+    const activeBookings = (await this.bookingRepo.findByUser(input.userId))
+      .filter(b => ['confirmed', 'pending', 'waitlist', 'pending_verify'].includes(b.status));
+    for (const b of activeBookings) {
+      try {
+        const otherDate = new Date((await this.pgm.getClass(b.classId)).startTime).toISOString().slice(0, 10);
+        if (otherDate === classDate) {
+          throw new BadRequestException('Daily limit reached — you can only book 1 class per day');
+        }
+      } catch (e) {
+        if (e instanceof BadRequestException) throw e;
+      }
+    }
+
     // 1. Atomic idempotency claim
     const claim = await this.idempotencyRepo.tryClaim(
       input.userId, input.idempotencyKey, 'POST /bookings',
