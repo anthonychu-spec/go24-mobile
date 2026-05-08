@@ -350,16 +350,20 @@ function ClassRow({ item, onBook, isBooking, dayBooked }: {
           <Ionicons name="checkmark" size={14} color={colors.success} />
           <Text style={[s.lockedText, { color: colors.success }]}>1/1</Text>
         </View>
+      ) : full ? (
+        <View style={s.bookBtnLocked}>
+          <Text style={s.lockedText}>Full</Text>
+        </View>
       ) : (
         <Pressable
-          style={[s.bookBtn, full ? s.bookBtnFull : s.bookBtnAvail, isBooking && s.bookBtnLoading]}
-          onPress={() => onBook(item.id, full)}
+          style={[s.bookBtn, s.bookBtnAvail, isBooking && s.bookBtnLoading]}
+          onPress={() => onBook(item.id, false)}
           disabled={isBooking}
           hitSlop={8}
         >
           {isBooking
-            ? <ActivityIndicator color={full ? colors.textMuted : '#fff'} size="small" />
-            : <Ionicons name={full ? 'time-outline' : 'add'} size={20} color={full ? colors.textMuted : '#fff'} />
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Ionicons name="add" size={20} color="#fff" />
           }
         </Pressable>
       )}
