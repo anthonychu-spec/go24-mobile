@@ -56,6 +56,10 @@ export class BookingRepository {
     return this.bookings.findOne({ where: { id } });
   }
 
+  async findByExternalId(externalId: string): Promise<Booking | null> {
+    return this.bookings.findOne({ where: { externalId } });
+  }
+
   async findByUser(userId: string, status?: string): Promise<Booking[]> {
     const qb = this.bookings.createQueryBuilder('b')
       .where('b.user_id = :userId', { userId })

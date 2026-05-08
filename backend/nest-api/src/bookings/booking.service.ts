@@ -206,6 +206,36 @@ export class BookingsService {
     void check(1);
   }
 
+  // ── PGM webhook handlers ──────────────────────────────────────────────
+
+  /** PGM ClassesBookingCancelled — system/instructor cancel */
+  async handlePgmCancelled(pgmBookingId: number): Promise<void> {
+    const booking = await this.bookingRepo.findByExternalId(String(pgmBookingId));
+    if (!booking) {
+      this.logger.warn(`PGM cancel webhook: no local booking for externalId=${pgmBookingId}`);
+      return;
+    }
+    if (booking.status === 'cancelled') return; // already cancelled
+
+    await this.bookingRepo.transition(booking.id, 'cancelled', {}, 'pgm_webhook_cancel', 'system');
+    await this.emitOutbox('booking.cancelled', { bookingId: booking.id, classId: booking.classId, source: 'pgm_webhook' });
+    this.logger.log(`PGM cancel webhook: booking ${booking.id} cancelled (externalId=${pgmBookingId})`);
+  }
+
+  /** PGM ClassesBookingPromotedFromStandbyList — waitlist → confirmed */
+  async handlePgmPromoted(pgmBookingId: number): Promise<void> {
+    const booking = await this.bookingRepo.findByExternalId(String(pgmBookingId));
+    if (!booking) {
+      this.logger.warn(`PGM promoted webhook: no local booking for externalId=${pgmBookingId}`);
+      return;
+    }
+    if (booking.status === 'confirmed') return; // already promoted
+
+    await this.bookingRepo.transition(booking.id, 'confirmed', { waitlistPosition: null }, 'pgm_webhook_promoted', 'system');
+    await this.emitOutbox('booking.confirmed', { bookingId: booking.id, classId: booking.classId, source: 'pgm_webhook' });
+    this.logger.log(`PGM promoted webhook: booking ${booking.id} waitlist→confirmed (externalId=${pgmBookingId})`);
+  }
+
   private async emitOutbox(topic: string, payload: Record<string, unknown>): Promise<void> {
     try {
       await this.outbox.save(this.outbox.create({ topic, payload }));

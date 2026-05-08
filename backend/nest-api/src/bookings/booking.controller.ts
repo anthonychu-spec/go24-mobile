@@ -1,7 +1,8 @@
 import {
   BadRequestException, Body, Controller, Delete,
-  Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards,
+  Get, Headers, HttpCode, Logger, Param, Post, Query, Req, UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiHeader, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -59,5 +60,55 @@ export class BookingsController {
   ) {
     const user = req.user as AuthedUser;
     return this.svc.listMine(user.id, status);
+  }
+}
+
+/* ── PGM Webhook Controller (no JWT — secured by shared secret) ── */
+
+@ApiTags('webhooks')
+@Controller('webhooks/pgm')
+export class PgmWebhookController {
+  private readonly logger = new Logger(PgmWebhookController.name);
+  private readonly secret: string;
+
+  constructor(
+    private readonly svc: BookingsService,
+    private readonly cfg: ConfigService,
+  ) {
+    this.secret = cfg.get<string>('PGM_WEBHOOK_SECRET') ?? '';
+  }
+
+  @ApiOperation({ summary: 'PGM ClassesBookingCancelled webhook' })
+  @Post('booking-cancelled')
+  @HttpCode(200)
+  async bookingCancelled(@Body() body: any, @Headers('x-webhook-secret') secret: string) {
+    if (this.secret && secret !== this.secret) {
+      this.logger.warn('PGM webhook rejected: bad secret');
+      throw new BadRequestException('Invalid webhook secret');
+    }
+    const bookingId = body?.bookingId ?? body?.BookingId ?? body?.id;
+    if (!bookingId) {
+      this.logger.warn('PGM cancel webhook: missing bookingId', body);
+      return { ok: false, reason: 'missing bookingId' };
+    }
+    await this.svc.handlePgmCancelled(Number(bookingId));
+    return { ok: true };
+  }
+
+  @ApiOperation({ summary: 'PGM ClassesBookingPromotedFromStandbyList webhook' })
+  @Post('booking-promoted')
+  @HttpCode(200)
+  async bookingPromoted(@Body() body: any, @Headers('x-webhook-secret') secret: string) {
+    if (this.secret && secret !== this.secret) {
+      this.logger.warn('PGM webhook rejected: bad secret');
+      throw new BadRequestException('Invalid webhook secret');
+    }
+    const bookingId = body?.bookingId ?? body?.BookingId ?? body?.id;
+    if (!bookingId) {
+      this.logger.warn('PGM promoted webhook: missing bookingId', body);
+      return { ok: false, reason: 'missing bookingId' };
+    }
+    await this.svc.handlePgmPromoted(Number(bookingId));
+    return { ok: true };
   }
 }

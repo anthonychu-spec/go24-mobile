@@ -10,7 +10,7 @@ import { OutboxEvent } from './entities/outbox-event.entity';
 import { BookingRepository } from './repositories/booking.repo';
 import { IdempotencyRepository } from './repositories/idempotency.repo';
 import { BookingsService } from './booking.service';
-import { BookingsController } from './booking.controller';
+import { BookingsController, PgmWebhookController } from './booking.controller';
 import { ReconcileJob } from './jobs/reconcile.job';
 
 @Module({
@@ -26,6 +26,6 @@ import { ReconcileJob } from './jobs/reconcile.job';
     BookingsService,
     ReconcileJob,
   ],
-  controllers: [BookingsController],
+  controllers: [BookingsController, PgmWebhookController],
 })
 export class BookingsModule {}
