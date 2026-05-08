@@ -345,25 +345,21 @@ function ClassRow({ item, onBook, isBooking, dayBooked }: {
           <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
           <Text style={s.lockedText}>{opensIn}</Text>
         </View>
-      ) : dayBooked ? (
+      ) : dayBooked && !full ? (
         <View style={s.bookBtnLocked}>
           <Ionicons name="checkmark" size={14} color={colors.success} />
           <Text style={[s.lockedText, { color: colors.success }]}>1/1</Text>
         </View>
-      ) : full ? (
-        <View style={s.bookBtnLocked}>
-          <Text style={s.lockedText}>Full</Text>
-        </View>
       ) : (
         <Pressable
-          style={[s.bookBtn, s.bookBtnAvail, isBooking && s.bookBtnLoading]}
-          onPress={() => onBook(item.id, false)}
+          style={[s.bookBtn, full ? s.bookBtnFull : dayBooked ? s.bookBtnFull : s.bookBtnAvail, isBooking && s.bookBtnLoading]}
+          onPress={() => onBook(item.id, full)}
           disabled={isBooking}
           hitSlop={8}
         >
           {isBooking
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Ionicons name="add" size={20} color="#fff" />
+            ? <ActivityIndicator color={full ? colors.textMuted : '#fff'} size="small" />
+            : <Ionicons name={full ? 'hourglass-outline' : 'add'} size={20} color={full ? colors.textMuted : '#fff'} />
           }
         </Pressable>
       )}
