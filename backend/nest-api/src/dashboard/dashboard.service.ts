@@ -35,6 +35,7 @@ export interface DashboardData {
     classes: number;
     pt: number;
   };
+  totalVisits: number;
   unreadNotifications: number;
   streak: number;
 }
@@ -83,7 +84,7 @@ export class DashboardService {
     const monthStart = new Date();
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
 
-    const [contracts, ptAgreements, visits, nextBooking, monthClasses, memberMeta, streakResult] = await Promise.allSettled([
+    const [contracts, ptAgreements, visits, nextBooking, monthClasses, memberMeta, streakResult, totalVisitsResult] = await Promise.allSettled([
       this.fetchActiveContract(pgmMemberId),
       this.fetchPtAgreements(pgmMemberId),
       this.fetchMonthVisits(pgmMemberId, monthStart),
@@ -93,15 +94,17 @@ export class DashboardService {
       }),
       this.fetchMemberMeta(pgmMemberId),
       this.fetchStreak(pgmMemberId, userId),
+      this.fetchTotalVisits(pgmMemberId),
     ]);
 
-    const contract   = contracts.status      === 'fulfilled' ? contracts.value      : null;
-    const agreements = ptAgreements.status   === 'fulfilled' ? ptAgreements.value   : [];
-    const visitCount = visits.status         === 'fulfilled' ? visits.value         : 0;
-    const next       = nextBooking.status    === 'fulfilled' ? nextBooking.value     : null;
-    const classes    = monthClasses.status   === 'fulfilled' ? monthClasses.value   : 0;
-    const meta       = memberMeta.status     === 'fulfilled' ? memberMeta.value     : { name: null, outstanding: 0 };
-    const streak     = streakResult.status   === 'fulfilled' ? streakResult.value   : 0;
+    const contract    = contracts.status         === 'fulfilled' ? contracts.value         : null;
+    const agreements  = ptAgreements.status      === 'fulfilled' ? ptAgreements.value      : [];
+    const visitCount  = visits.status            === 'fulfilled' ? visits.value            : 0;
+    const next        = nextBooking.status       === 'fulfilled' ? nextBooking.value        : null;
+    const classes     = monthClasses.status      === 'fulfilled' ? monthClasses.value      : 0;
+    const meta        = memberMeta.status        === 'fulfilled' ? memberMeta.value        : { name: null, outstanding: 0 };
+    const streak      = streakResult.status      === 'fulfilled' ? streakResult.value      : 0;
+    const totalVisits = totalVisitsResult.status === 'fulfilled' ? totalVisitsResult.value : 0;
 
     const totalRemaining = agreements.reduce((s, a) => s + (a.remainingSessions ?? 0), 0);
     const totalSessions  = agreements.reduce((s, a) => s + (a.totalSessions ?? 0), 0);
@@ -126,6 +129,7 @@ export class DashboardService {
       pt: { remainingSessions: totalRemaining, totalSessions, expiresAt: ptExpires },
       nextClass: next,
       thisMonth: { visits: visitCount, classes, pt: 0 },
+      totalVisits,
       unreadNotifications: 0,
       streak,
     };
@@ -282,14 +286,25 @@ export class DashboardService {
 
   private async fetchActiveContract(pgmMemberId: number): Promise<{ planName: string | null; endDate: string } | null> {
     try {
-      const res = await this.pgm.get<{ value: any[] }>('/odata/Contracts', {
-        $filter: `memberId eq ${pgmMemberId} and status eq 'Current' and isDeleted eq false`,
-        $orderby: 'endDate desc',
-        $top: 1,
-      });
-      const c = res.value?.[0];
+      const [contractRes, plansRes] = await Promise.allSettled([
+        this.pgm.get<{ value: any[] }>('/odata/Contracts', {
+          $filter: `memberId eq ${pgmMemberId} and isActive eq true and isDeleted eq false`,
+          $orderby: 'endDate desc',
+          $select: 'id,paymentPlanId,endDate',
+          $top: 1,
+        }),
+        this.pgm.get<{ value: any[] }>('/odata/PaymentPlans', { $select: 'id,name' }),
+      ]);
+
+      const c = contractRes.status === 'fulfilled' ? contractRes.value.value?.[0] : null;
       if (!c) return null;
-      return { planName: c.planName ?? null, endDate: c.endDate };
+
+      const planMap = new Map<number, string>();
+      if (plansRes.status === 'fulfilled') {
+        for (const p of (plansRes.value.value ?? [])) planMap.set(p.id, p.name);
+      }
+
+      return { planName: planMap.get(c.paymentPlanId) ?? null, endDate: c.endDate };
     } catch { return null; }
   }
 
@@ -310,6 +325,17 @@ export class DashboardService {
         $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
         $select: 'id',
         $top: 200,
+      });
+      return res.value?.length ?? 0;
+    } catch { return 0; }
+  }
+
+  private async fetchTotalVisits(pgmMemberId: number): Promise<number> {
+    try {
+      const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
+        $filter: `memberId eq ${pgmMemberId}`,
+        $select: 'id',
+        $top: 500,
       });
       return res.value?.length ?? 0;
     } catch { return 0; }
@@ -365,12 +391,16 @@ export class DashboardService {
   }
 
   private async fetchNextBooking(userId: string): Promise<DashboardData['nextClass']> {
+    const today = new Date().toISOString().slice(0, 10);
+
     const confirmed = await this.bookingRepo
       .createQueryBuilder('b')
       .where('b.user_id = :userId', { userId })
       .andWhere('b.status = :status', { status: 'confirmed' })
-      .orderBy('b.created_at', 'DESC')
-      .limit(10)
+      .andWhere('(b.class_date >= :today OR b.class_date IS NULL)', { today })
+      .orderBy('b.class_date', 'ASC')
+      .addOrderBy('b.created_at', 'ASC')
+      .limit(20)
       .getMany();
 
     if (confirmed.length === 0) return null;

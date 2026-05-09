@@ -28,6 +28,7 @@ interface DashboardData {
   pt:        { remainingSessions: number; totalSessions: number; expiresAt: string | null };
   nextClass: { bookingId: string; classId: number; className?: string | null; startTime: string; minutesUntil: number; clubName: string | null } | null;
   thisMonth: { visits: number; classes: number; pt: number };
+  totalVisits: number;
   unreadNotifications: number;
   streak: number;
 }
@@ -146,21 +147,26 @@ function StatRow({ visits, pt, classes }: { visits:number; pt:number; classes:nu
     { label:'Classes',  val: classes, color:colors.indigo,  icon:'people-outline'  as const },
   ];
   return (
-    <View style={sr.wrap}>
-      {items.map((it, i) => (
-        <View key={it.label} style={[sr.item, i>0 && sr.border]}>
-          <View style={[sr.iconBox, { backgroundColor: it.color + '15' }]}>
-            <Ionicons name={it.icon} size={15} color={it.color} />
+    <View style={sr.outer}>
+      <Text style={sr.period}>THIS MONTH</Text>
+      <View style={sr.wrap}>
+        {items.map((it, i) => (
+          <View key={it.label} style={[sr.item, i>0 && sr.border]}>
+            <View style={[sr.iconBox, { backgroundColor: it.color + '15' }]}>
+              <Ionicons name={it.icon} size={15} color={it.color} />
+            </View>
+            <Text style={[sr.num, { color:it.color }]}>{it.val}</Text>
+            <Text style={sr.lbl}>{it.label}</Text>
           </View>
-          <Text style={[sr.num, { color:it.color }]}>{it.val}</Text>
-          <Text style={sr.lbl}>{it.label}</Text>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   );
 }
 const sr = StyleSheet.create({
-  wrap:    { flexDirection:'row', marginHorizontal:16, backgroundColor:colors.card,
+  outer:   { marginHorizontal:16, gap:8 },
+  period:  { fontSize:10, fontFamily:fonts.bold, color:colors.textMuted, letterSpacing:1.5 },
+  wrap:    { flexDirection:'row', backgroundColor:colors.card,
               borderRadius:20, paddingVertical:18,
               shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.06, shadowRadius:8, elevation:2 },
   item:    { flex:1, alignItems:'center', gap:5 },
@@ -271,13 +277,124 @@ const ag = StyleSheet.create({
 // ─── Actions data ─────────────────────────────────────────────────────────────
 
 const ACTIONS = [
-  { icon:'qr-code'               as const, label:'QR Check-in',   to:'/checkin/qr',       color:colors.primary, bg:colors.primaryBg },
-  { icon:'calendar'              as const, label:'Book a Class',   to:'/(tabs)/classes',   color:colors.blue,    bg:colors.blueBg    },
-  { icon:'bookmark'              as const, label:'My Bookings',    to:'/(tabs)/bookings',  color:colors.indigo,  bg:colors.indigoBg  },
-  { icon:'barbell'               as const, label:'PT Sessions',    to:'/(tabs)/pt',        color:colors.teal,    bg:colors.tealBg    },
-  { icon:'pulse'                 as const, label:'Activity Log',   to:'/(tabs)/activity',  color:colors.green,   bg:colors.greenBg   },
-  { icon:'gift'                  as const, label:'Refer a Friend', to:'/referral',         color:colors.rose,    bg:colors.roseBg    },
+  { icon:'calendar' as const, label:'Book a Class', to:'/(tabs)/classes',  color:colors.blue,   bg:colors.blueBg   },
+  { icon:'bookmark' as const, label:'My Bookings',  to:'/(tabs)/bookings', color:colors.indigo, bg:colors.indigoBg },
+  { icon:'barbell'  as const, label:'PT Sessions',  to:'/(tabs)/pt',       color:colors.teal,   bg:colors.tealBg   },
+  { icon:'pulse'    as const, label:'Activity Log', to:'/(tabs)/activity', color:colors.green,  bg:colors.greenBg  },
 ];
+
+// ─── Activity Hub ─────────────────────────────────────────────────────────────
+
+const MILESTONES = [10, 50, 100, 200];
+
+function ActivityHub({ totalVisits, hasExpired, hasDebt, onPay, onProfile }: {
+  totalVisits: number;
+  hasExpired: boolean;
+  hasDebt: boolean;
+  onPay: () => void;
+  onProfile: () => void;
+}) {
+  const next = MILESTONES.find(m => totalVisits < m);
+  const pct    = next ? Math.min(1, totalVisits / next) : 1;
+  const toGo   = next ? next - totalVisits : 0;
+
+  return (
+    <View style={hub.card}>
+      {/* Header row */}
+      <View style={hub.headerRow}>
+        <View style={hub.titleGroup}>
+          <Ionicons name="trophy-outline" size={16} color={colors.amber} />
+          <Text style={hub.title}>Activity Hub</Text>
+        </View>
+        <View style={hub.countBadge}>
+          <Text style={hub.countNum}>{totalVisits}</Text>
+          <Text style={hub.countLabel}> check-ins</Text>
+        </View>
+      </View>
+
+      {/* Progress to next milestone */}
+      {next ? (
+        <View style={hub.progressSection}>
+          <View style={hub.progressLabelRow}>
+            <Text style={hub.progressTxt}>{totalVisits} / {next} visits</Text>
+            <Text style={hub.progressTip}>{toGo} to go 🎯</Text>
+          </View>
+          <View style={hub.bar}>
+            <View style={[hub.fill, { width: `${pct * 100}%` as any }]} />
+          </View>
+        </View>
+      ) : (
+        <Text style={hub.maxTxt}>All milestones reached! 🏆</Text>
+      )}
+
+      {/* Milestone badges */}
+      <View style={hub.badges}>
+        {MILESTONES.map(m => {
+          const done = totalVisits >= m;
+          return (
+            <View key={m} style={[hub.badge, done && hub.badgeDone]}>
+              {done
+                ? <Ionicons name="checkmark" size={10} color="#fff" />
+                : <Text style={hub.badgeNum}>{m}</Text>
+              }
+              <Text style={[hub.badgeLbl, done && hub.badgeLblDone]}>{m}</Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Smart alerts */}
+      {hasDebt && (
+        <Pressable style={[hub.alert, hub.alertRed]} onPress={onPay}>
+          <Ionicons name="alert-circle" size={15} color={colors.primary} />
+          <Text style={[hub.alertTxt, { color: colors.primary }]}>Can't enter? Pay outstanding balance</Text>
+          <Ionicons name="chevron-forward" size={13} color={colors.primary} />
+        </Pressable>
+      )}
+      {hasExpired && !hasDebt && (
+        <Pressable style={[hub.alert, hub.alertAmber]} onPress={onProfile}>
+          <Ionicons name="card-outline" size={15} color={colors.amber} />
+          <Text style={[hub.alertTxt, { color: colors.amber }]}>Membership expired — renew now</Text>
+          <Ionicons name="chevron-forward" size={13} color={colors.amber} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+const hub = StyleSheet.create({
+  card:    { marginHorizontal:16, backgroundColor:colors.card, borderRadius:20, padding:18, gap:14,
+              shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.06, shadowRadius:8, elevation:2 },
+  headerRow:   { flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
+  titleGroup:  { flexDirection:'row', alignItems:'center', gap:7 },
+  title:       { fontSize:15, fontFamily:fonts.bold, color:colors.text },
+  countBadge:  { flexDirection:'row', alignItems:'baseline' },
+  countNum:    { fontSize:22, fontFamily:fonts.black, color:colors.amber },
+  countLabel:  { fontSize:11, fontFamily:fonts.regular, color:colors.textMuted },
+
+  progressSection:  { gap:7 },
+  progressLabelRow: { flexDirection:'row', justifyContent:'space-between' },
+  progressTxt:      { fontSize:12, fontFamily:fonts.semibold, color:colors.text },
+  progressTip:      { fontSize:12, fontFamily:fonts.semibold, color:colors.textMuted },
+  bar:   { height:7, backgroundColor:colors.bg, borderRadius:4, overflow:'hidden' },
+  fill:  { height:'100%', backgroundColor:colors.amber, borderRadius:4 },
+  maxTxt:{ fontSize:13, fontFamily:fonts.semibold, color:colors.amber, textAlign:'center' },
+
+  badges:   { flexDirection:'row', gap:10 },
+  badge:    { flex:1, alignItems:'center', gap:4, paddingVertical:10,
+               backgroundColor:colors.bg, borderRadius:12,
+               borderWidth:1.5, borderColor:colors.border },
+  badgeDone:{ backgroundColor:colors.amber, borderColor:colors.amber },
+  badgeNum: { fontSize:11, fontFamily:fonts.black, color:colors.textMuted },
+  badgeLbl: { fontSize:9, fontFamily:fonts.bold, color:colors.textMuted, letterSpacing:0.5 },
+  badgeLblDone:{ color:'rgba(255,255,255,0.85)' },
+
+  alert:    { flexDirection:'row', alignItems:'center', gap:9,
+               borderRadius:12, paddingHorizontal:13, paddingVertical:11 },
+  alertRed: { backgroundColor:colors.primaryBg, borderWidth:1, borderColor:colors.primary+'30' },
+  alertAmber:{ backgroundColor:colors.amberBg, borderWidth:1, borderColor:colors.amber+'30' },
+  alertTxt: { flex:1, fontSize:13, fontFamily:fonts.semibold },
+});
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -302,12 +419,14 @@ export default function HomeScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const name    = data?.user?.name ?? '';
-  const m       = data?.membership;
-  const pt      = data?.pt;
-  const unread  = data?.unreadNotifications ?? 0;
-  const hasDebt = (m?.outstandingBalance ?? 0) > 0;
-  const streak  = data?.streak ?? 0;
+  const name        = data?.user?.name ?? '';
+  const m           = data?.membership;
+  const pt          = data?.pt;
+  const unread      = data?.unreadNotifications ?? 0;
+  const hasDebt     = (m?.outstandingBalance ?? 0) > 0;
+  const streak      = data?.streak ?? 0;
+  const totalVisits = data?.totalVisits ?? 0;
+  const hasExpired  = m != null && !m.active && (m.daysRemaining == null || m.daysRemaining <= 0);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -375,6 +494,15 @@ export default function HomeScreen() {
           classes={data?.thisMonth.classes ?? 0}
         />
 
+        {/* Activity Hub */}
+        <ActivityHub
+          totalVisits={totalVisits}
+          hasExpired={hasExpired}
+          hasDebt={hasDebt}
+          onPay={() => router.push('/profile')}
+          onProfile={() => router.push('/profile')}
+        />
+
         {/* Banners — always visible; shows placeholder when empty */}
         <Text style={s.sectionTitle}>Promotions</Text>
         {banners.length > 0 ? (
@@ -411,16 +539,8 @@ export default function HomeScreen() {
         <Text style={s.sectionTitle}>Quick Actions</Text>
         <View style={s.grid}>
           {ACTIONS.map(a => (
-            <ActionCell key={a.label} {...a} badge={a.to==='/profile'&&hasDebt} />
+            <ActionCell key={a.label} {...a} />
           ))}
-          <ActionCell
-            icon="person-circle-outline"
-            label="My Account"
-            color={colors.amber}
-            bg={colors.amberBg}
-            to="/profile"
-            badge={hasDebt}
-          />
         </View>
 
         <View style={{height:8}} />
