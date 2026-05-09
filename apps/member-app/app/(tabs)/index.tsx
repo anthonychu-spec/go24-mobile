@@ -138,11 +138,11 @@ const mc = StyleSheet.create({
 
 // ─── Stat Card (inline) ───────────────────────────────────────────────────────
 
-function StatRow({ days, pt, visits }: { days:number|null; pt:number; visits:number }) {
+function StatRow({ visits, pt, classes }: { visits:number; pt:number; classes:number }) {
   const items = [
-    { label:'Days Left',   val: days ?? '—',  color:colors.primary, icon:'calendar-outline'  as const },
-    { label:'PT Sessions', val: pt,            color:colors.teal,    icon:'barbell-outline'   as const },
-    { label:'This Month',  val: visits,        color:colors.amber,   icon:'flame-outline'     as const },
+    { label:'Visits',     val: visits,  color:colors.primary, icon:'walk-outline'      as const },
+    { label:'PT Left',    val: pt,      color:colors.teal,    icon:'barbell-outline'   as const },
+    { label:'Classes',    val: classes, color:colors.indigo,  icon:'people-outline'    as const },
   ];
   return (
     <View style={sr.wrap}>
@@ -360,31 +360,12 @@ export default function HomeScreen() {
 
         {/* Stats */}
         <StatRow
-          days={m?.daysRemaining ?? null}
-          pt={pt?.remainingSessions ?? 0}
           visits={data?.thisMonth.visits ?? 0}
+          pt={pt?.remainingSessions ?? 0}
+          classes={data?.thisMonth.classes ?? 0}
         />
 
-        {/* Next class */}
-        <NextCard next={data?.nextClass ?? null} onBook={() => router.push('/(tabs)/classes')} />
-
-        {/* Actions grid */}
-        <Text style={s.sectionTitle}>Quick Actions</Text>
-        <View style={s.grid}>
-          {ACTIONS.map(a => (
-            <ActionCell key={a.label} {...a} badge={a.to==='/profile'&&hasDebt} />
-          ))}
-          <ActionCell
-            icon="person-circle-outline"
-            label="My Account"
-            color={colors.amber}
-            bg={colors.amberBg}
-            to="/profile"
-            badge={hasDebt}
-          />
-        </View>
-
-        {/* Banners */}
+        {/* Banners — above next class so they're seen */}
         {banners.length > 0 && (
           <>
             <Text style={s.sectionTitle}>Promotions</Text>
@@ -406,6 +387,25 @@ export default function HomeScreen() {
             )}
           </>
         )}
+
+        {/* Next class */}
+        <NextCard next={data?.nextClass ?? null} onBook={() => router.push('/(tabs)/classes')} />
+
+        {/* Actions grid */}
+        <Text style={s.sectionTitle}>Quick Actions</Text>
+        <View style={s.grid}>
+          {ACTIONS.map(a => (
+            <ActionCell key={a.label} {...a} badge={a.to==='/profile'&&hasDebt} />
+          ))}
+          <ActionCell
+            icon="person-circle-outline"
+            label="My Account"
+            color={colors.amber}
+            bg={colors.amberBg}
+            to="/profile"
+            badge={hasDebt}
+          />
+        </View>
 
         <View style={{height:8}} />
       </ScrollView>
