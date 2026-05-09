@@ -130,11 +130,11 @@ export default function HomeScreen() {
   const unread = data?.unreadNotifications ?? 0;
 
   const ACTIONS: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; to: string; }[] = [
+    { icon: 'qr-code',         label: 'QR Check-in',    to: '/checkin/qr' },
     { icon: 'calendar',        label: 'Book a class',   to: '/(tabs)/classes' },
     { icon: 'bookmark',        label: 'My Bookings',    to: '/(tabs)/bookings' },
     { icon: 'barbell',         label: 'PT Sessions',    to: '/(tabs)/pt' },
     { icon: 'pulse',           label: 'Activity',       to: '/(tabs)/activity' },
-    { icon: 'card',            label: 'Update Card',    to: '/payment/update-card' },
     { icon: 'gift',            label: 'Refer a Friend', to: '/referral' },
   ];
 
