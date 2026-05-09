@@ -284,7 +284,6 @@ export class PgmBookingAdapter implements IBookingRepo {
         $top: 200,
       }),
       this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-        $filter: `startDate ge ${fromStr}T00:00:00Z and startDate le ${toStr}T23:59:59Z`,
         $select: 'id,startDate,endDate,classTypeId,clubId',
         $top: 2000,
       }),
