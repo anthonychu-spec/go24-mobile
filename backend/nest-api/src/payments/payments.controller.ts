@@ -1,6 +1,6 @@
 import {
   Body, Controller, Get, Headers, HttpCode,
-  Post, RawBodyRequest, Req, UseGuards,
+  Post, Req, UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -32,7 +32,17 @@ export class PaymentsController {
     return this.svc.getCard(user.id);
   }
 
-  @ApiOperation({ summary: 'Adyen webhook (RECURRING_CONTRACT)' })
+  @ApiOperation({ summary: 'Buy a day pass using saved card' })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
+  @Post('pay-daypass')
+  @HttpCode(200)
+  payDayPass(@Req() req: Request) {
+    const user = req.user as AuthedUser;
+    return this.svc.payDayPass(user.id, user.pgmId);
+  }
+
+  @ApiOperation({ summary: 'Adyen webhook (RECURRING_CONTRACT + AUTHORISATION)' })
   @Post('webhook/adyen')
   @HttpCode(200)
   async adyenWebhook(
