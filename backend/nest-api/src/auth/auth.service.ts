@@ -239,5 +239,40 @@ export class AuthService {
     if (!Number.isFinite(memberId)) throw new AppError('INVALID_OTP', 'malformed token');
     return memberId;
   }
+
+  // ── Public methods for SignupService ──────────────────────────────────────
+
+  /**
+   * Create a brand-new user row (for signup flow — PGM member already created externally).
+   * Uses upsertUser so it's idempotent if called twice with same pgmMemberId.
+   */
+  async createUser(input: {
+    pgmMemberId: number;
+    email: string | null;
+    phone: string | null;
+  }): Promise<User> {
+    let user = await this.userRepo.findOne({ where: { pgmMemberId: input.pgmMemberId } });
+    if (!user) {
+      user = this.userRepo.create({
+        pgmMemberId: input.pgmMemberId,
+        email: input.email,
+        phone: input.phone,
+        role: 'member',
+        status: 'active',
+        lastPgmSyncAt: new Date(),
+      });
+    } else {
+      user.email  = input.email  ?? user.email;
+      user.phone  = input.phone  ?? user.phone;
+      user.status = 'active';
+      user.lastPgmSyncAt = new Date();
+    }
+    return this.userRepo.save(user);
+  }
+
+  /** Issue JWT tokens for a newly-created user (called by SignupService). */
+  async issueTokensForNewUser(user: User): Promise<IssueTokenResult> {
+    return this.issueTokens(user);
+  }
 }
 
