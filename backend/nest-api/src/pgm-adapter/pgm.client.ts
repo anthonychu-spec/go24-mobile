@@ -61,6 +61,8 @@ export class PgmClient {
         rollingCountTimeout: 30_000,
         rollingCountBuckets: 10,
         volumeThreshold: 10,
+        // 404 = "no data" in PGM OData — not a real upstream failure
+        errorFilter: (err: any) => err?.response?.status === 404,
       },
     );
 
