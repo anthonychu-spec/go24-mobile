@@ -33,6 +33,7 @@ interface Summary {
 interface ActivityResponse {
   summary: Summary;
   items: ActivityItem[];
+  errors?: string[];
 }
 
 const TYPE_ICON: Record<ActivityType, string> = {
@@ -64,19 +65,13 @@ function formatTime(iso: string) {
 }
 
 function ClassTypeSummary({ items }: { items: ActivityItem[] }) {
-  const classItems = items.filter(i => i.type === 'class');
-  if (classItems.length === 0) return null;
-
-  // Count by class type, sorted by frequency
   const counts = new Map<string, number>();
-  for (const item of classItems) {
+  for (const item of items.filter(i => i.type === 'class')) {
     counts.set(item.title, (counts.get(item.title) ?? 0) + 1);
   }
-  const top = Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-
-  const max = top[0]?.[1] ?? 1;
+  const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (top.length === 0) return null;
+  const max = top[0][1];
 
   return (
     <View style={s.typeCard}>
@@ -86,6 +81,31 @@ function ClassTypeSummary({ items }: { items: ActivityItem[] }) {
           <Text style={s.typeName} numberOfLines={1}>{name}</Text>
           <View style={s.typeBarWrap}>
             <View style={[s.typeBar, { width: `${(count / max) * 100}%` as any }]} />
+          </View>
+          <Text style={s.typeCount}>{count}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function ClubSummary({ items }: { items: ActivityItem[] }) {
+  const counts = new Map<string, number>();
+  for (const item of items.filter(i => i.type === 'checkin' && item.club)) {
+    counts.set(item.club!, (counts.get(item.club!) ?? 0) + 1);
+  }
+  const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (top.length === 0) return null;
+  const max = top[0][1];
+
+  return (
+    <View style={s.typeCard}>
+      <Text style={s.typeTitle}>Clubs Visited</Text>
+      {top.map(([club, count]) => (
+        <View key={club} style={s.typeRow}>
+          <Text style={s.typeName} numberOfLines={1}>{club}</Text>
+          <View style={s.typeBarWrap}>
+            <View style={[s.typeBar, { width: `${(count / max) * 100}%` as any, backgroundColor: colors.teal ?? colors.primary }]} />
           </View>
           <Text style={s.typeCount}>{count}</Text>
         </View>
@@ -263,7 +283,12 @@ export default function ActivityScreen() {
         ListHeaderComponent={
           <>
             {data?.summary && <SummaryCard summary={data.summary} />}
-            <ClassTypeSummary items={data?.items ?? []} />
+            {(data?.errors?.length ?? 0) > 0 && (
+              <View style={s.warnBar}>
+                <Ionicons name="warning-outline" size={14} color={colors.amber} />
+                <Text style={s.warnText}>Some data unavailable ({data!.errors!.join(', ')})</Text>
+              </View>
+            )}
             <View style={s.filterRow}>
               {FILTER_LABELS.map(f => (
                 <Pressable
@@ -277,6 +302,12 @@ export default function ActivityScreen() {
                 </Pressable>
               ))}
             </View>
+            {(filter === 'all' || filter === 'class') && (
+              <ClassTypeSummary items={data?.items ?? []} />
+            )}
+            {filter === 'checkin' && (
+              <ClubSummary items={data?.items ?? []} />
+            )}
           </>
         }
         ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 }} />}
@@ -359,6 +390,11 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
   },
   errorText: { color: colors.error, fontFamily: fonts.regular, fontSize: 13 },
+  warnBar: {
+    marginHorizontal: 16, marginBottom: 4, backgroundColor: colors.amberBg, borderRadius: 8,
+    paddingVertical: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6,
+  },
+  warnText: { color: colors.amber, fontFamily: fonts.regular, fontSize: 12, flex: 1 },
   empty:     { alignItems: 'center', paddingTop: 40, gap: 8 },
   emptyText: { color: colors.textMuted, fontFamily: fonts.regular, fontSize: 15 },
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Booking } from '../bookings/entities/booking.entity';
@@ -27,6 +27,8 @@ export interface ActivitySummary {
 
 @Injectable()
 export class ActivityService {
+  private readonly logger = new Logger(ActivityService.name);
+
   constructor(
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     private readonly pgm: PgmClient,
@@ -36,6 +38,7 @@ export class ActivityService {
   async getActivity(pgmMemberId: number, userId: string): Promise<{
     summary: ActivitySummary;
     items: ActivityItem[];
+    errors: string[];
   }> {
     const since = new Date();
     since.setMonth(since.getMonth() - 3);
@@ -46,22 +49,27 @@ export class ActivityService {
       this.fetchPt(pgmMemberId, since),
     ]);
 
-    const classItems = classes.status === 'fulfilled' ? classes.value : [];
-    const checkinItems = checkins.status === 'fulfilled' ? checkins.value : [];
-    const ptItems = ptSessions.status === 'fulfilled' ? ptSessions.value : [];
+    const errors: string[] = [];
+    const classItems = classes.status === 'fulfilled' ? classes.value : (errors.push('classes'), []);
+    const checkinItems = checkins.status === 'fulfilled' ? checkins.value : (errors.push('checkins'), []);
+    const ptItems = ptSessions.status === 'fulfilled' ? ptSessions.value : (errors.push('pt'), []);
+
+    if (classes.status === 'rejected') this.logger.error('fetchClasses failed', classes.reason);
+    if (checkins.status === 'rejected') this.logger.error('fetchCheckins failed', checkins.reason);
+    if (ptSessions.status === 'rejected') this.logger.error('fetchPt failed', ptSessions.reason);
 
     const allItems = [...classItems, ...checkinItems, ...ptItems]
       .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
     const summary = this.buildSummary(classItems, checkinItems, ptItems);
 
-    return { summary, items: allItems };
+    return { summary, items: allItems, errors };
   }
 
   private async fetchClasses(pgmMemberId: number, userId: string, since: Date): Promise<ActivityItem[]> {
-    // Get enriched bookings from PGM (has real class names, clubs, times)
+    // Use historical bookings method which fetches classes in the same date window
     const [pgmBookings, localBookings] = await Promise.all([
-      this.pgmBooking.listMyBookings(pgmMemberId).catch((): PgmBooking[] => []),
+      this.pgmBooking.listHistoricalBookings(pgmMemberId, since),
       this.bookingRepo
         .createQueryBuilder('b')
         .where('b.user_id = :userId', { userId })
@@ -93,15 +101,15 @@ export class ActivityService {
   }
 
   private async fetchCheckins(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
-    try {
-      const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
-        $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
-        $select: 'id,enterDate,exitDate,clubId',
-        $orderby: 'enterDate desc',
-        $top: 200,
-      });
+    const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
+      $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
+      $select: 'id,enterDate,clubId',
+      $top: 200,
+    });
 
-      return (res.value ?? []).map((v: any) => ({
+    return (res.value ?? [])
+      .sort((a: any, b: any) => new Date(b.enterDate).getTime() - new Date(a.enterDate).getTime())
+      .map((v: any) => ({
         id: `checkin-${v.id}`,
         type: 'checkin' as ActivityType,
         title: 'Check-in',
@@ -109,21 +117,20 @@ export class ActivityService {
         at: v.enterDate,
         club: v.clubId ? String(v.clubId) : null,
       }));
-    } catch {
-      return [];
-    }
   }
 
   private async fetchPt(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
-    try {
-      const res = await this.pgm.get<{ value: any[] }>('/odata/PtAgreementUsages', {
-        $filter: `memberId eq ${pgmMemberId} and date ge datetime'${since.toISOString().slice(0, 19)}'`,
-        $select: 'id,date,trainerId,agreementId',
-        $orderby: 'date desc',
-        $top: 200,
-      });
+    const res = await this.pgm.get<{ value: any[] }>('/odata/PtAgreementUsages', {
+      $filter: `memberId eq ${pgmMemberId}`,
+      $select: 'id,memberId,trainerId,agreementId,date,status',
+      $orderby: 'date desc',
+      $top: 200,
+    });
 
-      return (res.value ?? []).map((p: any) => ({
+    const sinceMs = since.getTime();
+    return (res.value ?? [])
+      .filter((p: any) => p.date && new Date(p.date).getTime() >= sinceMs)
+      .map((p: any) => ({
         id: `pt-${p.id}`,
         type: 'pt' as ActivityType,
         title: 'PT Session',
@@ -131,9 +138,6 @@ export class ActivityService {
         at: p.date,
         club: null,
       }));
-    } catch {
-      return [];
-    }
   }
 
   private buildSummary(

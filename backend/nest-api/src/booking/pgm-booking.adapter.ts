@@ -268,6 +268,52 @@ export class PgmBookingAdapter implements IBookingRepo {
     }
   }
 
+  /** Fetch historical bookings (last N months) with full class name enrichment. */
+  async listHistoricalBookings(memberId: number, since: Date): Promise<PgmBooking[]> {
+    try {
+      const sinceStr = since.toISOString().slice(0, 19);
+      const toStr    = new Date().toISOString().slice(0, 19);
+
+      const [bookingsRes, classesRes, classTypeMap, clubMap] = await Promise.all([
+        this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
+          $filter: `memberId eq ${memberId} and startDate ge datetime'${sinceStr}'`,
+          $select: 'id,classId,startDate,endDate,memberId,isStandby,isCancelled',
+          $orderby: 'startDate desc',
+          $top: 200,
+        }),
+        this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
+          $filter: `startDate ge datetime'${sinceStr}' and startDate le datetime'${toStr}'`,
+          $select: 'id,startDate,endDate,classTypeId,clubId',
+        }),
+        this.getClassTypeMap(),
+        this.getClubMap(),
+      ]);
+
+      const classMap = new Map<number, RawClass>();
+      for (const c of classesRes.value ?? []) classMap.set(c.id, c);
+
+      return (bookingsRes.value ?? [])
+        .filter(b => !b.isCancelled)
+        .map(b => {
+          const cls = classMap.get(b.classId);
+          return {
+            bookingId: b.id,
+            classId: b.classId,
+            className: cls
+              ? (classTypeMap.get(cls.classTypeId) ?? `Class #${b.classId}`)
+              : `Class #${b.classId}`,
+            startTime: b.startDate,
+            endTime:   b.endDate,
+            clubName:  cls ? (clubMap.get(cls.clubId) ?? null) : null,
+            isStandby:  b.isStandby  ?? false,
+            isCancelled: b.isCancelled ?? false,
+          };
+        });
+    } catch (err) {
+      throw normalizePgmError(err);
+    }
+  }
+
   async bookClass(memberId: number, classId: number): Promise<BookClassResult> {
     try {
       return await this.pgm.post<BookClassResult>('/ClassBooking/BookClass', {
