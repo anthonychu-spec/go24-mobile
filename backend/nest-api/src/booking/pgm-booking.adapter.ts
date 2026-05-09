@@ -121,7 +121,7 @@ export class PgmBookingAdapter implements IBookingRepo {
   private async getRawClasses(): Promise<RawClass[]> {
     if (this.isFresh(this.rawClassCache)) return this.rawClassCache.data;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const windowEnd = new Date(today); windowEnd.setDate(today.getDate() + 8);
+    const windowEnd = new Date(today); windowEnd.setDate(today.getDate() + 10);
     const from = today.toISOString().slice(0, 10);
     const to   = windowEnd.toISOString().slice(0, 10);
     const res = await this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
@@ -136,7 +136,7 @@ export class PgmBookingAdapter implements IBookingRepo {
   /** Return classes for the next N days (default 7), grouped by ISO date string */
   async listWeekClasses(params: { clubId?: number; days?: number } = {}): Promise<Record<string, PgmClass[]>> {
     try {
-      const days = params.days ?? 7;
+      const days = params.days ?? 9; // 216h = 9 days
       const [allClasses, classTypeMap, clubMap, instructorMap] = await Promise.all([
         this.getRawClasses(),
         this.getClassTypeMap(),

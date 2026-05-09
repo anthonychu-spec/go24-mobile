@@ -56,6 +56,7 @@ const LIVE_REFRESH_FAST_MS   = 10_000;
 const LIVE_REFRESH_NORMAL_MS = 30_000;
 const LIVE_REFRESH_SLOW_MS   = 60_000;
 const BOOKING_WINDOW_H = 168;
+const DISPLAY_DAYS = 9;        // show 9 days (216h)
 const RUSH_CLASS_KEYWORDS = ['reformer', 'bodypump', 'bodycombat', 'hiit'];
 const PEAK_HOURS = [[11, 14], [18, 21]] as const;
 
@@ -508,7 +509,7 @@ const cm = StyleSheet.create({
 
 /* ── Main screen ── */
 export default function ClassesScreen() {
-  const days = buildDays(7);
+  const days = buildDays(DISPLAY_DAYS);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
@@ -581,7 +582,10 @@ export default function ClassesScreen() {
   function selectDay(idx: number) { setSelectedIdx(idx); }
 
   const currentDayKey = dateKey(days[selectedIdx]);
-  const classes = weekClasses[currentDayKey] ?? [];
+  const now = Date.now();
+  const allDayClasses = weekClasses[currentDayKey] ?? [];
+  // Hide classes that have already started (past classes)
+  const classes = allDayClasses.filter(c => new Date(c.startTime).getTime() > now);
 
   // Dynamic live refresh
   const hasRushClasses = classes.some(c => RUSH_CLASS_KEYWORDS.some(k => c.name.toLowerCase().includes(k)));
