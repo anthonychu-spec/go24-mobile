@@ -35,12 +35,13 @@ export class AdyenClient {
     shopperReference: string;
     returnUrl: string;
     shopperEmail?: string;
+    amountHkd?: number; // 0 = card storage only; >0 = first charge
   }): Promise<{ sessionId: string; sessionData: string }> {
     const res = await this.http.post('/sessions', {
       merchantAccount: this.merchantAccount,
       shopperReference: input.shopperReference,
       shopperEmail: input.shopperEmail,
-      amount: { value: 0, currency: 'HKD' },
+      amount: { value: input.amountHkd ? Math.round(input.amountHkd * 100) : 0, currency: 'HKD' },
       returnUrl: input.returnUrl,
       storePaymentMethod: true,
       recurringProcessingModel: 'Subscription',
