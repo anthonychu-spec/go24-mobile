@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
@@ -22,6 +22,9 @@ function fmtHkd(n: number) {
 
 export default function AccessBlockedScreen() {
   const router = useRouter();
+  const { demo } = useLocalSearchParams<{ demo?: string }>();
+  const isDemo = demo === 'true';
+
   const [info, setInfo]       = useState<AccessInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying]   = useState(false);
@@ -53,7 +56,14 @@ export default function AccessBlockedScreen() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (isDemo) {
+      setInfo({ outstanding: 350, cardExpired: true, cardBrand: 'Visa', cardSummary: '•••• 4242' });
+      setLoading(false);
+      return;
+    }
+    load();
+  }, [isDemo, load]);
 
   const pay = useCallback(async () => {
     if (!info || info.outstanding <= 0) return;
