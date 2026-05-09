@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ActivityIndicator, FlatList, Pressable,
   RefreshControl, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { CalendarList } from 'react-native-calendars';
 import { apiClient } from '../../src/api/client';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
@@ -152,6 +153,25 @@ export default function ActivityScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [view, setView] = useState<'list' | 'calendar'>('list');
+
+  // Build heatmap marked dates from activity items
+  const markedDates = useMemo(() => {
+    const marks: Record<string, any> = {};
+    for (const item of data?.items ?? []) {
+      const key = item.at.slice(0, 10);
+      const count = (marks[key]?.count ?? 0) + 1;
+      marks[key] = {
+        count,
+        selected: true,
+        selectedColor:
+          count >= 3 ? colors.primaryDark
+          : count === 2 ? colors.primary
+          : colors.primary + 'AA',
+      };
+    }
+    return marks;
+  }, [data]);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -186,9 +206,45 @@ export default function ActivityScreen() {
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
-        <Text style={s.title}>Activity</Text>
-        <Text style={s.subtitle}>Last 3 months</Text>
+        <View>
+          <Text style={s.title}>Activity</Text>
+          <Text style={s.subtitle}>Last 3 months</Text>
+        </View>
+        <Pressable
+          style={[s.viewToggle, view === 'calendar' && s.viewToggleActive]}
+          onPress={() => setView(v => v === 'list' ? 'calendar' : 'list')}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={view === 'calendar' ? 'list-outline' : 'calendar-outline'}
+            size={18}
+            color={view === 'calendar' ? '#fff' : colors.primary}
+          />
+        </Pressable>
       </View>
+
+      {view === 'calendar' && (
+        <CalendarList
+          markedDates={markedDates}
+          markingType="custom"
+          pastScrollRange={6}
+          futureScrollRange={0}
+          scrollEnabled
+          showScrollIndicator
+          theme={{
+            backgroundColor: colors.bg,
+            calendarBackground: colors.bg,
+            selectedDayBackgroundColor: colors.primary,
+            todayTextColor: colors.primary,
+            dayTextColor: colors.text,
+            textDisabledColor: colors.border,
+            monthTextColor: colors.text,
+            textMonthFontFamily: fonts.bold,
+            textDayFontFamily: fonts.regular,
+            textDayFontSize: 13,
+          } as any}
+        />
+      )}
 
       {error ? (
         <View style={s.errorBar}>
@@ -197,7 +253,7 @@ export default function ActivityScreen() {
         </View>
       ) : null}
 
-      <FlatList
+      {view === 'list' && <FlatList
         data={filtered}
         keyExtractor={item => item.id}
         renderItem={({ item }) => <ActivityCard item={item} />}
@@ -231,7 +287,7 @@ export default function ActivityScreen() {
             <Text style={s.emptyText}>No records yet</Text>
           </View>
         }
-      />
+      />}
     </SafeAreaView>
   );
 }
@@ -239,7 +295,14 @@ export default function ActivityScreen() {
 const s = StyleSheet.create({
   safe:     { flex: 1, backgroundColor: colors.bg },
   center:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  viewToggle: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: colors.primaryBg,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  viewToggleActive: { backgroundColor: colors.primary },
   header:   {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
     backgroundColor: colors.card,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,

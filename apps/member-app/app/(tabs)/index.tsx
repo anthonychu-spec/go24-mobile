@@ -29,6 +29,7 @@ interface DashboardData {
   nextClass: { bookingId: string; classId: number; className?: string | null; startTime: string; minutesUntil: number; clubName: string | null } | null;
   thisMonth: { visits: number; classes: number; pt: number };
   unreadNotifications: number;
+  streak: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -306,6 +307,7 @@ export default function HomeScreen() {
   const pt      = data?.pt;
   const unread  = data?.unreadNotifications ?? 0;
   const hasDebt = (m?.outstandingBalance ?? 0) > 0;
+  const streak  = data?.streak ?? 0;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -355,6 +357,14 @@ export default function HomeScreen() {
             <Text style={[s.alertTxt,{color:m.daysRemaining<=0?colors.error:colors.amber}]}>
               {m.daysRemaining<=0 ? 'Membership expired' : `Expires in ${m.daysRemaining} days`}
             </Text>
+          </View>
+        )}
+
+        {/* Streak banner */}
+        {streak > 0 && (
+          <View style={s.streakBanner}>
+            <Text style={s.streakEmoji}>🔥</Text>
+            <Text style={s.streakText}>{streak}-week streak — keep it up!</Text>
           </View>
         )}
 
@@ -449,6 +459,15 @@ const s = StyleSheet.create({
   alertTxt: { flex:1, fontSize:13, fontFamily:fonts.semibold, color:colors.primary },
 
   sectionTitle: { fontSize:17, fontFamily:fonts.black, color:colors.text, paddingHorizontal:16 },
+
+  streakBanner: {
+    flexDirection:'row', alignItems:'center', gap:8,
+    marginHorizontal:16, backgroundColor:colors.amberBg,
+    borderRadius:12, paddingHorizontal:14, paddingVertical:11,
+    borderWidth:1, borderColor:colors.amber+'40',
+  },
+  streakEmoji: { fontSize:18 },
+  streakText:  { fontSize:13, fontFamily:fonts.semibold, color:colors.amber },
 
   grid: { flexDirection:'row', flexWrap:'wrap', paddingHorizontal:16, gap:10 },
 

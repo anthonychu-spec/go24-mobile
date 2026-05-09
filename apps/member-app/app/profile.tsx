@@ -163,9 +163,12 @@ export default function ProfileScreen() {
 
   const LINKS = [
     { icon: 'card-outline'          as const, label: 'My Memberships',      to: '/membership' },
-    { icon: 'wallet-outline'        as const, label: 'Update Payment Card',  to: '/payment/update-card' },
-    { icon: 'notifications-outline' as const, label: 'Notifications',        to: '/(tabs)/notifications' },
-    { icon: 'qr-code-outline'       as const, label: 'QR Check-in',          to: '/checkin/qr' },
+    { icon: 'snow-outline'          as const, label: 'Freeze Membership',   to: '/membership/freeze' },
+    { icon: 'receipt-outline'       as const, label: 'Payment History',     to: '/payments/history' },
+    { icon: 'star-outline'          as const, label: 'Favourite Classes',   to: '/favourites' },
+    { icon: 'wallet-outline'        as const, label: 'Update Payment Card', to: '/payment/update-card' },
+    { icon: 'notifications-outline' as const, label: 'Notifications',       to: '/(tabs)/notifications' },
+    { icon: 'qr-code-outline'       as const, label: 'QR Check-in',         to: '/checkin/qr' },
   ];
 
   return (
