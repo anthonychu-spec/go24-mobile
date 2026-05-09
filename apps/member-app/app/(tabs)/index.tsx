@@ -621,11 +621,11 @@ export default function HomeScreen() {
   const m           = data?.membership;
   const pt          = data?.pt;
   const unread      = data?.unreadNotifications ?? 0;
-  const hasDebt     = (m?.outstandingBalance ?? 0) > 0;
   const streak      = data?.streak ?? 0;
   const totalVisits = data?.totalVisits ?? 0;
   const hasExpired  = m != null && !m.active && (m.daysRemaining == null || m.daysRemaining <= 0);
-  const cardExpired = data?.savedCardExpired ?? false;
+  const cardExpired = __DEV__ || (data?.savedCardExpired ?? false);
+  const hasDebt     = __DEV__ || (m?.outstandingBalance ?? 0) > 0;
 
   return (
     <SafeAreaView style={s.safe}>
