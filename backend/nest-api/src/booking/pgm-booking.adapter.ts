@@ -388,7 +388,7 @@ export class PgmBookingAdapter implements IBookingRepo {
       endTime: b.endDate,
       clubName: null,
       isStandby: b.isStandby ?? false,
-      isCancelled: b.isCancelled ?? false,
+      isCancelled: b.isCanceled ?? false,
     };
   }
 }
