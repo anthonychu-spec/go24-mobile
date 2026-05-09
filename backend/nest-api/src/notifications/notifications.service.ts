@@ -208,6 +208,14 @@ export class NotificationsService {
     return { sent: userIds.length };
   }
 
+  // ── Direct push (no inbox record — for transient alerts) ─────────────────
+
+  async sendDirectPush(userId: string, title: string, body: string, data: Record<string, unknown> = {}): Promise<void> {
+    const tokens = await this.tokenRepo.find({ where: { userId } });
+    if (tokens.length === 0) return;
+    await this.sendPush(tokens.map(t => t.token), title, body, data);
+  }
+
   // ── Internal push ─────────────────────────────────────────────────────────
 
   private async sendPush(tokens: string[], title: string, body: string, data: Record<string, unknown>): Promise<void> {

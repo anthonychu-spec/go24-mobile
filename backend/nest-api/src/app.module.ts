@@ -17,6 +17,7 @@ import { ReferralModule } from './referral/referral.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CheckinModule } from './checkin/checkin.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { SignupModule } from './signup/signup.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { MetricsModule } from './metrics/metrics.module';
     DashboardModule,
     CheckinModule,
     MetricsModule,
+    SignupModule,
     DevtoolsModule.register({
       http: process.env.NODE_ENV !== 'production',
       port: 8000,
