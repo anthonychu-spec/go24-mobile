@@ -276,8 +276,6 @@ export class PgmBookingAdapter implements IBookingRepo {
     const [bookingsResult, classesResult, classTypeMap, clubMap] = await Promise.allSettled([
       this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
         $filter: `memberId eq ${memberId}`,
-        $select: 'id,classId,startDate,endDate,memberId,isStandby,isCancelled',
-        $orderby: 'startDate desc',
         $top: 200,
       }),
       this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
@@ -308,6 +306,8 @@ export class PgmBookingAdapter implements IBookingRepo {
     this.logger.log(
       `listHistoricalBookings: bookings=${bookings.length} classes=${classes.length} classMap=${classMap.size} typeMap=${typeMap.size}`,
     );
+    if (bookings.length > 0) this.logger.log(`sample booking keys: ${Object.keys(bookings[0]).join(',')}`);
+    if (classes.length > 0) this.logger.log(`sample class keys: ${Object.keys(classes[0]).join(',')}`);
 
     const results = bookings
       .filter(b => !b.isCancelled)
