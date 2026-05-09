@@ -19,7 +19,7 @@ const CELL = (W - 16 * 2 - 10) / 2;
 
 interface Banner { id: string; title: string | null; imageUrl: string; linkUrl: string | null }
 interface DashboardData {
-  user: { name: string | null; email: string | null };
+  user: { name: string | null; email: string | null; memberCode: string | null };
   membership: {
     active: boolean; planName: string | null;
     daysRemaining: number | null; expiresAt: string | null;
@@ -58,8 +58,12 @@ function fmtDate(iso: string|null) {
 
 // ─── Membership Card ──────────────────────────────────────────────────────────
 
-function MemberCard({ m, name, onPress }: {
-  m: DashboardData['membership']|undefined; name: string; onPress: ()=>void;
+function MemberCard({ m, pt, name, memberCode, onPress }: {
+  m: DashboardData['membership']|undefined;
+  pt: DashboardData['pt']|undefined;
+  name: string;
+  memberCode: string | null;
+  onPress: ()=>void;
 }) {
   const days = m?.daysRemaining ?? null;
   const pct  = days != null ? Math.max(0, Math.min(1, days/365)) : null;
@@ -81,18 +85,25 @@ function MemberCard({ m, name, onPress }: {
         </View>
       </View>
 
-      {/* centre */}
+      {/* centre — plan name + member name */}
       <View style={mc.centre}>
         <Text style={mc.plan}>{m?.planName?.toUpperCase() ?? 'MEMBERSHIP'}</Text>
         <Text style={mc.memberName} numberOfLines={1}>{name || '—'}</Text>
+        {memberCode && <Text style={mc.memberCode}>#{memberCode}</Text>}
       </View>
 
-      {/* bottom */}
+      {/* bottom — expiry, days remaining, PT sessions */}
       <View style={mc.bottom}>
         <View>
           <Text style={mc.metaLabel}>EXPIRES</Text>
           <Text style={mc.metaVal}>{fmtDate(m?.expiresAt ?? null)}</Text>
         </View>
+        {(pt?.remainingSessions ?? 0) > 0 && (
+          <View style={{ alignItems: 'center' }}>
+            <Text style={mc.metaLabel}>PT LEFT</Text>
+            <Text style={mc.metaVal}>{pt!.remainingSessions} sessions</Text>
+          </View>
+        )}
         {days != null && (
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={mc.metaLabel}>REMAINING</Text>
@@ -130,7 +141,8 @@ const mc = StyleSheet.create({
   pillTxt:{ fontSize:11, fontFamily:fonts.semibold, color:'#fff' },
   centre:{ gap:2 },
   plan:  { fontSize:10, fontFamily:fonts.semibold, color:'rgba(255,255,255,0.5)', letterSpacing:2 },
-  memberName:{ fontSize:26, fontFamily:fonts.black, color:'#fff' },
+  memberName: { fontSize:26, fontFamily:fonts.black, color:'#fff' },
+  memberCode: { fontSize:11, fontFamily:fonts.regular, color:'rgba(255,255,255,0.5)', letterSpacing:1, marginTop:1 },
   bottom:{ flexDirection:'row', justifyContent:'space-between', alignItems:'flex-end' },
   metaLabel:{ fontSize:9, fontFamily:fonts.semibold, color:'rgba(255,255,255,0.4)', letterSpacing:1.5, marginBottom:2 },
   metaVal:  { fontSize:13, fontFamily:fonts.bold, color:'rgba(255,255,255,0.85)' },
@@ -420,6 +432,7 @@ export default function HomeScreen() {
   useEffect(() => { load(); }, [load]);
 
   const name        = data?.user?.name ?? '';
+  const memberCode  = data?.user?.memberCode ?? null;
   const m           = data?.membership;
   const pt          = data?.pt;
   const unread      = data?.unreadNotifications ?? 0;
@@ -458,7 +471,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Membership card */}
-        <MemberCard m={m} name={name} onPress={() => router.push('/profile')} />
+        <MemberCard m={m} pt={pt} name={name} memberCode={memberCode} onPress={() => router.push('/profile')} />
 
         {/* Alerts */}
         {hasDebt && (

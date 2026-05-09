@@ -9,7 +9,7 @@ import type { IBookingRepo } from '../booking/booking.interfaces';
 import { PaymentsService } from '../payments/payments.service';
 
 export interface DashboardData {
-  user: { name: string | null; email: string | null };
+  user: { name: string | null; email: string | null; memberCode: string | null };
   membership: {
     active: boolean;
     planName: string | null;
@@ -84,7 +84,7 @@ export class DashboardService {
     const monthStart = new Date();
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
 
-    const [contracts, ptAgreements, visits, nextBooking, monthClasses, memberMeta, streakResult, totalVisitsResult] = await Promise.allSettled([
+    const [contracts, ptAgreements, visits, nextBooking, monthClasses, memberMeta, streakResult, totalVisitsResult, userRecord] = await Promise.allSettled([
       this.fetchActiveContract(pgmMemberId),
       this.fetchPtAgreements(pgmMemberId),
       this.fetchMonthVisits(pgmMemberId, monthStart),
@@ -95,6 +95,7 @@ export class DashboardService {
       this.fetchMemberMeta(pgmMemberId),
       this.fetchStreak(pgmMemberId, userId),
       this.fetchTotalVisits(pgmMemberId),
+      this.userRepo.findOne({ where: { id: userId }, select: ['memberCode'] }),
     ]);
 
     const contract    = contracts.status         === 'fulfilled' ? contracts.value         : null;
@@ -105,6 +106,7 @@ export class DashboardService {
     const meta        = memberMeta.status        === 'fulfilled' ? memberMeta.value        : { name: null, outstanding: 0 };
     const streak      = streakResult.status      === 'fulfilled' ? streakResult.value      : 0;
     const totalVisits = totalVisitsResult.status === 'fulfilled' ? totalVisitsResult.value : 0;
+    const memberCode  = userRecord.status        === 'fulfilled' ? (userRecord.value?.memberCode ?? null) : null;
 
     const totalRemaining = agreements.reduce((s, a) => s + (a.remainingSessions ?? 0), 0);
     const totalSessions  = agreements.reduce((s, a) => s + (a.totalSessions ?? 0), 0);
@@ -118,7 +120,7 @@ export class DashboardService {
     }
 
     return {
-      user: { name: meta.name, email: null },
+      user: { name: meta.name, email: null, memberCode },
       membership: {
         active: contract != null,
         planName: contract?.planName ?? null,
