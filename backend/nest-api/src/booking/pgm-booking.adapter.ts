@@ -49,7 +49,9 @@ interface RawBooking {
   endDate: string;
   memberId: number;
   isStandby: boolean;
-  isCancelled: boolean;
+  isCanceled: boolean;   // PGM uses single-l spelling
+  isDeleted: boolean;
+  hasAttended: boolean;
 }
 
 @Injectable()
