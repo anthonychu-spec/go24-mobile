@@ -13,28 +13,49 @@ interface GymClass {
   id: number; name: string; startTime: string; endTime: string;
   clubId: number; clubName: string | null; instructorName: string | null;
   maxParticipants: number; participantsCount: number;
+  standbyListLimit?: number;
   isWaitlist: boolean; isCancelled: boolean;
 }
-interface BookResult { success: boolean; bookingId: string; status: string; waitlistPosition?: number; }
+
+interface DayBooking {
+  bookingId: string;
+  classId: number;
+  status: 'confirmed' | 'pending' | 'waitlist' | 'pending_verify';
+  className: string;
+  clubName: string | null;
+  startTime: string;
+  endTime: string;
+  instructorName?: string | null;
+}
+
+// What we show in the confirmation modal
+interface ConfirmResult {
+  bookingId: string;
+  status: string;
+  className: string;
+  startTime: string;
+  endTime: string;
+  clubName: string | null;
+  instructorName: string | null;
+}
 
 type TimeSlot = 'all' | 'morning' | 'afternoon' | 'evening';
 
 interface Filters {
   availableOnly: boolean;
   timeSlot: TimeSlot;
-  classType: string | null;   // null = all class types
-  clubId: number | null;      // null = all clubs
+  classType: string | null;
+  clubId: number | null;
 }
 
-const DEFAULT_FILTERS: Filters = {
-  availableOnly: false,
-  timeSlot: 'all',
-  classType: null,
-  clubId: null,
-};
+const DEFAULT_FILTERS: Filters = { availableOnly: false, timeSlot: 'all', classType: null, clubId: null };
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-const LIVE_REFRESH_MS = 30_000; // refresh capacity every 30s
-const BOOKING_WINDOW_H = 168;  // members can book up to 168 hours ahead
+const LIVE_REFRESH_FAST_MS   = 10_000;
+const LIVE_REFRESH_NORMAL_MS = 30_000;
+const LIVE_REFRESH_SLOW_MS   = 60_000;
+const BOOKING_WINDOW_H = 168;
+const RUSH_CLASS_KEYWORDS = ['reformer', 'bodypump', 'bodycombat', 'hiit'];
+const PEAK_HOURS = [[11, 14], [18, 21]] as const;
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -46,6 +67,12 @@ function generateUUID() {
 function fmtTime(iso: string) {
   try { return new Date(iso).toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', hour12: false }); }
   catch { return iso; }
+}
+
+function fmtDate(iso: string) {
+  try {
+    return new Date(iso).toLocaleDateString('en-HK', { weekday: 'short', day: 'numeric', month: 'short' });
+  } catch { return ''; }
 }
 
 function durationMin(start: string, end: string) {
@@ -67,6 +94,10 @@ function buildDays(count = 7) {
   return Array.from({ length: count }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() + i); return d;
   });
+}
+
+function dateKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function applyFilters(classes: GymClass[], search: string, filters: Filters): GymClass[] {
@@ -94,10 +125,9 @@ function activeFilterCount(f: Filters) {
   return n;
 }
 
-// Extract unique class types and clubs from loaded classes
 function getClassOptions(classes: GymClass[]) {
-  const typeSet = new Map<string, string>();       // name → name
-  const clubSet = new Map<number, string>();       // id → name
+  const typeSet = new Map<string, string>();
+  const clubSet = new Map<number, string>();
   for (const c of classes) {
     if (c.name) typeSet.set(c.name, c.name);
     if (c.clubId && c.clubName) clubSet.set(c.clubId, c.clubName);
@@ -114,7 +144,6 @@ function CapacityBar({ filled, total }: { filled: number; total: number }) {
   const pct = Math.min(filled / total, 1);
   const spotsLeft = total - filled;
   const barColor = pct >= 1 ? colors.error : pct >= 0.8 ? colors.cta : colors.success;
-
   return (
     <View style={cb.wrap}>
       <View style={cb.track}>
@@ -126,7 +155,6 @@ function CapacityBar({ filled, total }: { filled: number; total: number }) {
     </View>
   );
 }
-
 const cb = StyleSheet.create({
   wrap:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   track: { flex: 1, height: 3, backgroundColor: colors.bg, borderRadius: 2, overflow: 'hidden' },
@@ -134,28 +162,72 @@ const cb = StyleSheet.create({
   label: { fontSize: 11, fontFamily: fonts.regular, minWidth: 44, textAlign: 'right' },
 });
 
+/* ── Day booking banner ── */
+function DayBookingBanner({
+  booking, onCancel, cancelling,
+}: {
+  booking: DayBooking;
+  onCancel: (bookingId: string) => void;
+  cancelling: boolean;
+}) {
+  const isWaitlist = booking.status === 'waitlist';
+  return (
+    <View style={[bn.wrap, isWaitlist ? bn.wrapWaitlist : bn.wrapBooked]}>
+      <View style={bn.iconCol}>
+        <Ionicons
+          name={isWaitlist ? 'time' : 'checkmark-circle'}
+          size={28}
+          color={isWaitlist ? '#8B5CF6' : colors.success}
+        />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={bn.label}>{isWaitlist ? 'WAITLIST' : 'BOOKED'}</Text>
+        <Text style={bn.name} numberOfLines={1}>{booking.className}</Text>
+        <Text style={bn.meta}>
+          {fmtTime(booking.startTime)} – {fmtTime(booking.endTime)}
+          {booking.clubName ? `  ·  ${booking.clubName}` : ''}
+        </Text>
+      </View>
+      <Pressable onPress={() => onCancel(booking.bookingId)} disabled={cancelling} hitSlop={10} style={bn.cancelBtn}>
+        {cancelling
+          ? <ActivityIndicator size="small" color={colors.error} />
+          : <Text style={bn.cancelText}>Cancel</Text>}
+      </Pressable>
+    </View>
+  );
+}
+const bn = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 12, marginTop: 10, marginBottom: 4,
+    padding: 14, borderRadius: 14, borderWidth: 1,
+  },
+  wrapBooked:   { backgroundColor: colors.success + '12', borderColor: colors.success + '50' },
+  wrapWaitlist: { backgroundColor: '#8B5CF612', borderColor: '#8B5CF650' },
+  iconCol:      { alignItems: 'center', justifyContent: 'center', width: 32 },
+  label:        { fontSize: 10, fontFamily: fonts.bold, letterSpacing: 1, color: colors.textMuted },
+  name:         { fontSize: 15, fontFamily: fonts.black, color: colors.text },
+  meta:         { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
+  cancelBtn:    { paddingHorizontal: 8, paddingVertical: 6 },
+  cancelText:   { fontSize: 13, fontFamily: fonts.semibold, color: colors.error },
+});
+
 /* ── Filter sheet ── */
 function FilterSheet({
   visible, filters, allClasses, onApply, onClose,
 }: {
-  visible: boolean;
-  filters: Filters;
-  allClasses: GymClass[];
-  onApply: (f: Filters) => void;
-  onClose: () => void;
+  visible: boolean; filters: Filters; allClasses: GymClass[];
+  onApply: (f: Filters) => void; onClose: () => void;
 }) {
   const [draft, setDraft] = useState(filters);
   useEffect(() => { if (visible) setDraft(filters); }, [visible]);
-
   const { classTypes, clubs } = getClassOptions(allClasses);
-
   const TIME_SLOTS: { key: TimeSlot; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
     { key: 'all',       label: 'All day',   icon: 'time-outline' },
     { key: 'morning',   label: 'Morning',   icon: 'sunny-outline' },
     { key: 'afternoon', label: 'Afternoon', icon: 'partly-sunny-outline' },
     { key: 'evening',   label: 'Evening',   icon: 'moon-outline' },
   ];
-
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <Pressable style={fs.overlay} onPress={onClose} />
@@ -167,132 +239,90 @@ function FilterSheet({
             <Text style={fs.reset}>Reset all</Text>
           </Pressable>
         </View>
-
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Available only */}
           <View style={fs.row}>
             <View style={fs.rowLeft}>
               <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />
               <Text style={fs.rowLabel}>Available spots only</Text>
             </View>
-            <Switch
-              value={draft.availableOnly}
-              onValueChange={v => setDraft(d => ({ ...d, availableOnly: v }))}
-              trackColor={{ true: colors.primary, false: colors.border }}
-              thumbColor="#fff"
-            />
+            <Switch value={draft.availableOnly} onValueChange={v => setDraft(d => ({ ...d, availableOnly: v }))}
+              trackColor={{ true: colors.primary, false: colors.border }} thumbColor="#fff" />
           </View>
-
-          {/* Time of day */}
           <Text style={fs.sectionLabel}>Time of day</Text>
           <View style={fs.chips}>
             {TIME_SLOTS.map(ts => (
-              <Pressable
-                key={ts.key}
-                style={[fs.chip, draft.timeSlot === ts.key && fs.chipActive]}
-                onPress={() => setDraft(d => ({ ...d, timeSlot: ts.key }))}
-              >
+              <Pressable key={ts.key} style={[fs.chip, draft.timeSlot === ts.key && fs.chipActive]}
+                onPress={() => setDraft(d => ({ ...d, timeSlot: ts.key }))}>
                 <Ionicons name={ts.icon} size={15} color={draft.timeSlot === ts.key ? '#fff' : colors.textMuted} />
                 <Text style={[fs.chipText, draft.timeSlot === ts.key && fs.chipTextActive]}>{ts.label}</Text>
               </Pressable>
             ))}
           </View>
-
-          {/* Club filter */}
-          {clubs.length > 0 && (
-            <>
-              <Text style={fs.sectionLabel}>Club</Text>
-              <View style={fs.chips}>
-                <Pressable
-                  style={[fs.chip, draft.clubId === null && fs.chipActive]}
-                  onPress={() => setDraft(d => ({ ...d, clubId: null }))}
-                >
-                  <Text style={[fs.chipText, draft.clubId === null && fs.chipTextActive]}>All clubs</Text>
+          {clubs.length > 0 && (<>
+            <Text style={fs.sectionLabel}>Club</Text>
+            <View style={fs.chips}>
+              <Pressable style={[fs.chip, draft.clubId === null && fs.chipActive]}
+                onPress={() => setDraft(d => ({ ...d, clubId: null }))}>
+                <Text style={[fs.chipText, draft.clubId === null && fs.chipTextActive]}>All clubs</Text>
+              </Pressable>
+              {clubs.map(club => (
+                <Pressable key={club.id} style={[fs.chip, draft.clubId === club.id && fs.chipActive]}
+                  onPress={() => setDraft(d => ({ ...d, clubId: d.clubId === club.id ? null : club.id }))}>
+                  <Ionicons name="location-outline" size={13} color={draft.clubId === club.id ? '#fff' : colors.textMuted} />
+                  <Text style={[fs.chipText, draft.clubId === club.id && fs.chipTextActive]} numberOfLines={1}>{club.name}</Text>
                 </Pressable>
-                {clubs.map(club => (
-                  <Pressable
-                    key={club.id}
-                    style={[fs.chip, draft.clubId === club.id && fs.chipActive]}
-                    onPress={() => setDraft(d => ({ ...d, clubId: d.clubId === club.id ? null : club.id }))}
-                  >
-                    <Ionicons name="location-outline" size={13} color={draft.clubId === club.id ? '#fff' : colors.textMuted} />
-                    <Text style={[fs.chipText, draft.clubId === club.id && fs.chipTextActive]} numberOfLines={1}>
-                      {club.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          )}
-
-          {/* Class type filter */}
-          {classTypes.length > 0 && (
-            <>
-              <Text style={fs.sectionLabel}>Class type</Text>
-              <View style={fs.chips}>
-                <Pressable
-                  style={[fs.chip, draft.classType === null && fs.chipActive]}
-                  onPress={() => setDraft(d => ({ ...d, classType: null }))}
-                >
-                  <Text style={[fs.chipText, draft.classType === null && fs.chipTextActive]}>All types</Text>
+              ))}
+            </View>
+          </>)}
+          {classTypes.length > 0 && (<>
+            <Text style={fs.sectionLabel}>Class type</Text>
+            <View style={fs.chips}>
+              <Pressable style={[fs.chip, draft.classType === null && fs.chipActive]}
+                onPress={() => setDraft(d => ({ ...d, classType: null }))}>
+                <Text style={[fs.chipText, draft.classType === null && fs.chipTextActive]}>All types</Text>
+              </Pressable>
+              {classTypes.map(ct => (
+                <Pressable key={ct} style={[fs.chip, draft.classType === ct && fs.chipActive]}
+                  onPress={() => setDraft(d => ({ ...d, classType: d.classType === ct ? null : ct }))}>
+                  <Text style={[fs.chipText, draft.classType === ct && fs.chipTextActive]} numberOfLines={1}>{ct}</Text>
                 </Pressable>
-                {classTypes.map(ct => (
-                  <Pressable
-                    key={ct}
-                    style={[fs.chip, draft.classType === ct && fs.chipActive]}
-                    onPress={() => setDraft(d => ({ ...d, classType: d.classType === ct ? null : ct }))}
-                  >
-                    <Text style={[fs.chipText, draft.classType === ct && fs.chipTextActive]} numberOfLines={1}>
-                      {ct}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          )}
+              ))}
+            </View>
+          </>)}
         </ScrollView>
-
         <Pressable style={fs.applyBtn} onPress={() => { onApply(draft); onClose(); }}>
           <Text style={fs.applyText}>
-            Show Results
-            {activeFilterCount(draft) > 0 ? ` · ${activeFilterCount(draft)} active` : ''}
+            Show Results{activeFilterCount(draft) > 0 ? ` · ${activeFilterCount(draft)} active` : ''}
           </Text>
         </Pressable>
       </View>
     </Modal>
   );
 }
-
 const fs = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
   sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 24, paddingBottom: 36,
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    maxHeight: '80%',
+    position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '80%',
   },
-  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  title:       { fontSize: 18, fontFamily: fonts.black, color: colors.text },
-  reset:       { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
-
-  row:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  rowLeft:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowLabel:    { fontSize: 15, fontFamily: fonts.regular, color: colors.text },
-
-  sectionLabel:{ fontSize: 12, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginTop: 20, marginBottom: 12 },
-  chips:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  handle:       { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
+  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  title:        { fontSize: 18, fontFamily: fonts.black, color: colors.text },
+  reset:        { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
+  row:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  rowLeft:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rowLabel:     { fontSize: 15, fontFamily: fonts.regular, color: colors.text },
+  sectionLabel: { fontSize: 12, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginTop: 20, marginBottom: 12 },
+  chips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 20, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.card,
+    borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card,
   },
   chipActive:     { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText:       { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted },
   chipTextActive: { color: '#fff', fontFamily: fonts.semibold },
-
   applyBtn: {
     backgroundColor: colors.primary, borderRadius: 14,
     height: 52, alignItems: 'center', justifyContent: 'center', marginTop: 24,
@@ -302,23 +332,21 @@ const fs = StyleSheet.create({
 });
 
 /* ── Class row ── */
-function ClassRow({ item, onBook, isBooking, dayBooked }: {
+function ClassRow({ item, onBook, isBooking, locked }: {
   item: GymClass;
   onBook: (id: number, waitlist: boolean) => void;
   isBooking: boolean;
-  dayBooked: boolean;
+  locked: boolean;
 }) {
   const full = item.participantsCount >= item.maxParticipants;
   const dur = durationMin(item.startTime, item.endTime);
   const { bookable, opensIn } = bookingWindowStatus(item.startTime);
-
   return (
     <View style={s.classRow}>
       <View style={s.timeCol}>
         <Text style={s.timeMain}>{fmtTime(item.startTime)}</Text>
         <Text style={s.timeDur}>{dur}min</Text>
       </View>
-
       <View style={s.infoCol}>
         <Text style={s.className} numberOfLines={1}>{item.name}</Text>
         {item.instructorName && (
@@ -339,35 +367,34 @@ function ClassRow({ item, onBook, isBooking, dayBooked }: {
         )}
         <CapacityBar filled={item.participantsCount} total={item.maxParticipants} />
       </View>
-
       {!bookable ? (
         <View style={s.bookBtnLocked}>
           <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
           <Text style={s.lockedText}>{opensIn}</Text>
         </View>
-      ) : dayBooked && !full ? (
+      ) : locked ? (
         <View style={s.bookBtnLocked}>
           <Ionicons name="checkmark" size={14} color={colors.success} />
           <Text style={[s.lockedText, { color: colors.success }]}>1/1</Text>
         </View>
       ) : (
         <Pressable
-          style={[s.bookBtn, full ? s.bookBtnFull : dayBooked ? s.bookBtnFull : s.bookBtnAvail, isBooking && s.bookBtnLoading]}
+          style={[s.bookBtn, full ? s.bookBtnFull : s.bookBtnAvail, isBooking && s.bookBtnLoading]}
           onPress={() => onBook(item.id, full)}
           disabled={isBooking}
           hitSlop={8}
         >
           {isBooking
             ? <ActivityIndicator color={full ? colors.textMuted : '#fff'} size="small" />
-            : <Ionicons name={full ? 'hourglass-outline' : 'add'} size={20} color={full ? colors.textMuted : '#fff'} />
-          }
+            : <Ionicons name={full ? 'hourglass-outline' : 'add'} size={20} color={full ? colors.textMuted : '#fff'} />}
         </Pressable>
       )}
     </View>
   );
 }
 
-function SuccessModal({ result, onClose }: { result: BookResult | null; onClose: () => void }) {
+/* ── Confirmation modal ── */
+function ConfirmModal({ result, onClose }: { result: ConfirmResult | null; onClose: () => void }) {
   if (!result) return null;
   const isWaitlist = result.status === 'waitlist';
   return (
@@ -375,15 +402,52 @@ function SuccessModal({ result, onClose }: { result: BookResult | null; onClose:
       <View style={s.modalBg}>
         <View style={s.modalSheet}>
           <View style={s.modalHandle} />
-          <Ionicons
-            name={isWaitlist ? 'time' : 'checkmark-circle'}
-            size={56}
-            color={isWaitlist ? colors.textMuted : colors.success}
-          />
-          <Text style={s.modalTitle}>{isWaitlist ? 'Added to Waitlist' : 'Booking Confirmed!'}</Text>
-          <Text style={s.modalSub}>
-            {isWaitlist ? "We'll notify you when a spot opens up" : 'Your spot has been reserved'}
+
+          {/* Icon */}
+          <View style={[cm.iconCircle, { backgroundColor: isWaitlist ? '#8B5CF615' : colors.success + '15' }]}>
+            <Ionicons
+              name={isWaitlist ? 'time' : 'checkmark-circle'}
+              size={40}
+              color={isWaitlist ? '#8B5CF6' : colors.success}
+            />
+          </View>
+
+          <Text style={s.modalTitle}>
+            {isWaitlist ? 'Added to Waitlist' : 'Booking Confirmed!'}
           </Text>
+
+          {/* Booking details card */}
+          <View style={cm.card}>
+            <View style={cm.cardRow}>
+              <Ionicons name="barbell-outline" size={16} color={colors.primary} />
+              <Text style={cm.cardText} numberOfLines={1}>{result.className}</Text>
+            </View>
+            <View style={cm.divider} />
+            <View style={cm.cardRow}>
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+              <Text style={cm.cardText}>{fmtDate(result.startTime)}</Text>
+            </View>
+            <View style={cm.divider} />
+            <View style={cm.cardRow}>
+              <Ionicons name="time-outline" size={16} color={colors.primary} />
+              <Text style={cm.cardText}>{fmtTime(result.startTime)} – {fmtTime(result.endTime)}</Text>
+            </View>
+            {result.clubName && (<>
+              <View style={cm.divider} />
+              <View style={cm.cardRow}>
+                <Ionicons name="location-outline" size={16} color={colors.primary} />
+                <Text style={cm.cardText} numberOfLines={1}>{result.clubName}</Text>
+              </View>
+            </>)}
+            {result.instructorName && (<>
+              <View style={cm.divider} />
+              <View style={cm.cardRow}>
+                <Ionicons name="person-outline" size={16} color={colors.primary} />
+                <Text style={cm.cardText}>{result.instructorName}</Text>
+              </View>
+            </>)}
+          </View>
+
           <Pressable style={s.modalBtn} onPress={onClose}>
             <Text style={s.modalBtnText}>Done</Text>
           </Pressable>
@@ -392,6 +456,16 @@ function SuccessModal({ result, onClose }: { result: BookResult | null; onClose:
     </Modal>
   );
 }
+const cm = StyleSheet.create({
+  iconCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  card: {
+    width: '100%', borderRadius: 14, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.bg, marginTop: 8, marginBottom: 4, overflow: 'hidden',
+  },
+  cardRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  cardText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text, flex: 1 },
+  divider:  { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginHorizontal: 16 },
+});
 
 /* ── Main screen ── */
 export default function ClassesScreen() {
@@ -400,28 +474,43 @@ export default function ClassesScreen() {
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [showFilter, setShowFilter] = useState(false);
-  // weekClasses: map of "YYYY-MM-DD" → GymClass[]
   const [weekClasses, setWeekClasses] = useState<Record<string, GymClass[]>>({});
-  const [bookedDays, setBookedDays] = useState<Set<string>>(new Set());
+  const [dayBookings, setDayBookings] = useState<Map<string, DayBooking>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [bookingId, setBookingId] = useState<number | null>(null);
-  const [result, setResult] = useState<BookResult | null>(null);
+  const [confirmResult, setConfirmResult] = useState<ConfirmResult | null>(null);
   const [toast, setToast] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [cancellingBanner, setCancellingBanner] = useState(false);
   const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchBookedDays = useCallback(async () => {
     try {
       const { data } = await apiClient.get<any[]>('/bookings');
-      const days = new Set<string>();
+      const map = new Map<string, DayBooking>();
       for (const b of data) {
         if (!['confirmed', 'pending', 'waitlist', 'pending_verify'].includes(b.status)) continue;
         const st = b.startTime ?? b.createdAt;
-        if (st) days.add(new Date(st).toISOString().slice(0, 10));
+        if (!st || !b.classId) continue;
+        const key = new Date(st).toISOString().slice(0, 10);
+        const existing = map.get(key);
+        // Prefer confirmed/pending over waitlist if two entries on same day
+        if (!existing || existing.status === 'waitlist') {
+          map.set(key, {
+            bookingId:    b.id,
+            classId:      b.classId,
+            status:       b.status,
+            className:    b.className ?? `Class #${b.classId}`,
+            clubName:     b.clubName ?? null,
+            startTime:    b.startTime,
+            endTime:      b.endTime,
+            instructorName: b.instructorName ?? null,
+          });
+        }
       }
-      setBookedDays(days);
+      setDayBookings(map);
     } catch { /* ignore */ }
   }, []);
 
@@ -439,50 +528,75 @@ export default function ClassesScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [fetchBookedDays]);
 
-  // Initial load — fetches all 7 days at once
   useEffect(() => { fetchWeek(); }, [fetchWeek]);
 
-  // Live refresh every 30s — silently updates capacity for all days
-  useEffect(() => {
-    liveRef.current = setInterval(() => fetchWeek(true), LIVE_REFRESH_MS);
-    return () => { if (liveRef.current) clearInterval(liveRef.current); };
-  }, [fetchWeek]);
-
-  // Day switching is instant — no API call needed
   function selectDay(idx: number) { setSelectedIdx(idx); }
 
-  // Get classes for the selected day
-  const dayKey = (() => {
-    const d = days[selectedIdx];
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  })();
-  const classes = weekClasses[dayKey] ?? [];
+  const currentDayKey = dateKey(days[selectedIdx]);
+  const classes = weekClasses[currentDayKey] ?? [];
 
-  async function handleBook(classId: number, acceptWaitlist: boolean) {
+  // Dynamic live refresh
+  const hasRushClasses = classes.some(c => RUSH_CLASS_KEYWORDS.some(k => c.name.toLowerCase().includes(k)));
+  const isPeak = PEAK_HOURS.some(([from, to]) => { const h = new Date().getHours(); return h >= from && h < to; });
+  const refreshMs = hasRushClasses ? LIVE_REFRESH_FAST_MS
+    : (classes.length > 0 && isPeak) ? LIVE_REFRESH_NORMAL_MS
+    : LIVE_REFRESH_SLOW_MS;
+
+  useEffect(() => {
+    liveRef.current = setInterval(() => fetchWeek(true), refreshMs);
+    return () => { if (liveRef.current) clearInterval(liveRef.current); };
+  }, [fetchWeek, refreshMs]);
+
+  async function doBook(classId: number, acceptWaitlist: boolean) {
     setBookingId(classId); setToast('');
+    const classInfo = classes.find(c => c.id === classId);
     try {
-      const { data } = await apiClient.post<BookResult>('/bookings', { classId, acceptWaitlist }, {
-        headers: { 'idempotency-key': generateUUID() },
+      const { data } = await apiClient.post<{ success: boolean; bookingId: string; status: string }>(
+        '/bookings', { classId, acceptWaitlist },
+        { headers: { 'idempotency-key': generateUUID() } },
+      );
+      setConfirmResult({
+        bookingId:      data.bookingId,
+        status:         data.status,
+        className:      classInfo?.name ?? `Class #${classId}`,
+        startTime:      classInfo?.startTime ?? '',
+        endTime:        classInfo?.endTime ?? '',
+        clubName:       classInfo?.clubName ?? null,
+        instructorName: classInfo?.instructorName ?? null,
       });
-      setResult(data);
-      fetchBookedDays(); // refresh daily limit state
-      fetchWeek(true); // silent refresh after booking
+      await Promise.all([fetchBookedDays(), fetchWeek(true)]);
     } catch (err: any) {
       setToast(err?.response?.data?.message ?? 'Booking failed. Please try again.');
       setTimeout(() => setToast(''), 4000);
     } finally { setBookingId(null); }
   }
 
+  function handleBook(classId: number, isWaitlist: boolean) { doBook(classId, isWaitlist); }
+
+  async function handleBannerCancel(bookingId: string) {
+    // Optimistic — remove banner immediately
+    const prev = new Map(dayBookings);
+    setDayBookings(map => { const next = new Map(map); next.delete(currentDayKey); return next; });
+    setCancellingBanner(true);
+    try {
+      await apiClient.delete(`/bookings/${bookingId}`, { headers: { 'idempotency-key': generateUUID() } });
+      await Promise.all([fetchBookedDays(), fetchWeek(true)]);
+    } catch {
+      setDayBookings(prev); // rollback on failure
+      setToast('Failed to cancel. Please try again.');
+      setTimeout(() => setToast(''), 4000);
+    } finally { setCancellingBanner(false); }
+  }
+
   const filtered = applyFilters(classes, search, filters);
   const filterCount = activeFilterCount(filters);
-
   const selectedDay = days[selectedIdx];
   const dateLabel = (selectedIdx === 0 ? 'Today ' : selectedIdx === 1 ? 'Tomorrow ' : '') +
     selectedDay.toLocaleDateString('en-HK', { day: 'numeric', month: 'long', year: 'numeric' });
-
   const liveLabel = lastUpdated
     ? `Live · ${lastUpdated.toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', hour12: false })}`
     : 'Loading...';
+  const todayBooking = dayBookings.get(currentDayKey) ?? null;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -491,16 +605,10 @@ export default function ClassesScreen() {
       {/* Header */}
       <View style={s.header}>
         <Text style={s.title}>Book classes</Text>
-        <Pressable
-          style={[s.filterBtn, filterCount > 0 && s.filterBtnActive]}
-          onPress={() => setShowFilter(true)}
-          hitSlop={8}
-        >
+        <Pressable style={[s.filterBtn, filterCount > 0 && s.filterBtnActive]} onPress={() => setShowFilter(true)} hitSlop={8}>
           <Ionicons name="options-outline" size={18} color={filterCount > 0 ? '#fff' : colors.text} />
           {filterCount > 0 && (
-            <View style={s.filterBadge}>
-              <Text style={s.filterBadgeText}>{filterCount}</Text>
-            </View>
+            <View style={s.filterBadge}><Text style={s.filterBadgeText}>{filterCount}</Text></View>
           )}
         </Pressable>
       </View>
@@ -508,14 +616,8 @@ export default function ClassesScreen() {
       {/* Search */}
       <View style={s.searchWrap}>
         <Ionicons name="search" size={16} color={colors.textMuted} />
-        <TextInput
-          style={s.searchInput}
-          placeholder="Search for classes"
-          placeholderTextColor={colors.textMuted}
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-        />
+        <TextInput style={s.searchInput} placeholder="Search for classes" placeholderTextColor={colors.textMuted}
+          value={search} onChangeText={setSearch} returnKeyType="search" />
         {search.length > 0 && (
           <Pressable onPress={() => setSearch('')} hitSlop={8}>
             <Ionicons name="close-circle" size={16} color={colors.textMuted} />
@@ -523,19 +625,24 @@ export default function ClassesScreen() {
         )}
       </View>
 
-      {/* Day picker */}
+      {/* Day picker with booking dots */}
       <View style={s.dayPickerWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dayPicker}>
-          {days.map((d, i) => (
-            <Pressable
-              key={i}
-              style={[s.dayCell, i === selectedIdx && s.dayCellActive]}
-              onPress={() => selectDay(i)}
-            >
-              <Text style={[s.dayLabel, i === selectedIdx && s.dayLabelActive]}>{DAYS[d.getDay()]}</Text>
-              <Text style={[s.dayNum,   i === selectedIdx && s.dayNumActive]}>{d.getDate()}</Text>
-            </Pressable>
-          ))}
+          {days.map((d, i) => {
+            const key = dateKey(d);
+            const hasBooking = dayBookings.has(key);
+            const bookingStatus = dayBookings.get(key)?.status;
+            const dotColor = bookingStatus === 'waitlist' ? '#8B5CF6' : colors.success;
+            return (
+              <Pressable key={i} style={[s.dayCell, i === selectedIdx && s.dayCellActive]} onPress={() => selectDay(i)}>
+                <Text style={[s.dayLabel, i === selectedIdx && s.dayLabelActive]}>{DAYS[d.getDay()]}</Text>
+                <Text style={[s.dayNum, i === selectedIdx && s.dayNumActive]}>{d.getDate()}</Text>
+                {hasBooking
+                  ? <View style={[s.dayDot, { backgroundColor: i === selectedIdx ? '#fff' : dotColor }]} />
+                  : <View style={s.dayDotEmpty} />}
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -549,26 +656,38 @@ export default function ClassesScreen() {
           data={filtered}
           keyExtractor={item => String(item.id)}
           renderItem={({ item }) => (
-            <ClassRow item={item} onBook={handleBook} isBooking={bookingId === item.id} dayBooked={bookedDays.has(dayKey)} />
+            <ClassRow
+              item={item}
+              onBook={handleBook}
+              isBooking={bookingId === item.id}
+              locked={dayBookings.has(currentDayKey)}
+            />
           )}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchWeek(false); }} tintColor={colors.primary} />}
           ListHeaderComponent={
-            <View style={s.dateHeader}>
-              <Text style={s.dateHeaderText}>{dateLabel}</Text>
-              <Text style={s.liveLabel}>
-                <Ionicons name="radio-button-on" size={10} color={colors.success} />
-                {' '}{liveLabel}
-              </Text>
-            </View>
+            <>
+              <View style={s.dateHeader}>
+                <Text style={s.dateHeaderText}>{dateLabel}</Text>
+                <Text style={s.liveLabel}>
+                  <Ionicons name="radio-button-on" size={10} color={colors.success} />
+                  {' '}{liveLabel}
+                </Text>
+              </View>
+              {todayBooking && (
+                <DayBookingBanner
+                  booking={todayBooking}
+                  onCancel={handleBannerCancel}
+                  cancelling={cancellingBanner}
+                />
+              )}
+            </>
           }
           ItemSeparatorComponent={() => <View style={s.separator} />}
           ListEmptyComponent={
             <View style={s.empty}>
               <Ionicons name="calendar-outline" size={40} color={colors.border} />
               <Text style={s.emptyTitle}>No classes found</Text>
-              <Text style={s.emptySub}>
-                {filterCount > 0 ? 'Try adjusting your filters' : 'Check back later'}
-              </Text>
+              <Text style={s.emptySub}>{filterCount > 0 ? 'Try adjusting your filters' : 'Check back later'}</Text>
               {filterCount > 0 && (
                 <Pressable style={s.clearFiltersBtn} onPress={() => setFilters(DEFAULT_FILTERS)}>
                   <Text style={s.clearFiltersText}>Clear filters</Text>
@@ -581,14 +700,8 @@ export default function ClassesScreen() {
         />
       )}
 
-      <FilterSheet
-        visible={showFilter}
-        filters={filters}
-        allClasses={classes}
-        onApply={setFilters}
-        onClose={() => setShowFilter(false)}
-      />
-      <SuccessModal result={result} onClose={() => setResult(null)} />
+      <FilterSheet visible={showFilter} filters={filters} allClasses={classes} onApply={setFilters} onClose={() => setShowFilter(false)} />
+      <ConfirmModal result={confirmResult} onClose={() => setConfirmResult(null)} />
     </SafeAreaView>
   );
 }
@@ -599,22 +712,17 @@ const s = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
-    backgroundColor: colors.card,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, backgroundColor: colors.card,
   },
   title:   { fontSize: 30, fontFamily: fonts.black, color: colors.text },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card,
   },
-  filterBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterBadge: {
-    backgroundColor: '#fff', width: 16, height: 16, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  filterBadgeText: { fontSize: 9, fontFamily: fonts.black, color: colors.primary },
+  filterBtnActive:  { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterBadge:      { backgroundColor: '#fff', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  filterBadgeText:  { fontSize: 9, fontFamily: fonts.black, color: colors.primary },
 
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -625,16 +733,18 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, fontFamily: fonts.regular, color: colors.text, padding: 0 },
 
   dayPickerWrap: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  dayPicker:     { paddingHorizontal: 12, paddingBottom: 10, paddingTop: 6, gap: 2 },
+  dayPicker:     { paddingHorizontal: 12, paddingBottom: 8, paddingTop: 6, gap: 2 },
   dayCell: {
-    width: 46, height: 64, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center', gap: 3,
+    width: 46, height: 70, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center', gap: 2,
   },
   dayCellActive:  { backgroundColor: colors.primary },
   dayLabel:       { fontSize: 11, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1 },
   dayLabelActive: { color: 'rgba(255,255,255,0.8)' },
   dayNum:         { fontSize: 22, fontFamily: fonts.black, color: '#C7C7CC' },
   dayNumActive:   { color: '#fff' },
+  dayDot:         { width: 5, height: 5, borderRadius: 3 },
+  dayDotEmpty:    { width: 5, height: 5 },
 
   dateHeader:     { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.bg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateHeaderText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.text },
@@ -642,8 +752,7 @@ const s = StyleSheet.create({
 
   classRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: colors.card,
+    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: colors.card,
   },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 },
 
@@ -651,46 +760,35 @@ const s = StyleSheet.create({
   timeMain: { fontSize: 16, fontFamily: fonts.black, color: colors.primary },
   timeDur:  { fontSize: 11, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 2 },
 
-  infoCol:  { flex: 1, gap: 4 },
-  className:{ fontSize: 16, fontFamily: fonts.bold, color: colors.text },
+  infoCol:   { flex: 1, gap: 4 },
+  className: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
 
   metaRow:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metaText: { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
 
-  avatar: {
-    width: 18, height: 18, borderRadius: 9,
-    backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center',
-  },
+  avatar:     { width: 18, height: 18, borderRadius: 9, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 8, fontFamily: fonts.bold, color: colors.textMuted },
 
-  bookBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  bookBtn:        { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   bookBtnAvail:   { backgroundColor: colors.cta },
   bookBtnFull:    { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   bookBtnLoading: { opacity: 0.6 },
-  bookBtnLocked: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border,
-  },
-  lockedText: { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted, marginTop: 1 },
+  bookBtnLocked:  { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
+  lockedText:     { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted, marginTop: 1 },
 
-  toast:    { marginHorizontal: 16, marginBottom: 4, backgroundColor: '#FFF0F0', borderRadius: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary },
-  toastText:{ fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
+  toast:     { marginHorizontal: 16, marginBottom: 4, backgroundColor: '#FFF0F0', borderRadius: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary },
+  toastText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
 
-  empty:          { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyTitle:     { fontSize: 16, fontFamily: fonts.bold,    color: colors.textMuted },
-  emptySub:       { fontSize: 13, fontFamily: fonts.regular, color: colors.textMuted },
-  clearFiltersBtn:{ marginTop: 4, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: colors.primary },
+  empty:           { alignItems: 'center', paddingTop: 60, gap: 8 },
+  emptyTitle:      { fontSize: 16, fontFamily: fonts.bold,    color: colors.textMuted },
+  emptySub:        { fontSize: 13, fontFamily: fonts.regular, color: colors.textMuted },
+  clearFiltersBtn: { marginTop: 4, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: colors.primary },
   clearFiltersText:{ fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
 
-  modalBg:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  modalSheet:{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, alignItems: 'center', gap: 8, paddingBottom: 36 },
-  modalHandle:{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 8 },
-  modalTitle: { fontSize: 20, fontFamily: fonts.black, color: colors.text },
-  modalSub:   { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center' },
-  modalBtn:   { backgroundColor: colors.cta, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 48, marginTop: 10 },
+  modalBg:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalSheet:  { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, alignItems: 'center', gap: 10, paddingBottom: 36 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 4 },
+  modalTitle:  { fontSize: 20, fontFamily: fonts.black, color: colors.text },
+  modalBtn:    { backgroundColor: colors.cta, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 48, marginTop: 8, width: '100%', alignItems: 'center' },
   modalBtnText:{ color: '#fff', fontFamily: fonts.bold, fontSize: 16 },
 });
