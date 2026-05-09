@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Dimensions, FlatList, Image, Linking,
+  Animated, Dimensions, FlatList, Image, Linking,
   Pressable, RefreshControl, ScrollView,
   StatusBar, StyleSheet, Text, View, Platform,
 } from 'react-native';
@@ -322,6 +322,7 @@ function buildHints(args: {
   hasExpired: boolean;
   cardExpired: boolean;
   onPay: () => void;
+  onUpdateCard: () => void;
   onProfile: () => void;
   onPT: () => void;
   onClasses: () => void;
@@ -335,27 +336,27 @@ function buildHints(args: {
     cards.push({
       key: 'card-expired',
       icon: 'card', iconColor: colors.primary, iconBg: colors.primaryBg,
-      title: '信用卡已過期',
-      body: '你的儲存信用卡已過期，自動付款及 App 付款將無法進行，請更新卡資料。',
-      action: '更新信用卡', onPress: args.onProfile,
+      title: 'Credit Card Expired',
+      body: 'Your saved card has expired. Automatic payments and in-app payments will fail until you update your card details.',
+      action: 'Update Card', onPress: args.onUpdateCard,
     });
   }
   if (hasDebt) {
     cards.push({
       key: 'debt',
       icon: 'alert-circle', iconColor: colors.primary, iconBg: colors.primaryBg,
-      title: '入唔到場？立即付款',
-      body: '你有未繳費項目。付清後即可正常進場，唔需要等人工處理。',
-      action: '立即付款', onPress: args.onPay,
+      title: 'Can\'t Enter? Pay Now',
+      body: 'We detected an outstanding balance blocking your entry. Clear it instantly in-app — no need to wait for staff.',
+      action: 'Resolve Now', onPress: args.onPay,
     });
   }
   if (hasExpired) {
     cards.push({
       key: 'expired',
       icon: 'card-outline', iconColor: colors.amber, iconBg: colors.amberBg,
-      title: '會籍已過期',
-      body: '你嘅會籍已到期，請聯絡職員或到帳戶頁面更新資料以繼續使用。',
-      action: '查看帳戶', onPress: args.onProfile,
+      title: 'Membership Expired',
+      body: 'Your membership has lapsed. Contact staff or visit your account page to renew.',
+      action: 'My Account', onPress: args.onProfile,
     });
   }
 
@@ -367,15 +368,15 @@ function buildHints(args: {
     cards.push({
       key: 'milestone',
       icon: 'trophy-outline', iconColor: colors.amber, iconBg: colors.amberBg,
-      title: `到訪里程碑：${totalVisits} / ${next} 次`,
-      body: `仲差 ${toGo} 次就達成 ${next} 次到訪徽章！（進度 ${pct}%）`,
+      title: `Visit Milestone: ${totalVisits} / ${next}`,
+      body: `${toGo} more visits to earn your ${next}-visit badge! You're ${pct}% there.`,
     });
   } else {
     cards.push({
       key: 'milestone-done',
       icon: 'trophy', iconColor: colors.amber, iconBg: colors.amberBg,
-      title: '所有里程碑已達成 🏆',
-      body: `你已完成 10 / 50 / 100 / 200 次到訪，總到訪 ${totalVisits} 次。繼續保持！`,
+      title: 'All Milestones Reached 🏆',
+      body: `You've completed 10 / 50 / 100 / 200 visits with ${totalVisits} total check-ins. Keep it up!`,
     });
   }
 
@@ -384,18 +385,18 @@ function buildHints(args: {
     cards.push({
       key: 'streak',
       icon: 'flame', iconColor: '#F97316', iconBg: '#FFF7ED',
-      title: `🔥 連續 ${streak} 星期落場`,
+      title: `🔥 ${streak}-Week Streak`,
       body: streak >= 4
-        ? `連續 ${streak} 星期！你係 GO24 嘅健身常客，繼續保持紀律。`
-        : `已連續 ${streak} 星期，繼續落場就可以建立長期習慣！`,
+        ? `${streak} weeks straight — you're one of GO24's most dedicated members. Stay consistent!`
+        : `${streak} weeks in a row. Keep showing up to build a lasting habit!`,
     });
   } else if (streak === 0) {
     cards.push({
       key: 'streak-start',
       icon: 'flame-outline', iconColor: colors.textMuted, iconBg: colors.bg,
-      title: '開始你的連續記錄',
-      body: '今個星期落場就可以開始計算連續記錄，建立運動習慣從今天開始。',
-      action: '預約課堂', onPress: args.onClasses,
+      title: 'Start Your Streak',
+      body: 'Visit the gym this week to kick off your streak. Consistency is everything.',
+      action: 'Book a Class', onPress: args.onClasses,
     });
   }
 
@@ -404,17 +405,17 @@ function buildHints(args: {
     cards.push({
       key: 'pt-plenty',
       icon: 'barbell-outline', iconColor: colors.teal, iconBg: colors.tealBg,
-      title: `你有 ${ptRemaining} 堂 PT 未用`,
-      body: '記得定期預約私人教練課堂，唔好讓 sessions 白白過期。',
-      action: '預約 PT', onPress: args.onPT,
+      title: `${ptRemaining} PT Sessions Available`,
+      body: 'Book your personal training sessions regularly so they don\'t go to waste.',
+      action: 'Book PT', onPress: args.onPT,
     });
   } else if (ptRemaining > 0 && ptRemaining < 5) {
     cards.push({
       key: 'pt-low',
       icon: 'barbell', iconColor: colors.teal, iconBg: colors.tealBg,
-      title: `PT 只剩 ${ptRemaining} 堂`,
-      body: '你嘅 PT sessions 快用完，請聯絡教練或職員安排續購。',
-      action: '查看 PT', onPress: args.onPT,
+      title: `Only ${ptRemaining} PT Session${ptRemaining > 1 ? 's' : ''} Left`,
+      body: 'Your PT sessions are running low. Contact your trainer or staff to top up.',
+      action: 'View PT', onPress: args.onPT,
     });
   }
 
@@ -423,17 +424,17 @@ function buildHints(args: {
     cards.push({
       key: 'inactive',
       icon: 'walk-outline', iconColor: colors.indigo, iconBg: colors.indigoBg,
-      title: '今個月未有落場記錄',
-      body: '立即預約課堂，開始本月嘅健身旅程！',
-      action: '睇課堂時間表', onPress: args.onClasses,
+      title: 'No Visits This Month Yet',
+      body: 'Book a class and kick off your month. Every session counts!',
+      action: 'View Schedule', onPress: args.onClasses,
     });
   } else {
     const total = monthVisits + monthClasses;
     cards.push({
       key: 'monthly',
       icon: 'stats-chart-outline', iconColor: colors.indigo, iconBg: colors.indigoBg,
-      title: `本月已落場 ${total} 次`,
-      body: `入場 ${monthVisits} 次 · 上課 ${monthClasses} 堂。${total >= 8 ? '非常積極，繼續！' : '目標每星期最少 2 次，你做到㗎！'}`,
+      title: `${total} Visit${total > 1 ? 's' : ''} This Month`,
+      body: `${monthVisits} gym ${monthVisits === 1 ? 'entry' : 'entries'} · ${monthClasses} ${monthClasses === 1 ? 'class' : 'classes'}. ${total >= 8 ? 'Excellent work — keep going!' : 'Aim for at least 2 visits per week. You\'ve got this!'}`,
     });
   }
 
@@ -442,14 +443,16 @@ function buildHints(args: {
     cards.push({
       key: 'expiry-warn',
       icon: 'calendar-outline', iconColor: colors.warning, iconBg: '#FFFBF0',
-      title: `會籍 ${daysRemaining} 日後到期`,
-      body: '請聯絡職員或到帳戶頁面安排續約，以免影響使用。',
-      action: '查看帳戶', onPress: args.onProfile,
+      title: `Membership Expires in ${daysRemaining} Day${daysRemaining > 1 ? 's' : ''}`,
+      body: 'Contact staff or visit your account page to renew before it lapses.',
+      action: 'My Account', onPress: args.onProfile,
     });
   }
 
   return cards;
 }
+
+const URGENT_KEYS = new Set(['card-expired', 'debt', 'expired']);
 
 function InteractiveHub(props: {
   totalVisits: number;
@@ -462,53 +465,132 @@ function InteractiveHub(props: {
   hasExpired: boolean;
   cardExpired: boolean;
   onPay: () => void;
+  onUpdateCard: () => void;
   onProfile: () => void;
   onPT: () => void;
   onClasses: () => void;
 }) {
-  const hints = buildHints(props);
+  const all     = buildHints(props);
+  const urgent  = all.filter(h => URGENT_KEYS.has(h.key));
+  const info    = all.filter(h => !URGENT_KEYS.has(h.key));
+
+  const [idx, setIdx] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const idxRef   = useRef(0);
+
+  const fadeTo = (next: number) => {
+    Animated.sequence([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
+    setTimeout(() => { idxRef.current = next; setIdx(next); }, 300);
+  };
+
+  useEffect(() => {
+    if (info.length <= 1) return;
+    const t = setInterval(() => {
+      fadeTo((idxRef.current + 1) % info.length);
+    }, 4000);
+    return () => clearInterval(t);
+  }, [info.length]);
+
+  const navigate = (dir: 1 | -1) => {
+    fadeTo(Math.max(0, Math.min(info.length - 1, idxRef.current + dir)));
+  };
+
+  const h = info[idx];
 
   return (
-    <View style={hub.wrap}>
-      <Text style={s.sectionTitle}>互動 HUB</Text>
-      {hints.map(h => (
-        <Pressable
-          key={h.key}
-          style={hub.card}
-          onPress={h.onPress}
-          disabled={!h.onPress}
-        >
-          <View style={[hub.iconBox, { backgroundColor: h.iconBg }]}>
-            <Ionicons name={h.icon} size={20} color={h.iconColor} />
+    <View style={hub.outer}>
+      <Text style={s.sectionTitle}>Smart Hub</Text>
+
+      {/* ── Pinned urgent alerts ── */}
+      {urgent.map(u => (
+        <Pressable key={u.key} style={[hub.card, hub.cardUrgent]} onPress={u.onPress}>
+          <View style={[hub.iconBox, { backgroundColor: u.iconBg }]}>
+            <Ionicons name={u.icon} size={20} color={u.iconColor} />
           </View>
           <View style={hub.content}>
-            <Text style={hub.title}>{h.title}</Text>
-            <Text style={hub.body}>{h.body}</Text>
-            {h.action && (
+            <Text style={hub.title}>{u.title}</Text>
+            <Text style={hub.body}>{u.body}</Text>
+            {u.action && (
               <View style={hub.actionRow}>
-                <Text style={[hub.actionTxt, { color: h.iconColor }]}>{h.action}</Text>
-                <Ionicons name="chevron-forward" size={12} color={h.iconColor} />
+                <Text style={[hub.actionTxt, { color: u.iconColor }]}>{u.action}</Text>
+                <Ionicons name="chevron-forward" size={12} color={u.iconColor} />
               </View>
             )}
           </View>
+          <Ionicons name="chevron-forward" size={18} color={u.iconColor} style={{ opacity: 0.5 }} />
         </Pressable>
       ))}
+
+      {/* ── Cycling info card ── */}
+      {h && (
+        <View style={hub.card}>
+          <View style={[hub.iconBox, { backgroundColor: h.iconBg }]}>
+            <Ionicons name={h.icon} size={20} color={h.iconColor} />
+          </View>
+          <Animated.View style={[hub.content, { opacity: fadeAnim }]}>
+            <Text style={hub.title}>{h.title}</Text>
+            <Text style={hub.body}>{h.body}</Text>
+            {h.action && (
+              <Pressable style={hub.actionRow} onPress={h.onPress}>
+                <Text style={[hub.actionTxt, { color: h.iconColor }]}>{h.action}</Text>
+                <Ionicons name="chevron-forward" size={12} color={h.iconColor} />
+              </Pressable>
+            )}
+          </Animated.View>
+
+          {info.length > 1 && (
+            <View style={hub.nav}>
+              <Pressable
+                onPress={() => navigate(-1)} disabled={idx === 0}
+                hitSlop={8} style={hub.navBtn}
+              >
+                <Ionicons name="chevron-up" size={16} color={idx === 0 ? colors.border : colors.textMuted} />
+              </Pressable>
+              <View style={hub.navDots}>
+                {info.map((_, i) => (
+                  <View key={i} style={[hub.navDot, i === idx && hub.navDotActive]} />
+                ))}
+              </View>
+              <Pressable
+                onPress={() => navigate(1)} disabled={idx === info.length - 1}
+                hitSlop={8} style={hub.navBtn}
+              >
+                <Ionicons name="chevron-down" size={16} color={idx === info.length - 1 ? colors.border : colors.textMuted} />
+              </Pressable>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }
 
 const hub = StyleSheet.create({
-  wrap:    { gap:8 },
-  card:    { flexDirection:'row', alignItems:'flex-start', gap:14,
-              marginHorizontal:16, backgroundColor:colors.card, borderRadius:18,
-              padding:16,
-              shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.05, shadowRadius:6, elevation:1 },
-  iconBox: { width:44, height:44, borderRadius:13, alignItems:'center', justifyContent:'center', flexShrink:0 },
+  outer:      { gap:8 },
+  headerRow:  { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16 },
+  counter:    { fontSize:11, fontFamily:fonts.semibold, color:colors.textMuted },
+
+  card:       { flexDirection:'row', alignItems:'center', gap:14,
+                marginHorizontal:16, backgroundColor:colors.card, borderRadius:20,
+                padding:16, minHeight:90,
+                shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.06, shadowRadius:8, elevation:2 },
+  cardUrgent: { borderWidth:1.5, borderColor:colors.primary + '30' },
+  iconBox: { width:46, height:46, borderRadius:13, alignItems:'center', justifyContent:'center', flexShrink:0 },
   content: { flex:1, gap:4 },
   title:   { fontSize:14, fontFamily:fonts.bold, color:colors.text },
   body:    { fontSize:12, fontFamily:fonts.regular, color:colors.textMuted, lineHeight:18 },
-  actionRow:{ flexDirection:'row', alignItems:'center', gap:3, marginTop:4 },
-  actionTxt:{ fontSize:12, fontFamily:fonts.semibold },
+  actionRow: { flexDirection:'row', alignItems:'center', gap:3, marginTop:5 },
+  actionTxt: { fontSize:12, fontFamily:fonts.semibold },
+
+  nav:           { alignItems:'center', gap:4, flexShrink:0 },
+  navBtn:        { width:28, height:28, alignItems:'center', justifyContent:'center' },
+  navBtnDisabled:{ opacity:0.3 },
+  navDots:       { gap:3, alignItems:'center' },
+  navDot:        { width:4, height:4, borderRadius:2, backgroundColor:colors.border },
+  navDotActive:  { backgroundColor:colors.primary, height:10, borderRadius:3 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -611,7 +693,7 @@ export default function HomeScreen() {
           classes={data?.thisMonth.classes ?? 0}
         />
 
-        {/* 互動 HUB */}
+        {/* Smart Hub */}
         <InteractiveHub
           totalVisits={totalVisits}
           streak={streak}
@@ -622,7 +704,8 @@ export default function HomeScreen() {
           hasDebt={hasDebt}
           hasExpired={hasExpired}
           cardExpired={cardExpired}
-          onPay={() => router.push('/profile')}
+          onPay={() => router.push('/payment/access-blocked')}
+          onUpdateCard={() => router.push('/payment/update-card')}
           onProfile={() => router.push('/profile')}
           onPT={() => router.push('/(tabs)/pt')}
           onClasses={() => router.push('/(tabs)/classes')}
