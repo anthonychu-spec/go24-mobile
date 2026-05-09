@@ -142,9 +142,7 @@ Step 2: Choose Plan
 Step 3: Take Selfie (Face ID)
   - Camera opens (expo-camera)
   - Member takes photo
-  - Stored securely in backend (S3 or local storage)
-  - Used later by staff to enroll in Suprema BioStation 3
-  - Note: Face enrollment requires physical Suprema device — not instant
+  - Uploaded to backend with signup form
 
 Step 4: Payment (Adyen)
   - Adyen Drop-In for first payment
@@ -153,21 +151,36 @@ Step 4: Payment (Adyen)
     → Create PGM contract (selected plan)
     → Create user record in our DB
     → Issue JWT → auto-login
-    → Send welcome push notification
-  - Face photo flagged for staff to enroll in Suprema (async)
+    → POST face photo to Suprema BioStation 3 API (async)
+    → Send welcome push: "Welcome! Your Face ID is being activated..."
+```
+
+### Face ID Webhook Flow
+```
+Backend → Suprema API (enroll face)
+Suprema processes...
+Suprema → POST /webhooks/suprema/enroll → our backend
+  Success: update face_enrollments.status = 'enrolled'
+           push notification: "✅ Face ID activated — you can now enter GO24"
+  Failure: update face_enrollments.status = 'failed'
+           push notification: "❌ Face ID failed — please retake your photo"
+           Member can retake photo from Profile screen → retry enrollment
 ```
 
 ### Backend — New endpoints (no auth guard)
 - `GET /public/plans` → list of PGM PaymentPlans
-- `POST /public/signup` → `{ personalDetails, planId, facePhotoBase64 }`
+- `POST /public/signup` → `{ personalDetails, planId, facePhotoBase64, adyenPaymentData }`
   - Creates PGM member + contract
   - Processes Adyen payment
+  - Submits face to Suprema async
   - Returns `{ accessToken, refreshToken }`
+- `POST /webhooks/suprema/enroll` → Suprema callback (HMAC verified)
 
 ### Notes
-- Face ID enrollment in Suprema is **not instant** — staff does it from admin panel
-- Member can enter gym via QR Check-in until Face ID is enrolled
-- Failure handling: if PGM member creation fails → refund Adyen charge automatically
+- Member can enter via QR Check-in immediately after signup
+- Face ID activates automatically once Suprema webhook confirms
+- Failure handling: if PGM creation fails → refund Adyen charge automatically
+- If face enrollment fails → member can retake photo from Profile → retry
 
 ---
 
@@ -226,7 +239,7 @@ Step 4: Payment (Adyen)
 | `membership_requests` | New: userId, type, startDate, endDate, reason, status |
 | `member_milestones` | New: userId, milestone, unlockedAt |
 | `payments` | New: userId, amountHkd, description, adyenRef, pdfPath, createdAt |
-| `face_enrollments` | New: userId, photoPath, status (pending/enrolled), enrolledAt |
+| `face_enrollments` | New: userId, photoPath, status (pending/enrolled/failed), supremaRef, enrolledAt |
 
 ---
 
