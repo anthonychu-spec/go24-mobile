@@ -249,7 +249,7 @@ export class PgmBookingAdapter implements IBookingRepo {
       for (const c of allClasses) classMap.set(c.id, c);
 
       return (bookingsRes.value ?? [])
-        .filter(b => !b.isCancelled)
+        .filter(b => !b.isCanceled && !b.isDeleted)
         .map(b => {
           const cls = classMap.get(b.classId);
           return {
@@ -260,7 +260,7 @@ export class PgmBookingAdapter implements IBookingRepo {
             endTime: b.endDate,
             clubName: cls ? (clubMap.get(cls.clubId) ?? null) : null,
             isStandby: b.isStandby ?? false,
-            isCancelled: b.isCancelled ?? false,
+            isCancelled: b.isCanceled ?? false,
           };
         });
     } catch (err) {
@@ -270,18 +270,21 @@ export class PgmBookingAdapter implements IBookingRepo {
 
   /** Fetch historical bookings (last N months) with full class name enrichment. */
   async listHistoricalBookings(memberId: number, since: Date): Promise<PgmBooking[]> {
-    const sinceStr = since.toISOString().slice(0, 10);
-    const toStr    = new Date().toISOString().slice(0, 10);
+    // Extend class window: 12 months back → 3 months forward to cover all booking dates
+    const classFrom = new Date(); classFrom.setMonth(classFrom.getMonth() - 12);
+    const classTo   = new Date(); classTo.setMonth(classTo.getMonth() + 3);
+    const fromStr   = classFrom.toISOString().slice(0, 10);
+    const toStr     = classTo.toISOString().slice(0, 10);
 
     const [bookingsResult, classesResult, classTypeMap, clubMap] = await Promise.allSettled([
-      this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
+      this.pgm.get<{ value: any[] }>('/odata/ClassBookings', {
         $filter: `memberId eq ${memberId}`,
         $top: 200,
       }),
       this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-        $filter: `startDate ge ${sinceStr}T00:00:00Z and startDate le ${toStr}T23:59:59Z`,
+        $filter: `startDate ge ${fromStr}T00:00:00Z and startDate le ${toStr}T23:59:59Z`,
         $select: 'id,startDate,endDate,classTypeId,clubId',
-        $top: 500,
+        $top: 2000,
       }),
       this.getClassTypeMap(),
       this.getClubMap(),
@@ -310,7 +313,7 @@ export class PgmBookingAdapter implements IBookingRepo {
     if (classes.length > 0) this.logger.log(`sample class keys: ${Object.keys(classes[0]).join(',')}`);
 
     const results = bookings
-      .filter(b => !b.isCancelled)
+      .filter(b => !b.isCanceled && !b.isDeleted)
       .map(b => {
         const cls = classMap.get(b.classId);
         return {
