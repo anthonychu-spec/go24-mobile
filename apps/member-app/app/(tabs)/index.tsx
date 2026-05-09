@@ -140,9 +140,9 @@ const mc = StyleSheet.create({
 
 function StatRow({ visits, pt, classes }: { visits:number; pt:number; classes:number }) {
   const items = [
-    { label:'Visits',     val: visits,  color:colors.primary, icon:'walk-outline'      as const },
-    { label:'PT Left',    val: pt,      color:colors.teal,    icon:'barbell-outline'   as const },
-    { label:'Classes',    val: classes, color:colors.indigo,  icon:'people-outline'    as const },
+    { label:'Visits',   val: visits,  color:colors.primary, icon:'walk-outline'    as const },
+    { label:'PT',       val: pt,      color:colors.teal,    icon:'barbell-outline' as const },
+    { label:'Classes',  val: classes, color:colors.indigo,  icon:'people-outline'  as const },
   ];
   return (
     <View style={sr.wrap}>
@@ -358,10 +358,10 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Stats */}
+        {/* Stats — all this month */}
         <StatRow
           visits={data?.thisMonth.visits ?? 0}
-          pt={pt?.remainingSessions ?? 0}
+          pt={data?.thisMonth.pt ?? 0}
           classes={data?.thisMonth.classes ?? 0}
         />
 
