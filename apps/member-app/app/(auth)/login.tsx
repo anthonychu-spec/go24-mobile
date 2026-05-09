@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/context';
 import { t } from '../../src/i18n';
 import { colors } from '../../src/theme/colors';
@@ -21,6 +22,7 @@ function mapError(err: unknown): string {
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -132,6 +134,19 @@ export default function LoginScreen() {
           <Pressable style={s.forgotBtn}>
             <Text style={s.forgotText}>{t.login.forgotPassword}</Text>
           </Pressable>
+
+          {/* Divider */}
+          <View style={s.dividerRow}>
+            <View style={s.dividerLine} />
+            <Text style={s.dividerText}>or</Text>
+            <View style={s.dividerLine} />
+          </View>
+
+          {/* Join GO24 */}
+          <Pressable style={s.joinBtn} onPress={() => router.push('/signup' as any)}>
+            <Text style={s.joinText}>Not a member? </Text>
+            <Text style={s.joinTextBold}>Join GO24 →</Text>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -191,4 +206,12 @@ const s = StyleSheet.create({
 
   forgotBtn:  { alignItems: 'center', paddingVertical: 8 },
   forgotText: { fontSize: 14, fontFamily: fonts.regular, color: colors.primary },
+
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dividerLine:{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  dividerText:{ fontSize: 12, color: colors.textMuted, fontFamily: fonts.regular },
+
+  joinBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 4 },
+  joinText:     { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted },
+  joinTextBold: { fontSize: 14, fontFamily: fonts.bold,    color: colors.primary   },
 });

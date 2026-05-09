@@ -48,6 +48,7 @@ export interface MemberProfileData {
     phone: string | null;
     memberCode: string | null;
   };
+  hasMembership: boolean;
   balance: {
     outstanding: number;
     currency: string;
@@ -163,7 +164,7 @@ export class DashboardService {
   }
 
   async getProfile(userId: string, pgmId: number): Promise<MemberProfileData> {
-    const [memberRes, invoicesRes, userRes, cardRes] = await Promise.allSettled([
+    const [memberRes, invoicesRes, userRes, cardRes, contractRes] = await Promise.allSettled([
       this.pgm.get<{ value: any[] }>('/odata/Members', {
         $filter: `id eq ${pgmId}`,
         $select: 'id,firstName,lastName,email,phone',
@@ -177,12 +178,14 @@ export class DashboardService {
       }),
       this.userRepo.findOne({ where: { id: userId } }),
       this.paymentsService.getCard(userId),
+      this.fetchActiveContract(pgmId),
     ]);
 
-    const pgmMember = memberRes.status  === 'fulfilled' ? memberRes.value.value?.[0] : null;
-    const invoices  = invoicesRes.status === 'fulfilled' ? (invoicesRes.value.value ?? []) : [];
-    const user      = userRes.status    === 'fulfilled' ? userRes.value : null;
-    const card      = cardRes.status    === 'fulfilled' ? cardRes.value : null;
+    const pgmMember    = memberRes.status    === 'fulfilled' ? memberRes.value.value?.[0] : null;
+    const invoices     = invoicesRes.status  === 'fulfilled' ? (invoicesRes.value.value ?? []) : [];
+    const user         = userRes.status      === 'fulfilled' ? userRes.value : null;
+    const card         = cardRes.status      === 'fulfilled' ? cardRes.value : null;
+    const hasMembership = contractRes.status === 'fulfilled' ? contractRes.value !== null : false;
 
     const outstanding = invoices.reduce((s: number, inv: any) => s + (inv.totalAmount ?? 0), 0);
     const name = pgmMember
@@ -190,6 +193,7 @@ export class DashboardService {
       : null;
 
     return {
+      hasMembership,
       member: {
         pgmId,
         name,

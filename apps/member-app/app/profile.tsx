@@ -12,6 +12,7 @@ import { fonts } from '../src/theme/fonts';
 import { useAuth } from '../src/auth/context';
 
 interface ProfileData {
+  hasMembership: boolean;
   member: {
     pgmId: number;
     name: string | null;
@@ -126,6 +127,40 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleDayPass = () => {
+    if (!data?.savedCard) {
+      Alert.alert('No Card Saved', 'Please add a payment card first.', [
+        { text: 'Add Card', onPress: () => router.push('/payment/update-card') },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+    const DAY_PASS_PRICE = 'HK$150';
+    Alert.alert('Day Pass', `Charge ${DAY_PASS_PRICE} for a day pass?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Buy Now',
+        onPress: async () => {
+          setPaying(true);
+          try {
+            const { data: result } = await apiClient.post<{
+              success: boolean; resultCode: string; amountCharged: number;
+            }>('/payments/pay-daypass', {});
+            if (result.success) {
+              Alert.alert('✅ Day Pass Active', 'You can enter GO24 today.', [
+                { text: 'OK', onPress: load },
+              ]);
+            } else {
+              Alert.alert('Payment Failed', `Result: ${result.resultCode}. Please try again.`);
+            }
+          } catch {
+            Alert.alert('Error', 'Payment failed. Please contact staff.');
+          } finally { setPaying(false); }
+        },
+      },
+    ]);
+  };
+
   const LINKS = [
     { icon: 'card-outline'          as const, label: 'My Memberships',      to: '/membership' },
     { icon: 'wallet-outline'        as const, label: 'Update Payment Card',  to: '/payment/update-card' },
@@ -230,6 +265,19 @@ export default function ProfileScreen() {
               <Ionicons name="checkmark-circle" size={20} color={colors.success} />
               <Text style={s.clearText}>No outstanding balance</Text>
             </View>
+          )}
+
+          {/* ── Day Pass (no active membership) ── */}
+          {data && !data.hasMembership && (
+            <Pressable style={s.dayPassCard} onPress={handleDayPass}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.dayPassTitle}>No active membership</Text>
+                <Text style={s.dayPassSub}>Buy a day pass to enter GO24 today</Text>
+              </View>
+              <View style={s.dayPassBtn}>
+                <Text style={s.dayPassBtnTxt}>HK$150</Text>
+              </View>
+            </Pressable>
           )}
 
           {/* ── Account Details ── */}
@@ -370,6 +418,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 13,
   },
   clearText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.success },
+
+  // Day pass
+  dayPassCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: colors.amberBg, borderRadius: 14,
+    padding: 16, borderWidth: 1, borderColor: colors.amber + '40',
+  },
+  dayPassTitle: { fontSize: 14, fontFamily: fonts.bold, color: colors.amber },
+  dayPassSub:   { fontSize: 12, fontFamily: fonts.regular, color: colors.amber, marginTop: 2 },
+  dayPassBtn:   { backgroundColor: colors.amber, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  dayPassBtnTxt:{ fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
 
   // Account details
   detailsCard: {

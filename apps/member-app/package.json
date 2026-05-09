@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --port 8081",
     "dev": "expo start --port 8081",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
+    "android": "expo start --android --port 8081",
+    "ios": "expo start --ios --port 8081",
+    "web": "expo start --web --port 8081",
     "lint": "echo 'eslint tbd'",
     "typecheck": "tsc --noEmit",
     "test": "echo 'jest tbd' && exit 0"
@@ -22,6 +22,7 @@
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
     "expo-font": "^55.0.7",
+    "expo-image-picker": "~17.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-localization": "^55.0.13",
