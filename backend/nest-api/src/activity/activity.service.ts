@@ -101,11 +101,17 @@ export class ActivityService {
   }
 
   private async fetchCheckins(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
-    const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
-      $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
-      $select: 'id,enterDate',
-      $top: 200,
-    });
+    let res: { value: any[] };
+    try {
+      res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
+        $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
+        $select: 'id,enterDate',
+        $top: 200,
+      });
+    } catch (err: any) {
+      if (err?.response?.status === 404 || err?.status === 404) return [];
+      throw err;
+    }
 
     return (res.value ?? [])
       .sort((a: any, b: any) => new Date(b.enterDate).getTime() - new Date(a.enterDate).getTime())

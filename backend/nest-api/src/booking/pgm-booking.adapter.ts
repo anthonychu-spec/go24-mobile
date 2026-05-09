@@ -293,7 +293,11 @@ export class PgmBookingAdapter implements IBookingRepo {
       const classMap = new Map<number, RawClass>();
       for (const c of classesRes.value ?? []) classMap.set(c.id, c);
 
-      return (bookingsRes.value ?? [])
+      this.logger.log(
+        `listHistoricalBookings: bookings=${bookingsRes.value?.length ?? 0} classes=${classesRes.value?.length ?? 0} classMap=${classMap.size} classTypeMap=${classTypeMap.size}`,
+      );
+
+      const results = (bookingsRes.value ?? [])
         .filter(b => !b.isCancelled)
         .map(b => {
           const cls = classMap.get(b.classId);
@@ -310,6 +314,10 @@ export class PgmBookingAdapter implements IBookingRepo {
             isCancelled: b.isCancelled ?? false,
           };
         });
+
+      const resolved = results.filter(r => !r.className.startsWith('Class #')).length;
+      this.logger.log(`listHistoricalBookings: ${results.length} pgm bookings, ${resolved} names resolved`);
+      return results;
     } catch (err) {
       throw normalizePgmError(err);
     }
