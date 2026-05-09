@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator, FlatList, Modal, Pressable,
   RefreshControl, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, View,
@@ -44,11 +45,12 @@ type TimeSlot = 'all' | 'morning' | 'afternoon' | 'evening';
 interface Filters {
   availableOnly: boolean;
   timeSlot: TimeSlot;
-  classType: string | null;
-  clubId: number | null;
+  classTypes: string[];   // multi-select
+  clubIds: number[];      // multi-select
 }
 
-const DEFAULT_FILTERS: Filters = { availableOnly: false, timeSlot: 'all', classType: null, clubId: null };
+const DEFAULT_FILTERS: Filters = { availableOnly: false, timeSlot: 'all', classTypes: [], clubIds: [] };
+const FILTERS_STORAGE_KEY = 'go24:classFilters';
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const LIVE_REFRESH_FAST_MS   = 10_000;
 const LIVE_REFRESH_NORMAL_MS = 30_000;
@@ -104,8 +106,8 @@ function applyFilters(classes: GymClass[], search: string, filters: Filters): Gy
   return classes.filter(c => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (filters.availableOnly && c.participantsCount >= c.maxParticipants) return false;
-    if (filters.classType && c.name !== filters.classType) return false;
-    if (filters.clubId !== null && c.clubId !== filters.clubId) return false;
+    if (filters.classTypes.length > 0 && !filters.classTypes.includes(c.name)) return false;
+    if (filters.clubIds.length > 0 && !filters.clubIds.includes(c.clubId)) return false;
     if (filters.timeSlot !== 'all') {
       const h = getHour(c.startTime);
       if (filters.timeSlot === 'morning'   && h >= 12) return false;
@@ -120,8 +122,8 @@ function activeFilterCount(f: Filters) {
   let n = 0;
   if (f.availableOnly) n++;
   if (f.timeSlot !== 'all') n++;
-  if (f.classType) n++;
-  if (f.clubId !== null) n++;
+  n += f.classTypes.length;
+  n += f.clubIds.length;
   return n;
 }
 
@@ -214,20 +216,41 @@ const bn = StyleSheet.create({
 
 /* ── Filter sheet ── */
 function FilterSheet({
-  visible, filters, allClasses, onApply, onClose,
+  visible, filters, allClasses, onApply, onClose, onSaveDefault,
 }: {
   visible: boolean; filters: Filters; allClasses: GymClass[];
   onApply: (f: Filters) => void; onClose: () => void;
+  onSaveDefault: (f: Filters) => void;
 }) {
   const [draft, setDraft] = useState(filters);
   useEffect(() => { if (visible) setDraft(filters); }, [visible]);
   const { classTypes, clubs } = getClassOptions(allClasses);
+
+  function toggleClassType(ct: string) {
+    setDraft(d => ({
+      ...d,
+      classTypes: d.classTypes.includes(ct)
+        ? d.classTypes.filter(x => x !== ct)
+        : [...d.classTypes, ct],
+    }));
+  }
+
+  function toggleClub(id: number) {
+    setDraft(d => ({
+      ...d,
+      clubIds: d.clubIds.includes(id)
+        ? d.clubIds.filter(x => x !== id)
+        : [...d.clubIds, id],
+    }));
+  }
+
   const TIME_SLOTS: { key: TimeSlot; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
     { key: 'all',       label: 'All day',   icon: 'time-outline' },
     { key: 'morning',   label: 'Morning',   icon: 'sunny-outline' },
     { key: 'afternoon', label: 'Afternoon', icon: 'partly-sunny-outline' },
     { key: 'evening',   label: 'Evening',   icon: 'moon-outline' },
   ];
+
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <Pressable style={fs.overlay} onPress={onClose} />
@@ -248,6 +271,7 @@ function FilterSheet({
             <Switch value={draft.availableOnly} onValueChange={v => setDraft(d => ({ ...d, availableOnly: v }))}
               trackColor={{ true: colors.primary, false: colors.border }} thumbColor="#fff" />
           </View>
+
           <Text style={fs.sectionLabel}>Time of day</Text>
           <View style={fs.chips}>
             {TIME_SLOTS.map(ts => (
@@ -258,38 +282,47 @@ function FilterSheet({
               </Pressable>
             ))}
           </View>
+
           {clubs.length > 0 && (<>
-            <Text style={fs.sectionLabel}>Club</Text>
+            <Text style={fs.sectionLabel}>
+              Club{draft.clubIds.length > 0 ? ` · ${draft.clubIds.length} selected` : ''}
+            </Text>
             <View style={fs.chips}>
-              <Pressable style={[fs.chip, draft.clubId === null && fs.chipActive]}
-                onPress={() => setDraft(d => ({ ...d, clubId: null }))}>
-                <Text style={[fs.chipText, draft.clubId === null && fs.chipTextActive]}>All clubs</Text>
-              </Pressable>
-              {clubs.map(club => (
-                <Pressable key={club.id} style={[fs.chip, draft.clubId === club.id && fs.chipActive]}
-                  onPress={() => setDraft(d => ({ ...d, clubId: d.clubId === club.id ? null : club.id }))}>
-                  <Ionicons name="location-outline" size={13} color={draft.clubId === club.id ? '#fff' : colors.textMuted} />
-                  <Text style={[fs.chipText, draft.clubId === club.id && fs.chipTextActive]} numberOfLines={1}>{club.name}</Text>
-                </Pressable>
-              ))}
+              {clubs.map(club => {
+                const active = draft.clubIds.includes(club.id);
+                return (
+                  <Pressable key={club.id} style={[fs.chip, active && fs.chipActive]} onPress={() => toggleClub(club.id)}>
+                    <Ionicons name="location-outline" size={13} color={active ? '#fff' : colors.textMuted} />
+                    <Text style={[fs.chipText, active && fs.chipTextActive]} numberOfLines={1}>{club.name}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </>)}
+
           {classTypes.length > 0 && (<>
-            <Text style={fs.sectionLabel}>Class type</Text>
+            <Text style={fs.sectionLabel}>
+              Class type{draft.classTypes.length > 0 ? ` · ${draft.classTypes.length} selected` : ''}
+            </Text>
             <View style={fs.chips}>
-              <Pressable style={[fs.chip, draft.classType === null && fs.chipActive]}
-                onPress={() => setDraft(d => ({ ...d, classType: null }))}>
-                <Text style={[fs.chipText, draft.classType === null && fs.chipTextActive]}>All types</Text>
-              </Pressable>
-              {classTypes.map(ct => (
-                <Pressable key={ct} style={[fs.chip, draft.classType === ct && fs.chipActive]}
-                  onPress={() => setDraft(d => ({ ...d, classType: d.classType === ct ? null : ct }))}>
-                  <Text style={[fs.chipText, draft.classType === ct && fs.chipTextActive]} numberOfLines={1}>{ct}</Text>
-                </Pressable>
-              ))}
+              {classTypes.map(ct => {
+                const active = draft.classTypes.includes(ct);
+                return (
+                  <Pressable key={ct} style={[fs.chip, active && fs.chipActive]} onPress={() => toggleClassType(ct)}>
+                    <Text style={[fs.chipText, active && fs.chipTextActive]} numberOfLines={1}>{ct}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </>)}
+
+          {/* Save as default */}
+          <Pressable style={fs.saveDefaultBtn} onPress={() => { onSaveDefault(draft); }}>
+            <Ionicons name="bookmark-outline" size={14} color={colors.primary} />
+            <Text style={fs.saveDefaultText}>Save as default</Text>
+          </Pressable>
         </ScrollView>
+
         <Pressable style={fs.applyBtn} onPress={() => { onApply(draft); onClose(); }}>
           <Text style={fs.applyText}>
             Show Results{activeFilterCount(draft) > 0 ? ` · ${activeFilterCount(draft)} active` : ''}
@@ -329,6 +362,12 @@ const fs = StyleSheet.create({
     shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
   applyText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold },
+
+  saveDefaultBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: 20, paddingVertical: 10, justifyContent: 'center',
+  },
+  saveDefaultText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
 });
 
 /* ── Class row ── */
@@ -473,6 +512,15 @@ export default function ClassesScreen() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [savedToast, setSavedToast] = useState(false);
+
+  // Load saved default filter on mount
+  useEffect(() => {
+    AsyncStorage.getItem(FILTERS_STORAGE_KEY).then(raw => {
+      if (!raw) return;
+      try { setFilters(JSON.parse(raw)); } catch { /* ignore corrupt data */ }
+    });
+  }, []);
   const [showFilter, setShowFilter] = useState(false);
   const [weekClasses, setWeekClasses] = useState<Record<string, GymClass[]>>({});
   const [dayBookings, setDayBookings] = useState<Map<string, DayBooking>>(new Map());
@@ -573,6 +621,13 @@ export default function ClassesScreen() {
 
   function handleBook(classId: number, isWaitlist: boolean) { doBook(classId, isWaitlist); }
 
+  async function handleSaveDefault(f: Filters) {
+    await AsyncStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(f));
+    setFilters(f);
+    setSavedToast(true);
+    setTimeout(() => setSavedToast(false), 2000);
+  }
+
   async function handleBannerCancel(bookingId: string) {
     // Optimistic — remove banner immediately
     const prev = new Map(dayBookings);
@@ -648,6 +703,12 @@ export default function ClassesScreen() {
 
       {toast ? <View style={s.toast}><Text style={s.toastText}>{toast}</Text></View> : null}
       {error ? <View style={s.toast}><Text style={s.toastText}>{error}</Text></View> : null}
+      {savedToast ? (
+        <View style={[s.toast, s.toastSuccess]}>
+          <Ionicons name="bookmark" size={13} color={colors.success} />
+          <Text style={[s.toastText, { color: colors.success }]}>Default filter saved</Text>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
@@ -700,7 +761,7 @@ export default function ClassesScreen() {
         />
       )}
 
-      <FilterSheet visible={showFilter} filters={filters} allClasses={classes} onApply={setFilters} onClose={() => setShowFilter(false)} />
+      <FilterSheet visible={showFilter} filters={filters} allClasses={classes} onApply={setFilters} onClose={() => setShowFilter(false)} onSaveDefault={handleSaveDefault} />
       <ConfirmModal result={confirmResult} onClose={() => setConfirmResult(null)} />
     </SafeAreaView>
   );
@@ -776,8 +837,9 @@ const s = StyleSheet.create({
   bookBtnLocked:  { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   lockedText:     { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted, marginTop: 1 },
 
-  toast:     { marginHorizontal: 16, marginBottom: 4, backgroundColor: '#FFF0F0', borderRadius: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary },
-  toastText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
+  toast:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 16, marginBottom: 4, backgroundColor: '#FFF0F0', borderRadius: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary },
+  toastSuccess: { backgroundColor: colors.success + '15', borderLeftColor: colors.success },
+  toastText:    { fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
 
   empty:           { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyTitle:      { fontSize: 16, fontFamily: fonts.bold,    color: colors.textMuted },
