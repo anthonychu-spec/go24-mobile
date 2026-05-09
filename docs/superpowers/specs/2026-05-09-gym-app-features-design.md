@@ -286,13 +286,36 @@ Suprema denies entry
 
 ### Still Needed
 - Deep link from push notification → directly open Profile screen
-- Staff notification when payment clears (so they can open the door)
 - Day pass option: if no active membership → can pay for a single visit
 
-### Day Pass (Extension)
-- Amount: fixed price (e.g. HK$150/day)
-- `POST /me/pay-daypass` → Adyen charge → create 1-day PGM contract
-- Available from entry-denied push AND from Login screen (non-member)
+### Adyen Payment Success Webhook Path
+```
+Member pays (outstanding or day pass)
+  → Adyen processes charge
+  → POST /webhooks/adyen → event: AUTHORISATION
+  → Parse reference field to identify payment type:
+      "outstanding-{pgmId}-{ts}"  → outstanding balance
+      "daypass-{pgmId}-{ts}"      → day pass
+
+Outstanding success:
+  → Record payment in our DB
+  → Push to member: "✅ Payment received — please try entering again"
+  → Push to staff channel (n8n / Slack): "Member {name} paid HK$XXX — grant entry"
+
+Day pass success:
+  → POST to PGM: create 1-day contract for pgmId
+  → Push to member: "✅ Day pass activated — you may enter now"
+  → Push to staff: "Day pass: {name} — grant entry"
+
+Payment failure (AUTHORISATION success:false):
+  → Push to member: "❌ Payment failed — please check your card"
+```
+
+### Day Pass
+- Amount: fixed price (e.g. HK$150/day), configurable via env var
+- `POST /me/pay-daypass` → Adyen charge with reference `daypass-{pgmId}-{ts}`
+- Available from entry-denied push AND from Profile screen
+- Non-member day pass: available before login (public endpoint)
 
 ---
 
