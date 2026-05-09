@@ -260,8 +260,44 @@ Suprema → POST /webhooks/suprema/enroll → our backend
 
 ---
 
+---
+
+## Section D — Entry Denial → Payment Flow
+
+**Goal:** When Suprema denies entry (face not recognised / membership issue), member can pay outstanding balance directly from the app to gain entry.
+
+### Flow
+```
+Suprema denies entry
+  → n8n webhook → POST /notifications/entry-denied
+  → Backend looks up member by pgmId
+  → Push notification: "Entry denied — tap to view your account"
+  → Member opens app → Profile screen shows:
+      - Outstanding balance (red card)
+      - "Pay Now" button (charges saved Adyen card)
+  → Member pays → staff / system grants entry
+```
+
+### Already Built (current codebase)
+- `POST /notifications/entry-denied` ✅
+- `GET /me/profile` → outstanding balance ✅
+- `POST /me/pay-outstanding` → Adyen charge ✅
+- Profile screen red balance card + Pay Now button ✅
+
+### Still Needed
+- Deep link from push notification → directly open Profile screen
+- Staff notification when payment clears (so they can open the door)
+- Day pass option: if no active membership → can pay for a single visit
+
+### Day Pass (Extension)
+- Amount: fixed price (e.g. HK$150/day)
+- `POST /me/pay-daypass` → Adyen charge → create 1-day PGM contract
+- Available from entry-denied push AND from Login screen (non-member)
+
+---
+
 ## Out of Scope (This Spec)
-- Section D (Smart Hub) — not yet defined, separate spec
+- Section D Smart Hub UI — not yet defined, separate spec
 - Admin panel for banner management — separate session
 - Trainer app — separate project
 - Social features — explicitly excluded
