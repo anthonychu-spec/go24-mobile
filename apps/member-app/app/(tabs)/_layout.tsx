@@ -6,12 +6,10 @@ import { fonts } from '../../src/theme/fonts';
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TAB_CONFIG: Record<string, { label: string; active: IoniconsName; inactive: IoniconsName }> = {
-  index:         { label: 'Home',          active: 'home',          inactive: 'home-outline' },
-  classes:       { label: 'Classes',       active: 'calendar',      inactive: 'calendar-outline' },
-  bookings:      { label: 'Bookings',      active: 'bookmark',      inactive: 'bookmark-outline' },
-  activity:      { label: 'Activity',      active: 'pulse',         inactive: 'pulse-outline' },
-  pt:            { label: 'PT',            active: 'barbell',       inactive: 'barbell-outline' },
-  notifications: { label: 'Notifications', active: 'notifications', inactive: 'notifications-outline' },
+  index:    { label: 'Home',     active: 'home',     inactive: 'home-outline' },
+  classes:  { label: 'Classes',  active: 'calendar', inactive: 'calendar-outline' },
+  activity: { label: 'Activity', active: 'pulse',    inactive: 'pulse-outline' },
+  pt:       { label: 'PT',       active: 'barbell',  inactive: 'barbell-outline' },
 };
 
 export default function TabLayout() {
@@ -19,8 +17,10 @@ export default function TabLayout() {
     <Tabs
       screenOptions={({ route }) => {
         const cfg = TAB_CONFIG[route.name] ?? { label: route.name, active: 'ellipse', inactive: 'ellipse-outline' };
+        const hidden = !TAB_CONFIG[route.name]; // hide bookings, notifications
         return {
           headerShown: false,
+          href: hidden ? null : undefined,
           tabBarLabel: cfg.label,
           tabBarStyle: {
             backgroundColor: colors.card,
