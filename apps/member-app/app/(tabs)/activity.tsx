@@ -62,6 +62,37 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+function ClassTypeSummary({ items }: { items: ActivityItem[] }) {
+  const classItems = items.filter(i => i.type === 'class');
+  if (classItems.length === 0) return null;
+
+  // Count by class type, sorted by frequency
+  const counts = new Map<string, number>();
+  for (const item of classItems) {
+    counts.set(item.title, (counts.get(item.title) ?? 0) + 1);
+  }
+  const top = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const max = top[0]?.[1] ?? 1;
+
+  return (
+    <View style={s.typeCard}>
+      <Text style={s.typeTitle}>Class Types</Text>
+      {top.map(([name, count]) => (
+        <View key={name} style={s.typeRow}>
+          <Text style={s.typeName} numberOfLines={1}>{name}</Text>
+          <View style={s.typeBarWrap}>
+            <View style={[s.typeBar, { width: `${(count / max) * 100}%` as any }]} />
+          </View>
+          <Text style={s.typeCount}>{count}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function SummaryCard({ summary }: { summary: Summary }) {
   return (
     <View style={s.summaryCard}>
@@ -84,9 +115,7 @@ function SummaryCard({ summary }: { summary: Summary }) {
 
       {summary.streakDays > 0 && (
         <View style={s.streakBar}>
-          <Text style={s.streakText}>
-            🔥 {summary.streakDays}-day streak
-          </Text>
+          <Text style={s.streakText}>🔥 {summary.streakDays}-day streak</Text>
         </View>
       )}
 
@@ -178,6 +207,7 @@ export default function ActivityScreen() {
         ListHeaderComponent={
           <>
             {data?.summary && <SummaryCard summary={data.summary} />}
+            <ClassTypeSummary items={data?.items ?? []} />
             <View style={s.filterRow}>
               {FILTER_LABELS.map(f => (
                 <Pressable
@@ -268,4 +298,16 @@ const s = StyleSheet.create({
   errorText: { color: colors.error, fontFamily: fonts.regular, fontSize: 13 },
   empty:     { alignItems: 'center', paddingTop: 40, gap: 8 },
   emptyText: { color: colors.textMuted, fontFamily: fonts.regular, fontSize: 15 },
+
+  typeCard: {
+    backgroundColor: colors.card, marginHorizontal: 16, marginBottom: 4,
+    borderRadius: 14, padding: 16, gap: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  },
+  typeTitle:   { fontSize: 13, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
+  typeRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  typeName:    { fontSize: 13, fontFamily: fonts.semibold, color: colors.text, width: 130 },
+  typeBarWrap: { flex: 1, height: 6, backgroundColor: colors.bg, borderRadius: 3, overflow: 'hidden' },
+  typeBar:     { height: '100%', backgroundColor: colors.primary, borderRadius: 3 },
+  typeCount:   { fontSize: 13, fontFamily: fonts.bold, color: colors.primary, minWidth: 20, textAlign: 'right' },
 });
