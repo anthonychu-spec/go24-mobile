@@ -6,11 +6,13 @@ import { Charge } from './entities/charge.entity';
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PgmModule } from '../pgm-adapter/pgm.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PaymentMethod, Charge]),
     NotificationsModule,
+    PgmModule,
   ],
   providers: [AdyenClient, PaymentsService],
   controllers: [PaymentsController],

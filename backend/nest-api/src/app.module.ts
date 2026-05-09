@@ -18,6 +18,10 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { CheckinModule } from './checkin/checkin.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { SignupModule } from './signup/signup.module';
+import { FavouritesModule } from './favourites/favourites.module';
+import { SettingsModule } from './settings/settings.module';
+import { MembershipRequestsModule } from './membership-requests/membership-requests.module';
+import { MilestonesModule } from './milestones/milestones.module';
 
 @Module({
   imports: [
@@ -37,6 +41,10 @@ import { SignupModule } from './signup/signup.module';
     CheckinModule,
     MetricsModule,
     SignupModule,
+    FavouritesModule,
+    SettingsModule,
+    MembershipRequestsModule,
+    MilestonesModule,
     DevtoolsModule.register({
       http: process.env.NODE_ENV !== 'production',
       port: 8000,

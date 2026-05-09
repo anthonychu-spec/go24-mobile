@@ -36,6 +36,7 @@ export interface DashboardData {
     pt: number;
   };
   unreadNotifications: number;
+  streak: number;
 }
 
 export interface MemberProfileData {
@@ -82,7 +83,7 @@ export class DashboardService {
     const monthStart = new Date();
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
 
-    const [contracts, ptAgreements, visits, nextBooking, monthClasses, memberMeta] = await Promise.allSettled([
+    const [contracts, ptAgreements, visits, nextBooking, monthClasses, memberMeta, streakResult] = await Promise.allSettled([
       this.fetchActiveContract(pgmMemberId),
       this.fetchPtAgreements(pgmMemberId),
       this.fetchMonthVisits(pgmMemberId, monthStart),
@@ -91,14 +92,16 @@ export class DashboardService {
         where: { userId, status: 'confirmed', createdAt: MoreThan(monthStart) },
       }),
       this.fetchMemberMeta(pgmMemberId),
+      this.fetchStreak(pgmMemberId, userId),
     ]);
 
-    const contract   = contracts.status    === 'fulfilled' ? contracts.value    : null;
-    const agreements = ptAgreements.status === 'fulfilled' ? ptAgreements.value : [];
-    const visitCount = visits.status       === 'fulfilled' ? visits.value       : 0;
-    const next       = nextBooking.status  === 'fulfilled' ? nextBooking.value  : null;
-    const classes    = monthClasses.status === 'fulfilled' ? monthClasses.value : 0;
-    const meta       = memberMeta.status   === 'fulfilled' ? memberMeta.value   : { name: null, outstanding: 0 };
+    const contract   = contracts.status      === 'fulfilled' ? contracts.value      : null;
+    const agreements = ptAgreements.status   === 'fulfilled' ? ptAgreements.value   : [];
+    const visitCount = visits.status         === 'fulfilled' ? visits.value         : 0;
+    const next       = nextBooking.status    === 'fulfilled' ? nextBooking.value     : null;
+    const classes    = monthClasses.status   === 'fulfilled' ? monthClasses.value   : 0;
+    const meta       = memberMeta.status     === 'fulfilled' ? memberMeta.value     : { name: null, outstanding: 0 };
+    const streak     = streakResult.status   === 'fulfilled' ? streakResult.value   : 0;
 
     const totalRemaining = agreements.reduce((s, a) => s + (a.remainingSessions ?? 0), 0);
     const totalSessions  = agreements.reduce((s, a) => s + (a.totalSessions ?? 0), 0);
@@ -124,6 +127,7 @@ export class DashboardService {
       nextClass: next,
       thisMonth: { visits: visitCount, classes, pt: 0 },
       unreadNotifications: 0,
+      streak,
     };
   }
 
@@ -309,6 +313,55 @@ export class DashboardService {
       });
       return res.value?.length ?? 0;
     } catch { return 0; }
+  }
+
+  private async fetchStreak(pgmMemberId: number, userId: string): Promise<number> {
+    try {
+      const since = new Date();
+      since.setFullYear(since.getFullYear() - 1);
+
+      const [visitsRes, classesRes] = await Promise.allSettled([
+        this.pgm.get<{ value: any[] }>('/odata/Visits', {
+          $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
+          $select: 'enterDate',
+          $top: 500,
+        }),
+        this.bookingRepo.find({
+          where: { userId, status: 'attended' },
+          select: ['createdAt'],
+        }),
+      ]);
+
+      const weekKeys = new Set<string>();
+
+      if (visitsRes.status === 'fulfilled') {
+        for (const v of visitsRes.value.value ?? []) {
+          weekKeys.add(this.isoWeek(new Date(v.enterDate)));
+        }
+      }
+      if (classesRes.status === 'fulfilled') {
+        for (const b of classesRes.value) {
+          weekKeys.add(this.isoWeek(new Date(b.createdAt)));
+        }
+      }
+
+      let streak = 0;
+      const now = new Date();
+      for (let w = 0; w < 52; w++) {
+        const check = new Date(now);
+        check.setDate(check.getDate() - w * 7);
+        if (weekKeys.has(this.isoWeek(check))) streak++;
+        else break;
+      }
+      return streak;
+    } catch { return 0; }
+  }
+
+  private isoWeek(d: Date): string {
+    const tmp = new Date(d);
+    tmp.setHours(0, 0, 0, 0);
+    tmp.setDate(tmp.getDate() - ((tmp.getDay() + 6) % 7)); // Monday
+    return tmp.toISOString().slice(0, 10);
   }
 
   private async fetchNextBooking(userId: string): Promise<DashboardData['nextClass']> {

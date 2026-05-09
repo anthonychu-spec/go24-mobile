@@ -9,6 +9,7 @@ export interface PgmClass {
   instructorName: string | null;
   maxParticipants: number;
   participantsCount: number;
+  standbyListLimit: number;  // max standby slots (0 = no waitlist)
   isWaitlist: boolean;
   isCancelled: boolean;
 }

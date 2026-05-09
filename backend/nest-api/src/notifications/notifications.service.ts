@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
+import { Cron } from '@nestjs/schedule';
 import { DeviceToken } from './entities/device-token.entity';
 import { Notification, NotificationType } from './entities/notification.entity';
 import { User } from '../auth/entities/user.entity';
+import { PgmClient } from '../pgm-adapter/pgm.client';
 
 const REASON_MESSAGES: Record<string, { title: string; body: string }> = {
   'No Active Contract': { title: '⚠️ 入場失敗', body: '你嘅會籍已到期，請於 App 內續會或聯絡前台。' },
@@ -23,6 +25,7 @@ export class NotificationsService {
     @InjectRepository(DeviceToken)   private readonly tokenRepo: Repository<DeviceToken>,
     @InjectRepository(Notification)  private readonly notiRepo: Repository<Notification>,
     @InjectRepository(User)          private readonly userRepo: Repository<User>,
+    private readonly pgm: PgmClient,
   ) {}
 
   // ── Device token ──────────────────────────────────────────────────────────
@@ -214,6 +217,43 @@ export class NotificationsService {
     const tokens = await this.tokenRepo.find({ where: { userId } });
     if (tokens.length === 0) return;
     await this.sendPush(tokens.map(t => t.token), title, body, data);
+  }
+
+  // ── Monthly summary cron ─────────────────────────────────────────────────
+
+  @Cron('0 9 1 * *', { timeZone: 'Asia/Hong_Kong' }) // 9 AM HKT, 1st of month
+  async sendMonthlySummary(): Promise<void> {
+    this.logger.log('Sending monthly summary notifications…');
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    const monthName = lastMonth.toLocaleDateString('en-HK', { month: 'long', year: 'numeric' });
+
+    const users = await this.userRepo.find({ where: { status: 'active' } });
+    for (const user of users) {
+      try {
+        const visits = await this.fetchLastMonthVisits(user.pgmMemberId, lastMonth);
+        if (visits === 0) continue;
+        await this.sendDirectPush(
+          user.id,
+          `Your ${monthName} Summary 💪`,
+          `You visited GO24 ${visits} time${visits !== 1 ? 's' : ''} last month. Keep it up!`,
+          { type: 'monthly_summary', month: monthName, visits },
+        );
+      } catch { /* skip */ }
+    }
+  }
+
+  private async fetchLastMonthVisits(pgmMemberId: number, month: Date): Promise<number> {
+    try {
+      const start = new Date(month.getFullYear(), month.getMonth(), 1);
+      const end   = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+      const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
+        $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${start.toISOString().slice(0,19)}' and enterDate le datetime'${end.toISOString().slice(0,19)}'`,
+        $select: 'id',
+        $top: 200,
+      });
+      return res.value?.length ?? 0;
+    } catch { return 0; }
   }
 
   // ── Internal push ─────────────────────────────────────────────────────────

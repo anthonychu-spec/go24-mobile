@@ -69,6 +69,10 @@ export class BookingRepository {
     return qb.getMany();
   }
 
+  async findByStatus(status: string): Promise<Booking[]> {
+    return this.bookings.find({ where: { status: status as any }, take: 200 });
+  }
+
   async findStalePending(olderThanSeconds: number): Promise<Booking[]> {
     const cutoff = new Date(Date.now() - olderThanSeconds * 1000);
     return this.bookings.createQueryBuilder('b')

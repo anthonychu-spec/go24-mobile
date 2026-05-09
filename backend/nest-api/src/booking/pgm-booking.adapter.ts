@@ -6,7 +6,7 @@ import {
 } from './booking.interfaces';
 
 const CACHE_TTL_MS       = 60 * 60 * 1000; // 1 hour  — lookup tables
-const CLASSES_CACHE_TTL  = 30 * 1000;      // 30s     — raw class list (live capacity)
+const CLASSES_CACHE_TTL  = 8 * 1000;       // 8s      — raw class list (live capacity, fast for rush booking)
 
 interface CacheEntry<T> {
   data: T;
@@ -125,7 +125,7 @@ export class PgmBookingAdapter implements IBookingRepo {
     const from = today.toISOString().slice(0, 10);
     const to   = windowEnd.toISOString().slice(0, 10);
     const res = await this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-      $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,isDeleted',
+      $select: 'id,startDate,endDate,classTypeId,clubId,instructorId,attendeesCount,attendeesLimit,standbyListLimit,isDeleted',
       $filter: `startDate ge ${from}T00:00:00Z and startDate le ${to}T23:59:59Z`,
     });
     const classes = res.value ?? [];
@@ -306,6 +306,7 @@ export class PgmBookingAdapter implements IBookingRepo {
       instructorName: c.instructorId ? (instructorMap.get(c.instructorId) ?? null) : null,
       maxParticipants: c.attendeesLimit,
       participantsCount: c.attendeesCount,
+      standbyListLimit: c.standbyListLimit ?? 0,
       isWaitlist: false,
       isCancelled: false,
     };

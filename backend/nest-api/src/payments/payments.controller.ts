@@ -1,7 +1,8 @@
 import {
   Body, Controller, Get, Headers, HttpCode,
-  Post, Req, UseGuards,
+  Param, Post, Req, Res, UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -40,6 +41,30 @@ export class PaymentsController {
   payDayPass(@Req() req: Request) {
     const user = req.user as AuthedUser;
     return this.svc.payDayPass(user.id, user.pgmId);
+  }
+
+  @ApiOperation({ summary: 'Payment history (charges + PGM invoices)' })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
+  @Get('/me/payments')
+  getPaymentHistory(@Req() req: Request) {
+    const user = req.user as AuthedUser;
+    return this.svc.getPaymentHistory(user.id, user.pgmId);
+  }
+
+  @ApiOperation({ summary: 'Download invoice PDF' })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
+  @Get('/me/payments/:id/invoice')
+  async downloadInvoice(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.svc.generateInvoicePdf((req.user as AuthedUser).id, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="go24-invoice-${id}.pdf"`);
+    res.end(pdf);
   }
 
   @ApiOperation({ summary: 'Adyen webhook (RECURRING_CONTRACT + AUTHORISATION)' })

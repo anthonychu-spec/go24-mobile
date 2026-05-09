@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PgmModule } from '../pgm-adapter/pgm.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { SettingsModule } from '../settings/settings.module';
 import { BOOKING_REPO } from '../booking/booking.interfaces';
 import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
 import { Booking } from './entities/booking.entity';
@@ -17,6 +19,8 @@ import { ReconcileJob } from './jobs/reconcile.job';
   imports: [
     TypeOrmModule.forFeature([Booking, BookingEvent, IdempotencyKey, OutboxEvent]),
     PgmModule,
+    NotificationsModule,
+    SettingsModule,
   ],
   providers: [
     { provide: BOOKING_REPO, useClass: PgmBookingAdapter },

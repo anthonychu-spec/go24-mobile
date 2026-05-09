@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BOOKING_REPO } from '../booking/booking.interfaces';
@@ -11,6 +12,8 @@ import {
   BookingFullError, DuplicateBookingError, InProgressError,
   isTempFail, mapPgmError,
 } from './errors/index';
+import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
 
 export interface BookInput {
   userId: string;
@@ -37,6 +40,8 @@ export class BookingsService {
     private readonly idempotencyRepo: IdempotencyRepository,
     @Inject(BOOKING_REPO) private readonly pgm: IBookingRepo,
     @InjectRepository(OutboxEvent) private readonly outbox: Repository<OutboxEvent>,
+    private readonly notifications: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
 
   private static readonly BOOKING_WINDOW_MS = 168 * 3600_000; // 168 hours
@@ -122,6 +127,10 @@ export class BookingsService {
       const response: BookResult = { success: true, bookingId: booking.id, status: 'confirmed' };
       await this.idempotencyRepo.complete(input.userId, input.idempotencyKey, response as any, 'terminal');
       await this.emitOutbox('booking.confirmed', { bookingId: booking.id, classId: input.classId });
+
+      // Schedule class reminder push (non-blocking)
+      void this.scheduleClassReminder(input.userId, input.classId, new Date(startMs), cls.name ?? `Class #${input.classId}`);
+
       return response;
 
     } catch (err) {
@@ -241,6 +250,73 @@ export class BookingsService {
       await this.outbox.save(this.outbox.create({ topic, payload }));
     } catch (err) {
       this.logger.error('Failed to write outbox event', err);
+    }
+  }
+
+  // ── Class reminder ────────────────────────────────────────────────────────
+
+  private async scheduleClassReminder(
+    userId: string,
+    classId: number,
+    classStart: Date,
+    className: string,
+  ): Promise<void> {
+    try {
+      const s = await this.settings.get(userId);
+      if (s.reminderMinutes === 0) return;
+
+      const fireAt = new Date(classStart.getTime() - s.reminderMinutes * 60_000);
+      const delayMs = fireAt.getTime() - Date.now();
+      if (delayMs <= 0) return; // already too close / past
+
+      setTimeout(async () => {
+        await this.notifications.sendDirectPush(
+          userId,
+          '🏋️ Class starting soon',
+          `${className} starts in ${s.reminderMinutes} minutes. See you there!`,
+          { type: 'class_reminder', classId },
+        ).catch(() => {});
+      }, delayMs);
+    } catch { /* non-fatal */ }
+  }
+
+  // ── Waitlist auto-cancel cron ─────────────────────────────────────────────
+
+  @Cron('*/15 * * * *') // every 15 minutes
+  async autoReleaseWaitlistSpots(): Promise<void> {
+    const fiveHoursFromNow = new Date(Date.now() + 5 * 3600_000);
+    try {
+      const waitlisted = await this.bookingRepo.findByStatus('waitlist');
+      for (const booking of waitlisted) {
+        try {
+          const cls = await this.pgm.getClass(booking.classId);
+          const startTime = new Date(cls.startTime);
+          if (startTime > fiveHoursFromNow) continue;
+
+          const s = await this.settings.get(booking.userId);
+
+          if (s.autoWaitlistCancel) {
+            await this.pgm.cancelBooking(booking.pgmMemberId ?? 0, booking.classId);
+            await this.bookingRepo.transition(booking.id, 'cancelled', {}, 'auto waitlist cancel');
+            await this.notifications.sendDirectPush(
+              booking.userId,
+              'Waitlist spot released',
+              `Your waitlist spot for ${cls.name ?? `Class #${booking.classId}`} was auto-released (class in < 5h).`,
+              { type: 'waitlist_auto_cancelled', classId: booking.classId },
+            ).catch(() => {});
+          } else {
+            // Just remind — don't cancel
+            await this.notifications.sendDirectPush(
+              booking.userId,
+              '⏰ You\'re confirmed!',
+              `You\'re confirmed for ${cls.name ?? `Class #${booking.classId}`} starting soon. Cancel if you can\'t make it.`,
+              { type: 'waitlist_reminder', classId: booking.classId },
+            ).catch(() => {});
+          }
+        } catch { /* skip this booking */ }
+      }
+    } catch (err) {
+      this.logger.error('autoReleaseWaitlistSpots error', err);
     }
   }
 }

@@ -1,0 +1,48 @@
+# Multi-stage build for nest-api
+# Built from repo root: docker build -f infra/droplet/Dockerfile.api -t go24/nest-api .
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
+
+# Copy workspace manifests (cache-friendly)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY backend/nest-api/package.json ./backend/nest-api/
+COPY packages/shared-ui/package.json ./packages/shared-ui/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/config/package.json ./packages/config/
+
+# Apps not needed for backend build but pnpm needs them in workspace
+COPY apps/member-app/package.json ./apps/member-app/
+COPY apps/trainer-app/package.json ./apps/trainer-app/
+
+RUN pnpm install --no-frozen-lockfile --filter nest-api... --prod=false
+
+# ─── Build stage ───
+FROM node:20-alpine AS build
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/backend/nest-api/node_modules ./backend/nest-api/node_modules
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json tsconfig.base.json ./
+COPY backend/nest-api ./backend/nest-api
+COPY packages ./packages
+RUN pnpm --filter nest-api build
+
+# ─── Runtime stage ───
+FROM node:20-alpine AS runtime
+# Run from package dir so pnpm symlinks in node_modules resolve via ../../../../node_modules/.pnpm
+WORKDIR /app/backend/nest-api
+ENV NODE_ENV=production
+RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
+RUN addgroup -g 1001 -S nodejs && adduser -u 1001 -S nest -G nodejs
+
+COPY --from=build --chown=nest:nodejs /app/node_modules /app/node_modules
+COPY --from=build --chown=nest:nodejs /app/backend/nest-api/node_modules ./node_modules
+COPY --from=build --chown=nest:nodejs /app/backend/nest-api/dist ./dist
+COPY --from=build --chown=nest:nodejs /app/backend/nest-api/package.json ./
+
+USER nest
+EXPOSE 3000
+CMD ["node", "dist/main.js"]
