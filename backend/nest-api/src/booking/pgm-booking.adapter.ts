@@ -270,57 +270,64 @@ export class PgmBookingAdapter implements IBookingRepo {
 
   /** Fetch historical bookings (last N months) with full class name enrichment. */
   async listHistoricalBookings(memberId: number, since: Date): Promise<PgmBooking[]> {
-    try {
-      const sinceStr = since.toISOString().slice(0, 10); // YYYY-MM-DD
-      const toStr    = new Date().toISOString().slice(0, 10);
+    const sinceStr = since.toISOString().slice(0, 10);
+    const toStr    = new Date().toISOString().slice(0, 10);
 
-      const [bookingsRes, classesRes, classTypeMap, clubMap] = await Promise.all([
-        this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
-          $filter: `memberId eq ${memberId}`,
-          $select: 'id,classId,startDate,endDate,memberId,isStandby,isCancelled',
-          $orderby: 'startDate desc',
-          $top: 200,
-        }),
-        this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-          $filter: `startDate ge ${sinceStr}T00:00:00Z and startDate le ${toStr}T23:59:59Z`,
-          $select: 'id,startDate,endDate,classTypeId,clubId',
-          $top: 500,
-        }),
-        this.getClassTypeMap(),
-        this.getClubMap(),
-      ]);
+    const [bookingsResult, classesResult, classTypeMap, clubMap] = await Promise.allSettled([
+      this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
+        $filter: `memberId eq ${memberId}`,
+        $select: 'id,classId,startDate,endDate,memberId,isStandby,isCancelled',
+        $orderby: 'startDate desc',
+        $top: 200,
+      }),
+      this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
+        $filter: `startDate ge ${sinceStr}T00:00:00Z and startDate le ${toStr}T23:59:59Z`,
+        $select: 'id,startDate,endDate,classTypeId,clubId',
+        $top: 500,
+      }),
+      this.getClassTypeMap(),
+      this.getClubMap(),
+    ]);
 
-      const classMap = new Map<number, RawClass>();
-      for (const c of classesRes.value ?? []) classMap.set(c.id, c);
-
-      this.logger.log(
-        `listHistoricalBookings: bookings=${bookingsRes.value?.length ?? 0} classes=${classesRes.value?.length ?? 0} classMap=${classMap.size} classTypeMap=${classTypeMap.size}`,
-      );
-
-      const results = (bookingsRes.value ?? [])
-        .filter(b => !b.isCancelled)
-        .map(b => {
-          const cls = classMap.get(b.classId);
-          return {
-            bookingId: b.id,
-            classId: b.classId,
-            className: cls
-              ? (classTypeMap.get(cls.classTypeId) ?? `Class #${b.classId}`)
-              : `Class #${b.classId}`,
-            startTime: b.startDate,
-            endTime:   b.endDate,
-            clubName:  cls ? (clubMap.get(cls.clubId) ?? null) : null,
-            isStandby:  b.isStandby  ?? false,
-            isCancelled: b.isCancelled ?? false,
-          };
-        });
-
-      const resolved = results.filter(r => !r.className.startsWith('Class #')).length;
-      this.logger.log(`listHistoricalBookings: ${results.length} pgm bookings, ${resolved} names resolved`);
-      return results;
-    } catch (err) {
-      throw normalizePgmError(err);
+    if (bookingsResult.status === 'rejected') {
+      this.logger.error('ClassBookings fetch failed', bookingsResult.reason?.message ?? bookingsResult.reason);
+      return [];
     }
+    if (classesResult.status === 'rejected') {
+      this.logger.warn('Historical Classes fetch failed — names will fall back', classesResult.reason?.message ?? classesResult.reason);
+    }
+
+    const bookings  = bookingsResult.value.value ?? [];
+    const classes   = classesResult.status === 'fulfilled' ? (classesResult.value.value ?? []) : [];
+    const typeMap   = classTypeMap.status === 'fulfilled' ? classTypeMap.value : new Map<number, string>();
+    const cMap      = clubMap.status === 'fulfilled' ? clubMap.value : new Map<number, string>();
+
+    const classMap = new Map<number, RawClass>();
+    for (const c of classes) classMap.set(c.id, c);
+
+    this.logger.log(
+      `listHistoricalBookings: bookings=${bookings.length} classes=${classes.length} classMap=${classMap.size} typeMap=${typeMap.size}`,
+    );
+
+    const results = bookings
+      .filter(b => !b.isCancelled)
+      .map(b => {
+        const cls = classMap.get(b.classId);
+        return {
+          bookingId:   b.id,
+          classId:     b.classId,
+          className:   cls ? (typeMap.get(cls.classTypeId) ?? `Class #${b.classId}`) : `Class #${b.classId}`,
+          startTime:   b.startDate,
+          endTime:     b.endDate,
+          clubName:    cls ? (cMap.get(cls.clubId) ?? null) : null,
+          isStandby:   b.isStandby  ?? false,
+          isCancelled: b.isCancelled ?? false,
+        };
+      });
+
+    const resolved = results.filter(r => !r.className.startsWith('Class #')).length;
+    this.logger.log(`listHistoricalBookings: ${results.length} bookings, ${resolved} names resolved`);
+    return results;
   }
 
   async bookClass(memberId: number, classId: number): Promise<BookClassResult> {
