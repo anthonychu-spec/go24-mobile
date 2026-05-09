@@ -365,10 +365,10 @@ export default function HomeScreen() {
           classes={data?.thisMonth.classes ?? 0}
         />
 
-        {/* Banners — above next class so they're seen */}
-        {banners.length > 0 && (
+        {/* Banners — always visible; shows placeholder when empty */}
+        <Text style={s.sectionTitle}>Promotions</Text>
+        {banners.length > 0 ? (
           <>
-            <Text style={s.sectionTitle}>Promotions</Text>
             <FlatList
               data={banners} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
               keyExtractor={b=>b.id}
@@ -386,6 +386,12 @@ export default function HomeScreen() {
               </View>
             )}
           </>
+        ) : (
+          <View style={s.bannerEmpty}>
+            <Ionicons name="megaphone-outline" size={28} color={colors.textMuted} />
+            <Text style={s.bannerEmptyTxt}>No promotions right now</Text>
+            <Text style={s.bannerEmptySub}>Check back soon for offers</Text>
+          </View>
         )}
 
         {/* Next class */}
@@ -445,6 +451,14 @@ const s = StyleSheet.create({
   sectionTitle: { fontSize:17, fontFamily:fonts.black, color:colors.text, paddingHorizontal:16 },
 
   grid: { flexDirection:'row', flexWrap:'wrap', paddingHorizontal:16, gap:10 },
+
+  bannerEmpty: {
+    marginHorizontal:16, backgroundColor:colors.card, borderRadius:18,
+    height:120, alignItems:'center', justifyContent:'center', gap:6,
+    borderWidth:1.5, borderColor:colors.border, borderStyle:'dashed',
+  },
+  bannerEmptyTxt: { fontSize:14, fontFamily:fonts.semibold, color:colors.textMuted },
+  bannerEmptySub: { fontSize:12, fontFamily:fonts.regular, color:colors.textMuted },
 
   banner:        { width:W-32, height:170, borderRadius:18, overflow:'hidden', marginHorizontal:16 },
   bannerImg:     { width:'100%', height:'100%' },
