@@ -109,7 +109,7 @@ export class PaymentsService {
     await this.chargeRepo.save(charge);
 
     if (!success) {
-      await this.notifications.sendPush(
+      await this.notifications.sendDirectPush(
         charge.userId, '❌ Payment Failed',
         'Your payment could not be processed. Please check your card.',
         { type: 'payment_failed', ref },
@@ -120,7 +120,7 @@ export class PaymentsService {
     const staffWebhook = this.cfg.get<string>('STAFF_NOTIFICATION_WEBHOOK_URL');
 
     if (type === 'outstanding') {
-      await this.notifications.sendPush(
+      await this.notifications.sendDirectPush(
         charge.userId, '✅ Payment Received',
         `HK$${amountHkd.toFixed(2)} received. Please try entering the gym again.`,
         { type: 'outstanding_paid', url: 'go24://profile' },
@@ -133,7 +133,7 @@ export class PaymentsService {
     }
 
     if (type === 'daypass') {
-      await this.notifications.sendPush(
+      await this.notifications.sendDirectPush(
         charge.userId, '✅ Day Pass Activated',
         'Your day pass is active. You may enter GO24 now.',
         { type: 'daypass_activated', url: 'go24://profile' },
