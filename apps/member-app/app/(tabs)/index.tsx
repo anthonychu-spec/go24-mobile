@@ -20,6 +20,7 @@ const CELL = (W - 16 * 2 - 10) / 2;
 interface Banner { id: string; title: string | null; imageUrl: string; linkUrl: string | null }
 interface DashboardData {
   user: { name: string | null; email: string | null; memberCode: string | null };
+  savedCardExpired: boolean;
   membership: {
     active: boolean; planName: string | null;
     daysRemaining: number | null; expiresAt: string | null;
@@ -295,117 +296,219 @@ const ACTIONS = [
   { icon:'pulse'    as const, label:'Activity Log', to:'/(tabs)/activity', color:colors.green,  bg:colors.greenBg  },
 ];
 
-// ─── Activity Hub ─────────────────────────────────────────────────────────────
+// ─── 互動 HUB ─────────────────────────────────────────────────────────────────
 
 const MILESTONES = [10, 50, 100, 200];
 
-function ActivityHub({ totalVisits, hasExpired, hasDebt, onPay, onProfile }: {
+interface HintCard {
+  key: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  iconColor: string;
+  iconBg: string;
+  title: string;
+  body: string;
+  action?: string;
+  onPress?: () => void;
+}
+
+function buildHints(args: {
   totalVisits: number;
-  hasExpired: boolean;
+  streak: number;
+  ptRemaining: number;
+  monthClasses: number;
+  monthVisits: number;
+  daysRemaining: number | null;
   hasDebt: boolean;
+  hasExpired: boolean;
+  cardExpired: boolean;
   onPay: () => void;
   onProfile: () => void;
-}) {
+  onPT: () => void;
+  onClasses: () => void;
+}): HintCard[] {
+  const cards: HintCard[] = [];
+  const { totalVisits, streak, ptRemaining, monthClasses, monthVisits,
+          daysRemaining, hasDebt, hasExpired, cardExpired } = args;
+
+  // ── Urgent first ──
+  if (cardExpired) {
+    cards.push({
+      key: 'card-expired',
+      icon: 'card', iconColor: colors.primary, iconBg: colors.primaryBg,
+      title: '信用卡已過期',
+      body: '你的儲存信用卡已過期，自動付款及 App 付款將無法進行，請更新卡資料。',
+      action: '更新信用卡', onPress: args.onProfile,
+    });
+  }
+  if (hasDebt) {
+    cards.push({
+      key: 'debt',
+      icon: 'alert-circle', iconColor: colors.primary, iconBg: colors.primaryBg,
+      title: '入唔到場？立即付款',
+      body: '你有未繳費項目。付清後即可正常進場，唔需要等人工處理。',
+      action: '立即付款', onPress: args.onPay,
+    });
+  }
+  if (hasExpired) {
+    cards.push({
+      key: 'expired',
+      icon: 'card-outline', iconColor: colors.amber, iconBg: colors.amberBg,
+      title: '會籍已過期',
+      body: '你嘅會籍已到期，請聯絡職員或到帳戶頁面更新資料以繼續使用。',
+      action: '查看帳戶', onPress: args.onProfile,
+    });
+  }
+
+  // ── Milestone progress ──
   const next = MILESTONES.find(m => totalVisits < m);
-  const pct    = next ? Math.min(1, totalVisits / next) : 1;
-  const toGo   = next ? next - totalVisits : 0;
+  if (next) {
+    const toGo = next - totalVisits;
+    const pct  = Math.round((totalVisits / next) * 100);
+    cards.push({
+      key: 'milestone',
+      icon: 'trophy-outline', iconColor: colors.amber, iconBg: colors.amberBg,
+      title: `到訪里程碑：${totalVisits} / ${next} 次`,
+      body: `仲差 ${toGo} 次就達成 ${next} 次到訪徽章！（進度 ${pct}%）`,
+    });
+  } else {
+    cards.push({
+      key: 'milestone-done',
+      icon: 'trophy', iconColor: colors.amber, iconBg: colors.amberBg,
+      title: '所有里程碑已達成 🏆',
+      body: `你已完成 10 / 50 / 100 / 200 次到訪，總到訪 ${totalVisits} 次。繼續保持！`,
+    });
+  }
+
+  // ── Streak ──
+  if (streak >= 2) {
+    cards.push({
+      key: 'streak',
+      icon: 'flame', iconColor: '#F97316', iconBg: '#FFF7ED',
+      title: `🔥 連續 ${streak} 星期落場`,
+      body: streak >= 4
+        ? `連續 ${streak} 星期！你係 GO24 嘅健身常客，繼續保持紀律。`
+        : `已連續 ${streak} 星期，繼續落場就可以建立長期習慣！`,
+    });
+  } else if (streak === 0) {
+    cards.push({
+      key: 'streak-start',
+      icon: 'flame-outline', iconColor: colors.textMuted, iconBg: colors.bg,
+      title: '開始你的連續記錄',
+      body: '今個星期落場就可以開始計算連續記錄，建立運動習慣從今天開始。',
+      action: '預約課堂', onPress: args.onClasses,
+    });
+  }
+
+  // ── PT sessions ──
+  if (ptRemaining >= 5) {
+    cards.push({
+      key: 'pt-plenty',
+      icon: 'barbell-outline', iconColor: colors.teal, iconBg: colors.tealBg,
+      title: `你有 ${ptRemaining} 堂 PT 未用`,
+      body: '記得定期預約私人教練課堂，唔好讓 sessions 白白過期。',
+      action: '預約 PT', onPress: args.onPT,
+    });
+  } else if (ptRemaining > 0 && ptRemaining < 5) {
+    cards.push({
+      key: 'pt-low',
+      icon: 'barbell', iconColor: colors.teal, iconBg: colors.tealBg,
+      title: `PT 只剩 ${ptRemaining} 堂`,
+      body: '你嘅 PT sessions 快用完，請聯絡教練或職員安排續購。',
+      action: '查看 PT', onPress: args.onPT,
+    });
+  }
+
+  // ── Monthly activity ──
+  if (monthVisits === 0 && monthClasses === 0) {
+    cards.push({
+      key: 'inactive',
+      icon: 'walk-outline', iconColor: colors.indigo, iconBg: colors.indigoBg,
+      title: '今個月未有落場記錄',
+      body: '立即預約課堂，開始本月嘅健身旅程！',
+      action: '睇課堂時間表', onPress: args.onClasses,
+    });
+  } else {
+    const total = monthVisits + monthClasses;
+    cards.push({
+      key: 'monthly',
+      icon: 'stats-chart-outline', iconColor: colors.indigo, iconBg: colors.indigoBg,
+      title: `本月已落場 ${total} 次`,
+      body: `入場 ${monthVisits} 次 · 上課 ${monthClasses} 堂。${total >= 8 ? '非常積極，繼續！' : '目標每星期最少 2 次，你做到㗎！'}`,
+    });
+  }
+
+  // ── Membership expiry warning (not yet expired) ──
+  if (!hasExpired && daysRemaining != null && daysRemaining <= 30 && daysRemaining > 0) {
+    cards.push({
+      key: 'expiry-warn',
+      icon: 'calendar-outline', iconColor: colors.warning, iconBg: '#FFFBF0',
+      title: `會籍 ${daysRemaining} 日後到期`,
+      body: '請聯絡職員或到帳戶頁面安排續約，以免影響使用。',
+      action: '查看帳戶', onPress: args.onProfile,
+    });
+  }
+
+  return cards;
+}
+
+function InteractiveHub(props: {
+  totalVisits: number;
+  streak: number;
+  ptRemaining: number;
+  monthClasses: number;
+  monthVisits: number;
+  daysRemaining: number | null;
+  hasDebt: boolean;
+  hasExpired: boolean;
+  cardExpired: boolean;
+  onPay: () => void;
+  onProfile: () => void;
+  onPT: () => void;
+  onClasses: () => void;
+}) {
+  const hints = buildHints(props);
 
   return (
-    <View style={hub.card}>
-      {/* Header row */}
-      <View style={hub.headerRow}>
-        <View style={hub.titleGroup}>
-          <Ionicons name="trophy-outline" size={16} color={colors.amber} />
-          <Text style={hub.title}>Activity Hub</Text>
-        </View>
-        <View style={hub.countBadge}>
-          <Text style={hub.countNum}>{totalVisits}</Text>
-          <Text style={hub.countLabel}> check-ins</Text>
-        </View>
-      </View>
-
-      {/* Progress to next milestone */}
-      {next ? (
-        <View style={hub.progressSection}>
-          <View style={hub.progressLabelRow}>
-            <Text style={hub.progressTxt}>{totalVisits} / {next} visits</Text>
-            <Text style={hub.progressTip}>{toGo} to go 🎯</Text>
+    <View style={hub.wrap}>
+      <Text style={s.sectionTitle}>互動 HUB</Text>
+      {hints.map(h => (
+        <Pressable
+          key={h.key}
+          style={hub.card}
+          onPress={h.onPress}
+          disabled={!h.onPress}
+        >
+          <View style={[hub.iconBox, { backgroundColor: h.iconBg }]}>
+            <Ionicons name={h.icon} size={20} color={h.iconColor} />
           </View>
-          <View style={hub.bar}>
-            <View style={[hub.fill, { width: `${pct * 100}%` as any }]} />
+          <View style={hub.content}>
+            <Text style={hub.title}>{h.title}</Text>
+            <Text style={hub.body}>{h.body}</Text>
+            {h.action && (
+              <View style={hub.actionRow}>
+                <Text style={[hub.actionTxt, { color: h.iconColor }]}>{h.action}</Text>
+                <Ionicons name="chevron-forward" size={12} color={h.iconColor} />
+              </View>
+            )}
           </View>
-        </View>
-      ) : (
-        <Text style={hub.maxTxt}>All milestones reached! 🏆</Text>
-      )}
-
-      {/* Milestone badges */}
-      <View style={hub.badges}>
-        {MILESTONES.map(m => {
-          const done = totalVisits >= m;
-          return (
-            <View key={m} style={[hub.badge, done && hub.badgeDone]}>
-              {done
-                ? <Ionicons name="checkmark" size={10} color="#fff" />
-                : <Text style={hub.badgeNum}>{m}</Text>
-              }
-              <Text style={[hub.badgeLbl, done && hub.badgeLblDone]}>{m}</Text>
-            </View>
-          );
-        })}
-      </View>
-
-      {/* Smart alerts */}
-      {hasDebt && (
-        <Pressable style={[hub.alert, hub.alertRed]} onPress={onPay}>
-          <Ionicons name="alert-circle" size={15} color={colors.primary} />
-          <Text style={[hub.alertTxt, { color: colors.primary }]}>Can't enter? Pay outstanding balance</Text>
-          <Ionicons name="chevron-forward" size={13} color={colors.primary} />
         </Pressable>
-      )}
-      {hasExpired && !hasDebt && (
-        <Pressable style={[hub.alert, hub.alertAmber]} onPress={onProfile}>
-          <Ionicons name="card-outline" size={15} color={colors.amber} />
-          <Text style={[hub.alertTxt, { color: colors.amber }]}>Membership expired — renew now</Text>
-          <Ionicons name="chevron-forward" size={13} color={colors.amber} />
-        </Pressable>
-      )}
+      ))}
     </View>
   );
 }
 
 const hub = StyleSheet.create({
-  card:    { marginHorizontal:16, backgroundColor:colors.card, borderRadius:20, padding:18, gap:14,
-              shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.06, shadowRadius:8, elevation:2 },
-  headerRow:   { flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
-  titleGroup:  { flexDirection:'row', alignItems:'center', gap:7 },
-  title:       { fontSize:15, fontFamily:fonts.bold, color:colors.text },
-  countBadge:  { flexDirection:'row', alignItems:'baseline' },
-  countNum:    { fontSize:22, fontFamily:fonts.black, color:colors.amber },
-  countLabel:  { fontSize:11, fontFamily:fonts.regular, color:colors.textMuted },
-
-  progressSection:  { gap:7 },
-  progressLabelRow: { flexDirection:'row', justifyContent:'space-between' },
-  progressTxt:      { fontSize:12, fontFamily:fonts.semibold, color:colors.text },
-  progressTip:      { fontSize:12, fontFamily:fonts.semibold, color:colors.textMuted },
-  bar:   { height:7, backgroundColor:colors.bg, borderRadius:4, overflow:'hidden' },
-  fill:  { height:'100%', backgroundColor:colors.amber, borderRadius:4 },
-  maxTxt:{ fontSize:13, fontFamily:fonts.semibold, color:colors.amber, textAlign:'center' },
-
-  badges:   { flexDirection:'row', gap:10 },
-  badge:    { flex:1, alignItems:'center', gap:4, paddingVertical:10,
-               backgroundColor:colors.bg, borderRadius:12,
-               borderWidth:1.5, borderColor:colors.border },
-  badgeDone:{ backgroundColor:colors.amber, borderColor:colors.amber },
-  badgeNum: { fontSize:11, fontFamily:fonts.black, color:colors.textMuted },
-  badgeLbl: { fontSize:9, fontFamily:fonts.bold, color:colors.textMuted, letterSpacing:0.5 },
-  badgeLblDone:{ color:'rgba(255,255,255,0.85)' },
-
-  alert:    { flexDirection:'row', alignItems:'center', gap:9,
-               borderRadius:12, paddingHorizontal:13, paddingVertical:11 },
-  alertRed: { backgroundColor:colors.primaryBg, borderWidth:1, borderColor:colors.primary+'30' },
-  alertAmber:{ backgroundColor:colors.amberBg, borderWidth:1, borderColor:colors.amber+'30' },
-  alertTxt: { flex:1, fontSize:13, fontFamily:fonts.semibold },
+  wrap:    { gap:8 },
+  card:    { flexDirection:'row', alignItems:'flex-start', gap:14,
+              marginHorizontal:16, backgroundColor:colors.card, borderRadius:18,
+              padding:16,
+              shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.05, shadowRadius:6, elevation:1 },
+  iconBox: { width:44, height:44, borderRadius:13, alignItems:'center', justifyContent:'center', flexShrink:0 },
+  content: { flex:1, gap:4 },
+  title:   { fontSize:14, fontFamily:fonts.bold, color:colors.text },
+  body:    { fontSize:12, fontFamily:fonts.regular, color:colors.textMuted, lineHeight:18 },
+  actionRow:{ flexDirection:'row', alignItems:'center', gap:3, marginTop:4 },
+  actionTxt:{ fontSize:12, fontFamily:fonts.semibold },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -440,6 +543,7 @@ export default function HomeScreen() {
   const streak      = data?.streak ?? 0;
   const totalVisits = data?.totalVisits ?? 0;
   const hasExpired  = m != null && !m.active && (m.daysRemaining == null || m.daysRemaining <= 0);
+  const cardExpired = data?.savedCardExpired ?? false;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -507,13 +611,21 @@ export default function HomeScreen() {
           classes={data?.thisMonth.classes ?? 0}
         />
 
-        {/* Activity Hub */}
-        <ActivityHub
+        {/* 互動 HUB */}
+        <InteractiveHub
           totalVisits={totalVisits}
-          hasExpired={hasExpired}
+          streak={streak}
+          ptRemaining={pt?.remainingSessions ?? 0}
+          monthClasses={data?.thisMonth.classes ?? 0}
+          monthVisits={data?.thisMonth.visits ?? 0}
+          daysRemaining={m?.daysRemaining ?? null}
           hasDebt={hasDebt}
+          hasExpired={hasExpired}
+          cardExpired={cardExpired}
           onPay={() => router.push('/profile')}
           onProfile={() => router.push('/profile')}
+          onPT={() => router.push('/(tabs)/pt')}
+          onClasses={() => router.push('/(tabs)/classes')}
         />
 
         {/* Banners — always visible; shows placeholder when empty */}
