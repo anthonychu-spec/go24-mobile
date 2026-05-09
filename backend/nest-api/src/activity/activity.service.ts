@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Booking } from '../bookings/entities/booking.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
+import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
+import type { PgmBooking } from '../booking/booking.interfaces';
 
 export type ActivityType = 'class' | 'pt' | 'checkin';
 
@@ -28,6 +30,7 @@ export class ActivityService {
   constructor(
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     private readonly pgm: PgmClient,
+    private readonly pgmBooking: PgmBookingAdapter,
   ) {}
 
   async getActivity(pgmMemberId: number, userId: string): Promise<{
@@ -38,7 +41,7 @@ export class ActivityService {
     since.setMonth(since.getMonth() - 3);
 
     const [classes, checkins, ptSessions] = await Promise.allSettled([
-      this.fetchClasses(userId, since),
+      this.fetchClasses(pgmMemberId, userId, since),
       this.fetchCheckins(pgmMemberId, since),
       this.fetchPt(pgmMemberId, since),
     ]);
@@ -55,24 +58,38 @@ export class ActivityService {
     return { summary, items: allItems };
   }
 
-  private async fetchClasses(userId: string, since: Date): Promise<ActivityItem[]> {
-    const bookings = await this.bookingRepo
-      .createQueryBuilder('b')
-      .where('b.user_id = :userId', { userId })
-      .andWhere('b.status IN (:...statuses)', { statuses: ['confirmed', 'attended'] })
-      .andWhere('b.created_at >= :since', { since })
-      .orderBy('b.created_at', 'DESC')
-      .limit(200)
-      .getMany();
+  private async fetchClasses(pgmMemberId: number, userId: string, since: Date): Promise<ActivityItem[]> {
+    // Get enriched bookings from PGM (has real class names, clubs, times)
+    const [pgmBookings, localBookings] = await Promise.all([
+      this.pgmBooking.listMyBookings(pgmMemberId).catch((): PgmBooking[] => []),
+      this.bookingRepo
+        .createQueryBuilder('b')
+        .where('b.user_id = :userId', { userId })
+        .andWhere('b.status IN (:...statuses)', { statuses: ['confirmed', 'pending', 'waitlist', 'attended', 'pending_verify'] })
+        .andWhere('b.created_at >= :since', { since })
+        .orderBy('b.created_at', 'DESC')
+        .limit(200)
+        .getMany(),
+    ]);
 
-    return bookings.map(b => ({
-      id: `class-${b.id}`,
-      type: 'class' as ActivityType,
-      title: `Class #${b.classId}`,
-      subtitle: b.status === 'attended' ? '已出席' : '已預約',
-      at: b.createdAt.toISOString(),
-      club: null,
-    }));
+    // Build PGM booking lookup by classId for name/club enrichment
+    const pgmMap = new Map<number, PgmBooking>(pgmBookings.map(b => [b.classId, b]));
+
+    return localBookings.map(b => {
+      const pgm = pgmMap.get(b.classId);
+      const statusLabel = b.status === 'attended'       ? 'Attended'
+                        : b.status === 'waitlist'        ? 'Waitlisted'
+                        : b.status === 'pending_verify'  ? 'Verifying'
+                        : 'Upcoming';
+      return {
+        id: `class-${b.id}`,
+        type: 'class' as ActivityType,
+        title: pgm?.className ?? `Class #${b.classId}`,
+        subtitle: statusLabel,
+        at: pgm?.startTime ?? b.createdAt.toISOString(),
+        club: pgm?.clubName ?? null,
+      };
+    });
   }
 
   private async fetchCheckins(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
@@ -87,8 +104,8 @@ export class ActivityService {
       return (res.value ?? []).map((v: any) => ({
         id: `checkin-${v.id}`,
         type: 'checkin' as ActivityType,
-        title: '入場',
-        subtitle: v.clubId ? `Club ${v.clubId}` : null,
+        title: 'Check-in',
+        subtitle: null,
         at: v.enterDate,
         club: v.clubId ? String(v.clubId) : null,
       }));
