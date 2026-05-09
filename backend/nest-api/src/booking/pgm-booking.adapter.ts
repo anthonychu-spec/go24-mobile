@@ -271,19 +271,20 @@ export class PgmBookingAdapter implements IBookingRepo {
   /** Fetch historical bookings (last N months) with full class name enrichment. */
   async listHistoricalBookings(memberId: number, since: Date): Promise<PgmBooking[]> {
     try {
-      const sinceStr = since.toISOString().slice(0, 19);
-      const toStr    = new Date().toISOString().slice(0, 19);
+      const sinceStr = since.toISOString().slice(0, 10); // YYYY-MM-DD
+      const toStr    = new Date().toISOString().slice(0, 10);
 
       const [bookingsRes, classesRes, classTypeMap, clubMap] = await Promise.all([
         this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
-          $filter: `memberId eq ${memberId} and startDate ge datetime'${sinceStr}'`,
+          $filter: `memberId eq ${memberId}`,
           $select: 'id,classId,startDate,endDate,memberId,isStandby,isCancelled',
           $orderby: 'startDate desc',
           $top: 200,
         }),
         this.pgm.get<{ value: RawClass[] }>('/odata/Classes', {
-          $filter: `startDate ge datetime'${sinceStr}' and startDate le datetime'${toStr}'`,
+          $filter: `startDate ge ${sinceStr}T00:00:00Z and startDate le ${toStr}T23:59:59Z`,
           $select: 'id,startDate,endDate,classTypeId,clubId',
+          $top: 500,
         }),
         this.getClassTypeMap(),
         this.getClubMap(),

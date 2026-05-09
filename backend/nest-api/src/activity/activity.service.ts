@@ -69,7 +69,7 @@ export class ActivityService {
   private async fetchClasses(pgmMemberId: number, userId: string, since: Date): Promise<ActivityItem[]> {
     // Use historical bookings method which fetches classes in the same date window
     const [pgmBookings, localBookings] = await Promise.all([
-      this.pgmBooking.listHistoricalBookings(pgmMemberId, since),
+      this.pgmBooking.listHistoricalBookings(pgmMemberId, since).catch((): PgmBooking[] => []),
       this.bookingRepo
         .createQueryBuilder('b')
         .where('b.user_id = :userId', { userId })
@@ -103,7 +103,7 @@ export class ActivityService {
   private async fetchCheckins(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
     const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
       $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
-      $select: 'id,enterDate,clubId',
+      $select: 'id,enterDate',
       $top: 200,
     });
 
@@ -115,17 +115,24 @@ export class ActivityService {
         title: 'Check-in',
         subtitle: null,
         at: v.enterDate,
-        club: v.clubId ? String(v.clubId) : null,
+        club: null,
       }));
   }
 
   private async fetchPt(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
-    const res = await this.pgm.get<{ value: any[] }>('/odata/PtAgreementUsages', {
-      $filter: `memberId eq ${pgmMemberId}`,
-      $select: 'id,memberId,trainerId,agreementId,date,status',
-      $orderby: 'date desc',
-      $top: 200,
-    });
+    let res: { value: any[] };
+    try {
+      res = await this.pgm.get<{ value: any[] }>('/odata/PtAgreementUsages', {
+        $filter: `memberId eq ${pgmMemberId}`,
+        $select: 'id,memberId,trainerId,agreementId,date,status',
+        $orderby: 'date desc',
+        $top: 200,
+      });
+    } catch (err: any) {
+      // PGM returns 404 when member has no PT sessions
+      if (err?.response?.status === 404 || err?.status === 404) return [];
+      throw err;
+    }
 
     const sinceMs = since.getTime();
     return (res.value ?? [])
