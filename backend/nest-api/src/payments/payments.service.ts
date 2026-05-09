@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AdyenClient } from './adyen.client';
@@ -83,5 +83,27 @@ export class PaymentsService {
 
   async getCard(userId: string): Promise<PaymentMethod | null> {
     return this.repo.findOne({ where: { userId, status: 'active' } });
+  }
+
+  async chargeOutstanding(
+    userId: string,
+    amountHkd: number,
+    reference: string,
+  ): Promise<{ success: boolean; pspReference?: string; resultCode: string }> {
+    const pm = await this.getCard(userId);
+    if (!pm?.recurringDetailRef) {
+      throw new BadRequestException('No saved card on file. Please add a card first.');
+    }
+    const result = await this.adyen.charge({
+      shopperReference: userId,
+      storedPaymentMethodId: pm.recurringDetailRef,
+      amountHkd,
+      reference,
+    });
+    return {
+      success: result.resultCode === 'Authorised',
+      pspReference: result.pspReference,
+      resultCode: result.resultCode,
+    };
   }
 }

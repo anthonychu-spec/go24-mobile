@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -12,7 +12,7 @@ import { DashboardService } from './dashboard.service';
 export class DashboardController {
   constructor(private readonly svc: DashboardService) {}
 
-  @ApiOperation({ summary: 'Dashboard summary — membership, PT, next class, this month stats' })
+  @ApiOperation({ summary: 'Dashboard summary — membership, PT, next class, stats' })
   @Get('dashboard')
   dashboard(@Req() req: Request) {
     const user = req.user as AuthedUser;
@@ -24,5 +24,19 @@ export class DashboardController {
   memberships(@Req() req: Request) {
     const user = req.user as AuthedUser;
     return this.svc.getMemberships(user.pgmId);
+  }
+
+  @ApiOperation({ summary: 'Member profile — personal info, outstanding balance, saved card' })
+  @Get('profile')
+  profile(@Req() req: Request) {
+    const user = req.user as AuthedUser;
+    return this.svc.getProfile(user.id, user.pgmId);
+  }
+
+  @ApiOperation({ summary: 'Charge saved card for outstanding PGM invoices' })
+  @Post('pay-outstanding')
+  payOutstanding(@Req() req: Request) {
+    const user = req.user as AuthedUser;
+    return this.svc.payOutstanding(user.id, user.pgmId);
   }
 }

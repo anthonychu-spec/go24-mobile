@@ -9,5 +9,6 @@ import { PaymentsController } from './payments.controller';
   imports: [TypeOrmModule.forFeature([PaymentMethod])],
   providers: [AdyenClient, PaymentsService],
   controllers: [PaymentsController],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

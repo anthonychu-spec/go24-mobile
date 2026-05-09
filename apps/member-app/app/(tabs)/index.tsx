@@ -18,7 +18,7 @@ const { width: W } = Dimensions.get('window');
 interface Banner { id: string; title: string | null; imageUrl: string; linkUrl: string | null }
 interface DashboardData {
   user: { name: string | null; email: string | null };
-  membership: { active: boolean; planName: string | null; daysRemaining: number | null; expiresAt: string | null };
+  membership: { active: boolean; planName: string | null; daysRemaining: number | null; expiresAt: string | null; outstandingBalance: number };
   pt: { remainingSessions: number; totalSessions: number; expiresAt: string | null };
   nextClass: { bookingId: string; classId: number; className?: string | null; startTime: string; minutesUntil: number; clubName: string | null } | null;
   thisMonth: { visits: number; classes: number; pt: number };
@@ -129,13 +129,15 @@ export default function HomeScreen() {
   const pt = data?.pt;
   const unread = data?.unreadNotifications ?? 0;
 
-  const ACTIONS: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; to: string; }[] = [
+  const ACTIONS: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; to: string; badge?: number }[] = [
     { icon: 'qr-code',         label: 'QR Check-in',    to: '/checkin/qr' },
     { icon: 'calendar',        label: 'Book a class',   to: '/(tabs)/classes' },
     { icon: 'bookmark',        label: 'My Bookings',    to: '/(tabs)/bookings' },
     { icon: 'barbell',         label: 'PT Sessions',    to: '/(tabs)/pt' },
     { icon: 'pulse',           label: 'Activity',       to: '/(tabs)/activity' },
     { icon: 'gift',            label: 'Refer a Friend', to: '/referral' },
+    { icon: 'person-circle-outline', label: 'My Account', to: '/profile',
+      badge: (m?.outstandingBalance ?? 0) > 0 ? 1 : undefined },
   ];
 
   return (
@@ -176,8 +178,19 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {/* Membership status card — tappable → /membership */}
-        <Pressable style={s.memberCard} onPress={() => router.push('/membership')}>
+        {/* Outstanding balance alert */}
+        {m && (m.outstandingBalance ?? 0) > 0 && (
+          <Pressable style={s.outstandingAlert} onPress={() => router.push('/profile')}>
+            <Ionicons name="alert-circle" size={18} color="#fff" />
+            <Text style={s.outstandingText}>
+              Outstanding balance HK${(m.outstandingBalance).toLocaleString('en-HK', { minimumFractionDigits: 2 })} — tap to pay
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+        )}
+
+        {/* Membership status card — tappable → /profile */}
+        <Pressable style={s.memberCard} onPress={() => router.push('/profile')}>
           <View style={s.memberLeft}>
             <View style={s.memberIconBox}>
               <Ionicons name="card" size={16} color={colors.primary} />
@@ -226,7 +239,13 @@ export default function HomeScreen() {
                 <Ionicons name={a.icon} size={18} color={colors.primary} />
               </View>
               <Text style={s.actionLabel}>{a.label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.border} />
+              {a.badge ? (
+                <View style={s.actionBadge}>
+                  <Ionicons name="alert-circle" size={16} color={colors.cta} />
+                </View>
+              ) : (
+                <Ionicons name="chevron-forward" size={16} color={colors.border} />
+              )}
             </Pressable>
           ))}
         </View>
@@ -259,10 +278,11 @@ export default function HomeScreen() {
           </>
         )}
 
-        {/* Logout */}
-        <Pressable style={s.logoutRow} onPress={logout}>
-          <Ionicons name="log-out-outline" size={18} color={colors.textMuted} />
-          <Text style={s.logoutText}>Log Out</Text>
+        {/* My Account link */}
+        <Pressable style={s.logoutRow} onPress={() => router.push('/profile')}>
+          <Ionicons name="person-outline" size={16} color={colors.textMuted} />
+          <Text style={s.logoutText}>My Account & Settings</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.border} />
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -391,6 +411,15 @@ const s = StyleSheet.create({
   dots:          { flexDirection: 'row', justifyContent: 'center', gap: 5 },
   dot:           { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.border },
   dotActive:     { backgroundColor: colors.primary, width: 14 },
+
+  outstandingAlert: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, backgroundColor: colors.primary,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11,
+  },
+  outstandingText: { flex: 1, fontSize: 13, fontFamily: fonts.semibold, color: '#fff' },
+
+  actionBadge: { width: 24, alignItems: 'center' },
 
   logoutRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
