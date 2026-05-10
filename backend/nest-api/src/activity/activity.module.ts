@@ -13,7 +13,9 @@ import { GYM_DATA_POOL } from './activity.constants';
     ActivityService,
     {
       provide: GYM_DATA_POOL,
-      useFactory: () => new Pool({ connectionString: process.env.GYM_DATA_URL }),
+      useFactory: () => process.env.GYM_DATA_URL
+        ? new Pool({ connectionString: process.env.GYM_DATA_URL })
+        : null,
     },
   ],
   controllers: [ActivityController],

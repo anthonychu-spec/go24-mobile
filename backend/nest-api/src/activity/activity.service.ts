@@ -32,7 +32,7 @@ export class ActivityService {
   constructor(
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     private readonly pgm: PgmClient,
-    @Inject(GYM_DATA_POOL) private readonly gymPool: Pool,
+    @Inject(GYM_DATA_POOL) private readonly gymPool: Pool | null,
   ) {}
 
   async getActivity(pgmMemberId: number, userId: string): Promise<{
@@ -72,7 +72,7 @@ export class ActivityService {
   private async fetchClasses(pgmMemberId: number, userId: string, since: Date, today: Date): Promise<ActivityItem[]> {
     const [dbResult, upcomingBookings] = await Promise.allSettled([
       // Historical attended classes (before today) → studio.by_member DB
-      this.gymPool.query(
+      this.gymPool?.query(
         `SELECT class_date, class_name, club FROM studio.by_member
          WHERE user_number = $1
          AND class_date >= $2 AND class_date < $3
@@ -91,7 +91,7 @@ export class ActivityService {
         .getMany(),
     ]);
 
-    const historicalItems: ActivityItem[] = dbResult.status === 'fulfilled'
+    const historicalItems: ActivityItem[] = dbResult.status === 'fulfilled' && dbResult.value
       ? dbResult.value.rows.map((r: any) => ({
           id: `class-db-${new Date(r.class_date).toISOString()}-${r.class_name}`,
           type: 'class' as ActivityType,
@@ -119,7 +119,7 @@ export class ActivityService {
   private async fetchCheckins(pgmMemberId: number, since: Date, today: Date): Promise<ActivityItem[]> {
     // Historical (before today) → local gym_data DB
     const [dbResult, todayResult] = await Promise.allSettled([
-      this.gymPool.query(
+      this.gymPool?.query(
         `SELECT id, enter_date, club FROM pgm.visits
          WHERE user_number = $1 AND enter_date >= $2 AND enter_date < $3
          ORDER BY enter_date DESC LIMIT 300`,
@@ -136,7 +136,7 @@ export class ActivityService {
       }),
     ]);
 
-    const dbItems: ActivityItem[] = dbResult.status === 'fulfilled'
+    const dbItems: ActivityItem[] = dbResult.status === 'fulfilled' && dbResult.value
       ? dbResult.value.rows.map((v: any) => ({
           id: `checkin-db-${v.id}`,
           type: 'checkin' as ActivityType,
@@ -162,6 +162,7 @@ export class ActivityService {
   }
 
   private async fetchPt(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
+    if (!this.gymPool) return [];
     try {
       const result = await this.gymPool.query(
         `SELECT done_date, product_name, club FROM commissions.done
