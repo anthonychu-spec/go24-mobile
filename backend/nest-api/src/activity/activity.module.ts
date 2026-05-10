@@ -6,8 +6,7 @@ import { PgmModule } from '../pgm-adapter/pgm.module';
 import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
 import { ActivityService } from './activity.service';
 import { ActivityController } from './activity.controller';
-
-export const GYM_DATA_POOL = 'GYM_DATA_POOL';
+import { GYM_DATA_POOL } from './activity.constants';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Booking]), PgmModule],

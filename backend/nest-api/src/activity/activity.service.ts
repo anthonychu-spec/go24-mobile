@@ -6,7 +6,7 @@ import { Booking } from '../bookings/entities/booking.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
 import type { PgmBooking } from '../booking/booking.interfaces';
-import { GYM_DATA_POOL } from './activity.module';
+import { GYM_DATA_POOL } from './activity.constants';
 
 export type ActivityType = 'class' | 'pt' | 'checkin';
 
