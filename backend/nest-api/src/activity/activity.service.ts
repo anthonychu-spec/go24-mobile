@@ -80,14 +80,14 @@ export class ActivityService {
          ORDER BY class_date DESC LIMIT 300`,
         [pgmMemberId.toString(), since, today],
       ),
-      // Today + upcoming → local bookings table
+      // Upcoming + recent bookings → local bookings table (full 2-month window)
       this.bookingRepo
         .createQueryBuilder('b')
         .where('b.user_id = :userId', { userId })
-        .andWhere('b.status IN (:...statuses)', { statuses: ['confirmed', 'pending', 'waitlist', 'pending_verify'] })
-        .andWhere('b.created_at >= :today', { today })
+        .andWhere('b.status IN (:...statuses)', { statuses: ['confirmed', 'pending', 'waitlist', 'attended', 'pending_verify'] })
+        .andWhere('b.created_at >= :since', { since })
         .orderBy('b.created_at', 'DESC')
-        .limit(50)
+        .limit(200)
         .getMany(),
     ]);
 
@@ -107,13 +107,22 @@ export class ActivityService {
           id: `class-${b.id}`,
           type: 'class' as ActivityType,
           title: `Class #${b.classId}`,
-          subtitle: b.status === 'waitlist' ? 'Waitlisted' : b.status === 'pending_verify' ? 'Verifying' : 'Upcoming',
+          subtitle: b.status === 'attended' ? 'Attended'
+                  : b.status === 'waitlist' ? 'Waitlisted'
+                  : b.status === 'pending_verify' ? 'Verifying'
+                  : 'Upcoming',
           at: b.createdAt.toISOString(),
           club: null,
         }))
       : [];
 
-    return [...upcomingItems, ...historicalItems];
+    // Deduplicate: DB records take priority (have class names), bookings fill the gap
+    const dbDates = new Set(historicalItems.map(i => i.at.slice(0, 10)));
+    const filteredBookings = this.gymPool
+      ? upcomingItems.filter(i => !dbDates.has(i.at.slice(0, 10)))
+      : upcomingItems;
+
+    return [...filteredBookings, ...historicalItems];
   }
 
   private async fetchCheckins(pgmMemberId: number, since: Date, today: Date): Promise<ActivityItem[]> {
