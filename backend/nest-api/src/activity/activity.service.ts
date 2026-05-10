@@ -1,10 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Pool } from 'pg';
 import { Booking } from '../bookings/entities/booking.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
 import type { PgmBooking } from '../booking/booking.interfaces';
+import { GYM_DATA_POOL } from './activity.module';
 
 export type ActivityType = 'class' | 'pt' | 'checkin';
 
@@ -33,6 +35,7 @@ export class ActivityService {
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     private readonly pgm: PgmClient,
     private readonly pgmBooking: PgmBookingAdapter,
+    @Inject(GYM_DATA_POOL) private readonly gymPool: Pool,
   ) {}
 
   async getActivity(pgmMemberId: number, userId: string): Promise<{
@@ -41,11 +44,14 @@ export class ActivityService {
     errors: string[];
   }> {
     const since = new Date();
-    since.setMonth(since.getMonth() - 3);
+    since.setMonth(since.getMonth() - 2);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const [classes, checkins, ptSessions] = await Promise.allSettled([
       this.fetchClasses(pgmMemberId, userId, since),
-      this.fetchCheckins(pgmMemberId, since),
+      this.fetchCheckins(pgmMemberId, since, today),
       this.fetchPt(pgmMemberId, since),
     ]);
 
@@ -100,57 +106,73 @@ export class ActivityService {
     });
   }
 
-  private async fetchCheckins(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
-    let res: { value: any[] };
-    try {
-      res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
-        $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
+  private async fetchCheckins(pgmMemberId: number, since: Date, today: Date): Promise<ActivityItem[]> {
+    // Historical (before today) → local gym_data DB
+    const [dbResult, todayResult] = await Promise.allSettled([
+      this.gymPool.query(
+        `SELECT id, enter_date, club FROM pgm.visits
+         WHERE user_number = $1 AND enter_date >= $2 AND enter_date < $3
+         ORDER BY enter_date DESC LIMIT 300`,
+        [pgmMemberId.toString(), since, today],
+      ),
+      // Today → PGM API (live)
+      this.pgm.get<{ value: any[] }>('/odata/Visits', {
+        $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${today.toISOString().slice(0, 19)}'`,
         $select: 'id,enterDate',
-        $top: 200,
-      });
-    } catch (err: any) {
-      if (err?.response?.status === 404 || err?.status === 404) return [];
-      throw err;
-    }
+        $top: 50,
+      }).catch((err: any) => {
+        if (err?.response?.status === 404 || err?.status === 404) return { value: [] };
+        throw err;
+      }),
+    ]);
 
-    return (res.value ?? [])
-      .sort((a: any, b: any) => new Date(b.enterDate).getTime() - new Date(a.enterDate).getTime())
-      .map((v: any) => ({
-        id: `checkin-${v.id}`,
-        type: 'checkin' as ActivityType,
-        title: 'Check-in',
-        subtitle: null,
-        at: v.enterDate,
-        club: null,
-      }));
+    const dbItems: ActivityItem[] = dbResult.status === 'fulfilled'
+      ? dbResult.value.rows.map((v: any) => ({
+          id: `checkin-db-${v.id}`,
+          type: 'checkin' as ActivityType,
+          title: 'Check-in',
+          subtitle: null,
+          at: new Date(v.enter_date).toISOString(),
+          club: v.club ?? null,
+        }))
+      : (this.logger.warn('gym_data visits query failed', (dbResult as PromiseRejectedResult).reason), []);
+
+    const todayItems: ActivityItem[] = todayResult.status === 'fulfilled'
+      ? ((todayResult.value as { value: any[] }).value ?? []).map((v: any) => ({
+          id: `checkin-${v.id}`,
+          type: 'checkin' as ActivityType,
+          title: 'Check-in',
+          subtitle: null,
+          at: v.enterDate,
+          club: null,
+        }))
+      : (this.logger.warn('PGM today visits failed', (todayResult as PromiseRejectedResult).reason), []);
+
+    return [...todayItems, ...dbItems];
   }
 
   private async fetchPt(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
-    let res: { value: any[] };
     try {
-      res = await this.pgm.get<{ value: any[] }>('/odata/PtAgreementUsages', {
-        $filter: `memberId eq ${pgmMemberId}`,
-        $select: 'id,memberId,trainerId,agreementId,date,status',
-        $orderby: 'date desc',
-        $top: 200,
-      });
-    } catch (err: any) {
-      // PGM returns 404 when member has no PT sessions
-      if (err?.response?.status === 404 || err?.status === 404) return [];
-      throw err;
-    }
-
-    const sinceMs = since.getTime();
-    return (res.value ?? [])
-      .filter((p: any) => p.date && new Date(p.date).getTime() >= sinceMs)
-      .map((p: any) => ({
-        id: `pt-${p.id}`,
+      const result = await this.gymPool.query(
+        `SELECT done_date, product_name, club FROM commissions.done
+         WHERE CAST(SPLIT_PART(user_number, '.', 1) AS BIGINT) = $1
+         AND commission_category = 'PT'
+         AND done_date >= $2
+         ORDER BY done_date DESC LIMIT 200`,
+        [pgmMemberId, since],
+      );
+      return result.rows.map((r: any) => ({
+        id: `pt-${new Date(r.done_date).toISOString()}-${r.product_name}`,
         type: 'pt' as ActivityType,
-        title: 'PT Session',
-        subtitle: p.trainerId ? `Trainer #${p.trainerId}` : null,
-        at: p.date,
-        club: null,
+        title: r.product_name ?? 'PT Session',
+        subtitle: r.club ?? null,
+        at: new Date(r.done_date).toISOString(),
+        club: r.club ?? null,
       }));
+    } catch (err) {
+      this.logger.warn('gym_data PT query failed', err);
+      return [];
+    }
   }
 
   private buildSummary(

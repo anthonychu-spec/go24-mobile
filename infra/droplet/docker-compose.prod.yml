@@ -47,6 +47,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-go24}
+      GYM_DATA_URL: ${GYM_DATA_URL}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: 15m
