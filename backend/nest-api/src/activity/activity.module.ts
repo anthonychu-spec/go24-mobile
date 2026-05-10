@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Pool } from 'pg';
 import { Booking } from '../bookings/entities/booking.entity';
 import { PgmModule } from '../pgm-adapter/pgm.module';
+import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
 import { ActivityService } from './activity.service';
 import { ActivityController } from './activity.controller';
 import { GYM_DATA_POOL } from './activity.constants';
@@ -11,6 +12,7 @@ import { GYM_DATA_POOL } from './activity.constants';
   imports: [TypeOrmModule.forFeature([Booking]), PgmModule],
   providers: [
     ActivityService,
+    PgmBookingAdapter,
     {
       provide: GYM_DATA_POOL,
       useFactory: () => process.env.GYM_DATA_URL

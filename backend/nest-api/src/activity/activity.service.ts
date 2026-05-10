@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Pool } from 'pg';
 import { Booking } from '../bookings/entities/booking.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
+import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
+import type { PgmBooking } from '../booking/booking.interfaces';
 import { GYM_DATA_POOL } from './activity.constants';
 
 export type ActivityType = 'class' | 'pt' | 'checkin';
@@ -32,6 +34,7 @@ export class ActivityService {
   constructor(
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     private readonly pgm: PgmClient,
+    private readonly pgmBooking: PgmBookingAdapter,
     @Inject(GYM_DATA_POOL) private readonly gymPool: Pool | null,
   ) {}
 
@@ -102,25 +105,35 @@ export class ActivityService {
         }))
       : (this.logger.warn('gym_data studio query failed', (dbResult as PromiseRejectedResult).reason), []);
 
-    const upcomingItems: ActivityItem[] = upcomingBookings.status === 'fulfilled'
-      ? upcomingBookings.value.map(b => ({
-          id: `class-${b.id}`,
-          type: 'class' as ActivityType,
-          title: `Class #${b.classId}`,
-          subtitle: b.status === 'attended' ? 'Attended'
-                  : b.status === 'waitlist' ? 'Waitlisted'
-                  : b.status === 'pending_verify' ? 'Verifying'
-                  : 'Upcoming',
-          at: b.createdAt.toISOString(),
-          club: null,
-        }))
-      : [];
+    // Enrich bookings with class name — use PGM cache (fast, already cached in memory)
+    const bookings = upcomingBookings.status === 'fulfilled' ? upcomingBookings.value : [];
+    const pgmMap = this.gymPool
+      ? new Map<number, PgmBooking>()
+      : new Map<number, PgmBooking>(
+          (await this.pgmBooking.listHistoricalBookings(pgmMemberId, since).catch((): PgmBooking[] => []))
+            .map(b => [b.classId, b]),
+        );
 
-    // Deduplicate: DB records take priority (have class names), bookings fill the gap
+    const bookingItems: ActivityItem[] = bookings.map(b => {
+      const pgm = pgmMap.get(b.classId);
+      return {
+        id: `class-${b.id}`,
+        type: 'class' as ActivityType,
+        title: pgm?.className ?? `Class #${b.classId}`,
+        subtitle: b.status === 'attended' ? 'Attended'
+                : b.status === 'waitlist' ? 'Waitlisted'
+                : b.status === 'pending_verify' ? 'Verifying'
+                : 'Upcoming',
+        at: pgm?.startTime ?? b.createdAt.toISOString(),
+        club: pgm?.clubName ?? null,
+      };
+    });
+
+    // When DB available: merge DB attended + bookings (dedup by date)
     const dbDates = new Set(historicalItems.map(i => i.at.slice(0, 10)));
     const filteredBookings = this.gymPool
-      ? upcomingItems.filter(i => !dbDates.has(i.at.slice(0, 10)))
-      : upcomingItems;
+      ? bookingItems.filter(i => !dbDates.has(i.at.slice(0, 10)))
+      : bookingItems;
 
     return [...filteredBookings, ...historicalItems];
   }
