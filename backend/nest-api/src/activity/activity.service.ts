@@ -4,8 +4,6 @@ import { Repository } from 'typeorm';
 import { Pool } from 'pg';
 import { Booking } from '../bookings/entities/booking.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
-import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
-import type { PgmBooking } from '../booking/booking.interfaces';
 import { GYM_DATA_POOL } from './activity.constants';
 
 export type ActivityType = 'class' | 'pt' | 'checkin';
@@ -34,7 +32,6 @@ export class ActivityService {
   constructor(
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
     private readonly pgm: PgmClient,
-    private readonly pgmBooking: PgmBookingAdapter,
     @Inject(GYM_DATA_POOL) private readonly gymPool: Pool,
   ) {}
 
@@ -50,7 +47,7 @@ export class ActivityService {
     today.setHours(0, 0, 0, 0);
 
     const [classes, checkins, ptSessions] = await Promise.allSettled([
-      this.fetchClasses(pgmMemberId, userId, since),
+      this.fetchClasses(pgmMemberId, userId, since, today),
       this.fetchCheckins(pgmMemberId, since, today),
       this.fetchPt(pgmMemberId, since),
     ]);
@@ -72,38 +69,51 @@ export class ActivityService {
     return { summary, items: allItems, errors };
   }
 
-  private async fetchClasses(pgmMemberId: number, userId: string, since: Date): Promise<ActivityItem[]> {
-    // Use historical bookings method which fetches classes in the same date window
-    const [pgmBookings, localBookings] = await Promise.all([
-      this.pgmBooking.listHistoricalBookings(pgmMemberId, since).catch((): PgmBooking[] => []),
+  private async fetchClasses(pgmMemberId: number, userId: string, since: Date, today: Date): Promise<ActivityItem[]> {
+    const [dbResult, upcomingBookings] = await Promise.allSettled([
+      // Historical attended classes (before today) → studio.by_member DB
+      this.gymPool.query(
+        `SELECT class_date, class_name, club FROM studio.by_member
+         WHERE user_number = $1
+         AND class_date >= $2 AND class_date < $3
+         AND has_presence = true
+         ORDER BY class_date DESC LIMIT 300`,
+        [pgmMemberId.toString(), since, today],
+      ),
+      // Today + upcoming → local bookings table
       this.bookingRepo
         .createQueryBuilder('b')
         .where('b.user_id = :userId', { userId })
-        .andWhere('b.status IN (:...statuses)', { statuses: ['confirmed', 'pending', 'waitlist', 'attended', 'pending_verify'] })
-        .andWhere('b.created_at >= :since', { since })
+        .andWhere('b.status IN (:...statuses)', { statuses: ['confirmed', 'pending', 'waitlist', 'pending_verify'] })
+        .andWhere('b.created_at >= :today', { today })
         .orderBy('b.created_at', 'DESC')
-        .limit(200)
+        .limit(50)
         .getMany(),
     ]);
 
-    // Build PGM booking lookup by classId for name/club enrichment
-    const pgmMap = new Map<number, PgmBooking>(pgmBookings.map(b => [b.classId, b]));
+    const historicalItems: ActivityItem[] = dbResult.status === 'fulfilled'
+      ? dbResult.value.rows.map((r: any) => ({
+          id: `class-db-${new Date(r.class_date).toISOString()}-${r.class_name}`,
+          type: 'class' as ActivityType,
+          title: r.class_name ?? 'Class',
+          subtitle: 'Attended',
+          at: new Date(r.class_date).toISOString(),
+          club: r.club ?? null,
+        }))
+      : (this.logger.warn('gym_data studio query failed', (dbResult as PromiseRejectedResult).reason), []);
 
-    return localBookings.map(b => {
-      const pgm = pgmMap.get(b.classId);
-      const statusLabel = b.status === 'attended'       ? 'Attended'
-                        : b.status === 'waitlist'        ? 'Waitlisted'
-                        : b.status === 'pending_verify'  ? 'Verifying'
-                        : 'Upcoming';
-      return {
-        id: `class-${b.id}`,
-        type: 'class' as ActivityType,
-        title: pgm?.className ?? `Class #${b.classId}`,
-        subtitle: statusLabel,
-        at: pgm?.startTime ?? b.createdAt.toISOString(),
-        club: pgm?.clubName ?? null,
-      };
-    });
+    const upcomingItems: ActivityItem[] = upcomingBookings.status === 'fulfilled'
+      ? upcomingBookings.value.map(b => ({
+          id: `class-${b.id}`,
+          type: 'class' as ActivityType,
+          title: `Class #${b.classId}`,
+          subtitle: b.status === 'waitlist' ? 'Waitlisted' : b.status === 'pending_verify' ? 'Verifying' : 'Upcoming',
+          at: b.createdAt.toISOString(),
+          club: null,
+        }))
+      : [];
+
+    return [...upcomingItems, ...historicalItems];
   }
 
   private async fetchCheckins(pgmMemberId: number, since: Date, today: Date): Promise<ActivityItem[]> {
