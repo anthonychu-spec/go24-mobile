@@ -3,12 +3,11 @@ import {
   ActivityIndicator, Alert, Pressable,
   ScrollView, StyleSheet, Text, View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../src/api/client';
-import { colors } from '../../src/theme/colors';
-import { fonts } from '../../src/theme/fonts';
+import { colors, spacing, type as t, radius, shadows } from '../../src/theme';
+import { Avatar, Badge, Button, Card, EmptyState, ListRow, SectionHeader, ScreenWrapper } from '../../src/components';
 import { useAuth } from '../../src/auth/context';
 
 interface ProfileData {
@@ -177,45 +176,45 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <SafeAreaView style={s.safe}>
+    <ScreenWrapper>
       {loading ? (
         <View style={s.center}>
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : error ? (
         <View style={s.center}>
-          <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
-          <Text style={s.errorText}>{error}</Text>
-          <Pressable style={s.retryBtn} onPress={load}>
-            <Text style={s.retryText}>Try Again</Text>
-          </Pressable>
+          <EmptyState
+            icon="cloud-offline-outline"
+            title="Unable to load"
+            subtitle={error}
+            action="Try Again"
+            onAction={load}
+          />
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={s.scroll}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ── Avatar + Name ── */}
-          <View style={s.avatarCard}>
-            <View style={s.avatar}>
-              <Text style={s.avatarText}>{getInitials(data?.member.name ?? null)}</Text>
-            </View>
-            <Text style={s.memberName}>{data?.member.name ?? '—'}</Text>
-            <Text style={s.memberId}>Member #{data?.member.pgmId}</Text>
-            {data?.member.memberCode ? (
-              <View style={s.codeChip}>
-                <Text style={s.codeText}>{data.member.memberCode}</Text>
-              </View>
-            ) : null}
-          </View>
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
-          {/* ── Outstanding Balance (red card) ── */}
+          {/* ── Profile hero ── */}
+          <Card rounded="xl" style={s.profileCard}>
+            <Avatar name={data?.member.name} size="xl" />
+            <Text style={[t.h3, { color: colors.text, marginTop: spacing.md }]}>
+              {data?.member.name ?? '—'}
+            </Text>
+            <Text style={[t.bodySm, { color: colors.textMuted, marginTop: 2 }]}>
+              Member #{data?.member.pgmId}
+            </Text>
+            {data?.member.memberCode && (
+              <Badge label={data.member.memberCode} variant="primary" style={{ marginTop: spacing.sm }} />
+            )}
+          </Card>
+
+          {/* ── Outstanding balance ── */}
           {data && data.balance.outstanding > 0 ? (
             <View style={s.balanceCard}>
               <View style={s.balanceTop}>
                 <View>
-                  <Text style={s.balanceLabel}>Outstanding Balance</Text>
-                  <Text style={s.balanceAmount}>{fmtHkd(data.balance.outstanding)}</Text>
+                  <Text style={[t.labelSm, { color: 'rgba(255,255,255,0.65)' }]}>Outstanding Balance</Text>
+                  <Text style={[t.stat, { color: '#fff', marginTop: 2 }]}>{fmtHkd(data.balance.outstanding)}</Text>
                 </View>
                 <Ionicons name="alert-circle" size={32} color="rgba(255,255,255,0.8)" />
               </View>
@@ -223,237 +222,137 @@ export default function SettingsScreen() {
               {data.balance.invoices.map(inv => (
                 <View key={inv.id} style={s.invoiceRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.invoiceDesc}>{inv.description ?? 'Invoice'}</Text>
-                    {inv.dueDate ? (
-                      <Text style={s.invDue}>Due {fmtDate(inv.dueDate)}</Text>
-                    ) : null}
+                    <Text style={[t.label, { color: '#fff' }]}>{inv.description ?? 'Invoice'}</Text>
+                    {inv.dueDate && (
+                      <Text style={[t.caption, { color: 'rgba(255,255,255,0.6)', marginTop: 2 }]}>
+                        Due {fmtDate(inv.dueDate)}
+                      </Text>
+                    )}
                   </View>
-                  <Text style={s.invoiceAmt}>{fmtHkd(inv.amount)}</Text>
+                  <Text style={[t.bodyBold, { color: '#fff' }]}>{fmtHkd(inv.amount)}</Text>
                 </View>
               ))}
 
-              {data.savedCard ? (
-                <Pressable
-                  style={[s.payBtn, paying && s.payBtnDisabled]}
-                  onPress={handlePayNow}
-                  disabled={paying}
-                >
-                  {paying ? (
-                    <ActivityIndicator color={colors.primary} size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="card-outline" size={18} color={colors.primary} />
-                      <Text style={s.payBtnText}>
-                        Pay Now — ···· {data.savedCard.summary}
-                      </Text>
-                    </>
-                  )}
-                </Pressable>
-              ) : (
-                <Pressable style={s.payBtn} onPress={() => router.push('/payment/update-card')}>
-                  <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-                  <Text style={s.payBtnText}>Add Card to Pay</Text>
-                </Pressable>
-              )}
+              <Button
+                label={data.savedCard
+                  ? `Pay Now — ···· ${data.savedCard.summary}`
+                  : 'Add Card to Pay'}
+                icon={data.savedCard ? 'card-outline' : 'add-circle-outline'}
+                variant="ghost"
+                loading={paying}
+                onPress={data.savedCard ? handlePayNow : () => router.push('/payment/update-card')}
+                style={s.payBtn}
+              />
             </View>
           ) : (
-            <View style={s.clearCard}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={s.clearText}>No outstanding balance</Text>
+            <View style={s.clearRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={[t.label, { color: colors.success }]}>No outstanding balance</Text>
             </View>
           )}
 
-          {/* ── Day Pass (no active membership) ── */}
+          {/* ── Day pass (no membership) ── */}
           {data && !data.hasMembership && (
-            <Pressable style={s.dayPassCard} onPress={handleDayPass}>
+            <Card onPress={handleDayPass} rounded="lg" style={s.dayPassCard}>
               <View style={{ flex: 1 }}>
-                <Text style={s.dayPassTitle}>No active membership</Text>
-                <Text style={s.dayPassSub}>Buy a day pass to enter GO24 today</Text>
-              </View>
-              <View style={s.dayPassBtn}>
-                <Text style={s.dayPassBtnTxt}>HK$150</Text>
-              </View>
-            </Pressable>
-          )}
-
-          {/* ── Account Details ── */}
-          <View style={s.detailsCard}>
-            <Text style={s.detailsTitle}>ACCOUNT DETAILS</Text>
-            {([
-              { icon: 'mail-outline', label: 'Email', value: data?.member.email ?? '—' },
-              { icon: 'call-outline', label: 'Phone', value: data?.member.phone ?? '—' },
-            ] as const).map(item => (
-              <View key={item.label} style={s.detailRow}>
-                <Ionicons name={item.icon} size={16} color={colors.textMuted} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.detailLabel}>{item.label}</Text>
-                  <Text style={s.detailValue}>{item.value}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* ── Saved Card ── */}
-          {data?.savedCard ? (
-            <Pressable style={s.cardRow} onPress={() => router.push('/payment/update-card')}>
-              <Ionicons name="card-outline" size={20} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.detailLabel}>Saved Card</Text>
-                <Text style={s.detailValue}>
-                  {data.savedCard.brand?.toUpperCase() ?? 'CARD'} ···· {data.savedCard.summary}
-                  {data.savedCard.expiryMonth ? `  exp ${data.savedCard.expiryMonth}/${data.savedCard.expiryYear}` : ''}
+                <Text style={[t.bodyBold, { color: colors.amber }]}>No active membership</Text>
+                <Text style={[t.bodySm, { color: colors.amber, marginTop: 2 }]}>
+                  Buy a day pass to enter GO24 today
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.border} />
-            </Pressable>
-          ) : (
-            <Pressable style={s.cardRow} onPress={() => router.push('/payment/update-card')}>
-              <Ionicons name="card-outline" size={20} color={colors.textMuted} />
-              <Text style={[s.detailValue, { flex: 1, color: colors.textMuted }]}>No card saved</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.border} />
-            </Pressable>
+              <View style={s.dayPassPrice}>
+                <Text style={[t.btnMd, { color: '#fff' }]}>HK$150</Text>
+              </View>
+            </Card>
           )}
 
-          {/* ── Links ── */}
-          <View style={s.linksCard}>
-            {LINKS.map((l, i) => (
-              <Pressable
-                key={l.label}
-                style={[s.linkRow, i < LINKS.length - 1 && s.linkDivider]}
-                onPress={() => router.push(l.to as any)}
-              >
-                <View style={[s.linkIconBox, { backgroundColor: l.bg }]}>
-                  <Ionicons name={l.icon} size={18} color={l.color} />
-                </View>
-                <Text style={s.linkLabel}>{l.label}</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.border} />
-              </Pressable>
-            ))}
-          </View>
+          {/* ── Account details ── */}
+          <Card rounded="lg" padding={spacing.base} style={s.detailsSection}>
+            <SectionHeader title="Account Details" style={{ marginBottom: spacing.md }} />
+            <ListRow icon="mail-outline" iconColor={colors.textMuted} iconBg={colors.bg}
+              label="Email" value={data?.member.email ?? '—'} showChevron={false} />
+            <ListRow icon="call-outline" iconColor={colors.textMuted} iconBg={colors.bg}
+              label="Phone" value={data?.member.phone ?? '—'} showChevron={false} divider={false} />
+          </Card>
 
-          {/* ── Logout ── */}
-          <Pressable style={s.logoutBtn} onPress={logout}>
+          {/* ── Saved card ── */}
+          <Card rounded="lg" padding={spacing.base} onPress={() => router.push('/payment/update-card')}>
+            <ListRow
+              icon="card-outline"
+              iconColor={data?.savedCard ? colors.primary : colors.textMuted}
+              iconBg={data?.savedCard ? colors.primaryBg : colors.bg}
+              label={data?.savedCard
+                ? `${data.savedCard.brand?.toUpperCase() ?? 'CARD'} ···· ${data.savedCard.summary}`
+                : 'No card saved'}
+              sublabel={data?.savedCard?.expiryMonth
+                ? `Exp ${data.savedCard.expiryMonth}/${data.savedCard.expiryYear}`
+                : 'Tap to add a payment card'}
+              divider={false}
+            />
+          </Card>
+
+          {/* ── Navigation links ── */}
+          <Card rounded="xl" padding={0} style={s.linksCard}>
+            {LINKS.map((l, i) => (
+              <ListRow
+                key={l.label}
+                icon={l.icon}
+                iconColor={l.color}
+                iconBg={l.bg}
+                label={l.label}
+                onPress={() => router.push(l.to as any)}
+                divider={i < LINKS.length - 1}
+                style={s.linkRow}
+              />
+            ))}
+          </Card>
+
+          {/* ── Logout — spatially separated (P9 destructive-nav-separation) ── */}
+          <Pressable style={s.logoutRow} onPress={logout} hitSlop={8}>
             <Ionicons name="log-out-outline" size={18} color={colors.error} />
-            <Text style={s.logoutText}>Log Out</Text>
+            <Text style={[t.label, { color: colors.error }]}>Log Out</Text>
           </Pressable>
+
         </ScrollView>
       )}
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
-const SHADOW = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.07,
-  shadowRadius: 8,
-  elevation: 3,
-} as const;
-
 const s = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  scroll: { padding: 16, paddingBottom: 48, gap: 12 },
+  center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scroll:      { padding: spacing.base, paddingBottom: spacing['3xl'], gap: spacing.md },
 
-  avatarCard: {
-    backgroundColor: colors.card, borderRadius: 20,
-    paddingVertical: 28, alignItems: 'center', gap: 6, ...SHADOW,
-  },
-  avatar: {
-    width: 76, height: 76, borderRadius: 38,
-    backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
-  },
-  avatarText: { fontSize: 30, fontFamily: fonts.black, color: '#fff' },
-  memberName: { fontSize: 20, fontFamily: fonts.bold, color: colors.text },
-  memberId:   { fontSize: 13, fontFamily: fonts.regular, color: colors.textMuted },
-  codeChip: {
-    backgroundColor: colors.primary + '12', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 5, marginTop: 4,
-  },
-  codeText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.primary },
+  profileCard: { alignItems: 'center', paddingVertical: spacing.xl },
 
   balanceCard: {
-    backgroundColor: colors.primary, borderRadius: 18,
-    padding: 20, gap: 10, ...SHADOW,
+    backgroundColor: colors.primary, borderRadius: radius.xl,
+    padding: spacing.lg, gap: spacing.sm, ...shadows.card,
   },
-  balanceTop:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  balanceLabel: { fontSize: 12, fontFamily: fonts.semibold, color: 'rgba(255,255,255,0.65)', letterSpacing: 0.5 },
-  balanceAmount:{ fontSize: 34, fontFamily: fonts.black, color: '#fff', marginTop: 2 },
+  balanceTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   invoiceRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
   },
-  invoiceDesc: { fontSize: 13, fontFamily: fonts.semibold, color: '#fff' },
-  invDue:      { fontSize: 11, fontFamily: fonts.regular, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
-  invoiceAmt:  { fontSize: 14, fontFamily: fonts.black, color: '#fff' },
-  payBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#fff', borderRadius: 12,
-    paddingVertical: 15, paddingHorizontal: 20, marginTop: 4,
-  },
-  payBtnDisabled: { opacity: 0.6 },
-  payBtnText: { fontSize: 15, fontFamily: fonts.bold, color: colors.primary },
+  payBtn:     { backgroundColor: '#fff', borderRadius: radius.md, marginTop: spacing.xs },
 
-  clearCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: colors.success + '15', borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 13,
-  },
-  clearText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.success },
-
-  dayPassCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.amberBg, borderRadius: 14,
-    padding: 16, borderWidth: 1, borderColor: colors.amber + '40',
-  },
-  dayPassTitle: { fontSize: 14, fontFamily: fonts.bold, color: colors.amber },
-  dayPassSub:   { fontSize: 12, fontFamily: fonts.regular, color: colors.amber, marginTop: 2 },
-  dayPassBtn:   { backgroundColor: colors.amber, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  dayPassBtnTxt:{ fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
-
-  detailsCard: {
-    backgroundColor: colors.card, borderRadius: 16, padding: 16, gap: 14, ...SHADOW,
-  },
-  detailsTitle: {
-    fontSize: 11, fontFamily: fonts.bold, color: colors.textMuted,
-    letterSpacing: 1.2, marginBottom: 2,
-  },
-  detailRow:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  detailLabel: { fontSize: 11, fontFamily: fonts.regular, color: colors.textMuted },
-  detailValue: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text, marginTop: 2 },
-
-  cardRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.card, borderRadius: 14, padding: 16, ...SHADOW,
+  clearRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.success + '15', borderRadius: radius.md,
+    paddingHorizontal: spacing.base, paddingVertical: spacing.md,
   },
 
-  linksCard: {
-    backgroundColor: colors.card, borderRadius: 16, overflow: 'hidden', ...SHADOW,
-  },
-  linkRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingHorizontal: 16, paddingVertical: 15,
-  },
-  linkDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  linkIconBox: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: colors.primary + '10',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  linkLabel: { flex: 1, fontSize: 15, fontFamily: fonts.regular, color: colors.text },
+  dayPassCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.amberBg },
+  dayPassPrice: { backgroundColor: colors.amber, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
 
-  logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 16,
-  },
-  logoutText: { fontSize: 15, fontFamily: fonts.semibold, color: colors.error },
+  detailsSection: { gap: 0 },
 
-  errorText: { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted },
-  retryBtn:  {
-    borderWidth: 1, borderColor: colors.primary, borderRadius: 20,
-    paddingHorizontal: 24, paddingVertical: 10,
+  linksCard: { overflow: 'hidden' },
+  linkRow:   { paddingHorizontal: spacing.base },
+
+  logoutRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, paddingVertical: spacing.base, marginTop: spacing.sm,
   },
-  retryText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
 });

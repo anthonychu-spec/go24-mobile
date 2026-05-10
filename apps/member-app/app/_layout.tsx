@@ -28,7 +28,7 @@ function RouteGuard() {
       const url: string = (response.notification.request.content.data as any)?.url ?? '';
       if (!url || !user) return;
       if (url.includes('profile') || url === 'go24://profile') {
-        router.push('/profile' as any);
+        router.push('/(tabs)/settings' as any);
       } else if (url.includes('home') || url === 'go24://home') {
         router.push('/(tabs)' as any);
       }

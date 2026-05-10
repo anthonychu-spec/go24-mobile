@@ -18,12 +18,13 @@ interface BadgeProps {
   variant?: BadgeVariant;
   dot?: boolean;
   icon?: React.ComponentProps<typeof Ionicons>['name'];
+  style?: any;
 }
 
-export function Badge({ label, variant = 'neutral', dot = false, icon }: BadgeProps) {
+export function Badge({ label, variant = 'neutral', dot = false, icon, style }: BadgeProps) {
   const c = VARIANT_COLORS[variant];
   return (
-    <View style={[s.wrap, { backgroundColor: c.bg }]}>
+    <View style={[s.wrap, { backgroundColor: c.bg }, style]}>
       {dot && <View style={[s.dot, { backgroundColor: c.dot }]} />}
       {icon && <Ionicons name={icon} size={11} color={c.text} />}
       <Text style={[s.text, { color: c.text }]}>{label}</Text>

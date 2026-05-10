@@ -13,6 +13,7 @@ interface ButtonProps extends Omit<PressableProps, 'style'> {
   icon?: React.ComponentProps<typeof Ionicons>['name'];
   iconPosition?: 'left' | 'right';
   fullWidth?: boolean;
+  style?: any;
 }
 
 const HEIGHT: Record<Size, number> = { sm: 36, md: 44, lg: 54 };
@@ -28,6 +29,7 @@ export function Button({
   iconPosition = 'left',
   fullWidth = false,
   disabled,
+  style,
   ...rest
 }: ButtonProps) {
   const isDisabled = disabled || loading;
@@ -41,6 +43,7 @@ export function Button({
     variant === 'danger'    && s.danger,
     fullWidth && s.fullWidth,
     isDisabled && s.disabled,
+    style,
   ] as any[];
 
   const textStyle = [

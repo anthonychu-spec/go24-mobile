@@ -13,6 +13,7 @@ interface ListRowProps {
   showChevron?: boolean;
   rightElement?: React.ReactNode;
   divider?: boolean;
+  style?: any;
 }
 
 export function ListRow({
@@ -26,9 +27,10 @@ export function ListRow({
   showChevron = true,
   rightElement,
   divider = true,
+  style,
 }: ListRowProps) {
   const content = (
-    <View style={[s.row, divider && s.divider]}>
+    <View style={[s.row, divider && s.divider, style]}>
       {/* Icon */}
       <View style={[s.iconBox, { backgroundColor: iconBg }]}>
         <Ionicons name={icon} size={18} color={iconColor} />
