@@ -295,7 +295,7 @@ export class DashboardService {
     try {
       const [contractRes, plansRes] = await Promise.allSettled([
         this.pgm.get<{ value: any[] }>('/odata/Contracts', {
-          $filter: `memberId eq ${pgmMemberId} and isActive eq true and isDeleted eq false`,
+          $filter: `memberId eq ${pgmMemberId} and isDeleted eq false and endDate ge datetime'${new Date().toISOString().slice(0, 10)}T00:00:00'`,
           $orderby: 'endDate desc',
           $select: 'id,paymentPlanId,endDate',
           $top: 1,
