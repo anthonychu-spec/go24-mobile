@@ -9,8 +9,12 @@ export class SignupCompleteDto {
   lastName!: string;
   email!: string;
   phone!: string;
-  dateOfBirth!: string;   // YYYY-MM-DD
+  dateOfBirth!: string;
+  sex!: string;
+  address!: string;
+  clubId!: number;
   planId!: number;
+  amountHkd!: number;
   facePhotoB64!: string;
   adyenPspReference!: string;
 }

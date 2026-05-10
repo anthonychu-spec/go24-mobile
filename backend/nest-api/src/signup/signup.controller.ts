@@ -19,6 +19,12 @@ export class SignupController {
     return this.svc.getPlans();
   }
 
+  @ApiOperation({ summary: 'List clubs (public)' })
+  @Get('public/clubs')
+  getClubs() {
+    return this.svc.getClubs();
+  }
+
   @ApiOperation({ summary: 'Create Adyen session for signup payment (public)' })
   @Post('public/signup/session')
   @HttpCode(200)

@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform,
-  Pressable, StatusBar, StyleSheet, Text, TextInput, View,
+  KeyboardAvoidingView, Platform,
+  Pressable, ScrollView, StatusBar, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/context';
 import { t } from '../../src/i18n';
-import { colors } from '../../src/theme/colors';
-import { fonts } from '../../src/theme/fonts';
+import { colors, fonts, spacing, type as ty, radius, shadows } from '../../src/theme';
+import { Button, Input } from '../../src/components';
 
 function mapError(err: unknown): string {
   const msg: string = (err as any)?.response?.data?.message ?? '';
@@ -23,10 +24,10 @@ function mapError(err: unknown): string {
 export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]       = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
@@ -46,172 +47,248 @@ export default function LoginScreen() {
     <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
 
-      {/* Brand hero — deep red */}
-      <View style={s.hero}>
+      {/* ── Brand hero with gradient ── */}
+      <LinearGradient
+        colors={[colors.primary, colors.primaryMid, colors.primaryDark]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.hero}
+      >
         <SafeAreaView edges={['top']}>
           <View style={s.heroContent}>
+            {/* Decorative geometric lines */}
+            <View style={s.heroDecor}>
+              <View style={[s.decorLine, s.decorLine1]} />
+              <View style={[s.decorLine, s.decorLine2]} />
+              <View style={[s.decorLine, s.decorLine3]} />
+            </View>
+
             <View style={s.logoRow}>
               <View style={s.logoSymbol}>
-                <Ionicons name="fitness" size={28} color="#fff" />
+                <Ionicons name="fitness" size={30} color="#fff" />
               </View>
               <View>
                 <Text style={s.logoWordmark}>GO24</Text>
                 <Text style={s.logoSub}>FITNESS</Text>
               </View>
             </View>
+
             <Text style={s.heroTagline}>Move. Train. Perform.</Text>
+            <Text style={s.heroDesc}>
+              Your premium fitness experience starts here
+            </Text>
           </View>
         </SafeAreaView>
-      </View>
+      </LinearGradient>
 
-      {/* Form panel — white */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.panel}>
-        <Text style={s.panelTitle}>Welcome back</Text>
-        <Text style={s.panelSub}>Sign in to your GO24 account</Text>
+      {/* ── White form panel ── */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={s.panel}
+      >
+        <ScrollView
+          contentContainerStyle={s.panelScroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <Text style={s.panelTitle}>{t.login.title}</Text>
+          <Text style={s.panelSub}>{t.login.subtitle}</Text>
 
-        <View style={s.fields}>
-          {/* Email */}
-          <View style={s.field}>
-            <Text style={s.label}>{t.login.emailLabel}</Text>
-            <View style={s.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color={colors.textMuted} style={s.inputIcon} />
-              <TextInput
-                style={s.input}
-                value={email}
-                onChangeText={setEmail}
-                placeholder={t.login.emailPlaceholder}
-                placeholderTextColor={colors.textMuted}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                editable={!submitting}
-              />
-            </View>
+          <View style={s.fields}>
+            <Input
+              label={t.login.emailLabel}
+              icon="mail-outline"
+              value={email}
+              onChangeText={setEmail}
+              placeholder={t.login.emailPlaceholder}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect={false}
+              editable={!submitting}
+            />
+
+            <Input
+              label={t.login.passwordLabel}
+              icon="lock-closed-outline"
+              value={password}
+              onChangeText={setPassword}
+              placeholder={t.login.passwordPlaceholder}
+              secureTextEntry={!showPass}
+              autoComplete="current-password"
+              editable={!submitting}
+              onSubmitEditing={handleSubmit}
+              returnKeyType="go"
+              error={error || undefined}
+              rightElement={
+                <Pressable onPress={() => setShowPass(p => !p)} hitSlop={8}>
+                  <Ionicons
+                    name={showPass ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              }
+            />
+
+            <Pressable style={s.forgotBtn}>
+              <Text style={s.forgotText}>{t.login.forgotPassword}</Text>
+            </Pressable>
+
+            <Button
+              label={t.login.submit}
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              onPress={handleSubmit}
+            />
           </View>
 
-          {/* Password */}
-          <View style={s.field}>
-            <Text style={s.label}>{t.login.passwordLabel}</Text>
-            <View style={s.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={s.inputIcon} />
-              <TextInput
-                style={[s.input, { flex: 1 }]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder={t.login.passwordPlaceholder}
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry={!showPass}
-                autoComplete="current-password"
-                editable={!submitting}
-                onSubmitEditing={handleSubmit}
-                returnKeyType="go"
-              />
-              <Pressable onPress={() => setShowPass(p => !p)} hitSlop={8}>
-                <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textMuted} />
-              </Pressable>
+          {/* ── Footer ── */}
+          <View style={s.footer}>
+            <View style={s.dividerRow}>
+              <View style={s.dividerLine} />
+              <Text style={s.dividerText}>or</Text>
+              <View style={s.dividerLine} />
             </View>
+
+            <Pressable
+              style={({ pressed }) => [s.joinBtn, pressed && s.joinPressed]}
+              onPress={() => router.push('/(auth)/landing' as any)}
+            >
+              <Text style={s.joinText}>{t.login.newToGo24} </Text>
+              <Text style={s.joinTextBold}>{t.login.joinNow}</Text>
+              <Ionicons name="arrow-forward" size={15} color={colors.primary} style={{ marginLeft: 4 }} />
+            </Pressable>
           </View>
-
-          {error ? (
-            <View style={s.errorRow}>
-              <Ionicons name="alert-circle-outline" size={14} color={colors.error} />
-              <Text style={s.errorText}>{error}</Text>
-            </View>
-          ) : null}
-
-          <Pressable
-            style={[s.signInBtn, submitting && s.signInBtnOff]}
-            onPress={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={s.signInText}>{t.login.submit}</Text>
-            }
-          </Pressable>
-
-          <Pressable style={s.forgotBtn}>
-            <Text style={s.forgotText}>{t.login.forgotPassword}</Text>
-          </Pressable>
-
-          {/* Divider */}
-          <View style={s.dividerRow}>
-            <View style={s.dividerLine} />
-            <Text style={s.dividerText}>or</Text>
-            <View style={s.dividerLine} />
-          </View>
-
-          {/* Join GO24 */}
-          <Pressable style={s.joinBtn} onPress={() => router.push('/signup' as any)}>
-            <Text style={s.joinText}>Not a member? </Text>
-            <Text style={s.joinTextBold}>Join GO24 →</Text>
-          </Pressable>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root:  { flex: 1, backgroundColor: colors.primary },
+const PANEL_RADIUS = radius['2xl'] + 4;
 
-  hero:  { backgroundColor: colors.primary },
-  heroContent: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 32 },
-  logoRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.primary },
+
+  // ── Hero ──
+  hero: { paddingBottom: PANEL_RADIUS + spacing.md },
+  heroContent: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing['2xl'],
+    paddingBottom: spacing.xl,
+  },
+  heroDecor: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+    opacity: 0.08,
+  },
+  decorLine: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    borderRadius: 2,
+  },
+  decorLine1: {
+    width: 180, height: 3,
+    top: 30, right: -40,
+    transform: [{ rotate: '-25deg' }],
+  },
+  decorLine2: {
+    width: 120, height: 2,
+    top: 80, right: 10,
+    transform: [{ rotate: '-25deg' }],
+  },
+  decorLine3: {
+    width: 90, height: 2,
+    top: 60, right: -10,
+    transform: [{ rotate: '-25deg' }],
+  },
+
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
   logoSymbol: {
-    width: 48, height: 48, borderRadius: 14,
+    width: 54, height: 54, borderRadius: radius.lg,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
   },
-  logoWordmark: { fontSize: 26, fontFamily: fonts.black, color: '#fff', letterSpacing: 3 },
-  logoSub:      { fontSize: 9,  fontFamily: fonts.bold,  color: 'rgba(255,255,255,0.6)', letterSpacing: 3, marginTop: -2 },
-  heroTagline:  { fontSize: 14, fontFamily: fonts.regular, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.5 },
+  logoWordmark: {
+    fontSize: 30, fontFamily: fonts.black, color: '#fff',
+    letterSpacing: 4,
+  },
+  logoSub: {
+    fontSize: 10, fontFamily: fonts.bold,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 4, marginTop: -1,
+  },
+  heroTagline: {
+    fontSize: 22, fontFamily: fonts.black, color: '#fff',
+    letterSpacing: 0.3,
+    marginBottom: spacing.xs,
+  },
+  heroDesc: {
+    ...ty.body, color: 'rgba(255,255,255,0.65)',
+    letterSpacing: 0.2,
+  },
 
+  // ── Form panel ──
   panel: {
-    flex: 1, backgroundColor: '#fff',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 24, paddingTop: 28,
+    flex: 1, backgroundColor: colors.card,
+    borderTopLeftRadius: PANEL_RADIUS,
+    borderTopRightRadius: PANEL_RADIUS,
+    marginTop: -PANEL_RADIUS,
   },
-  panelTitle: { fontSize: 22, fontFamily: fonts.black, color: colors.text },
-  panelSub:   { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 4, marginBottom: 24 },
-
-  fields: { gap: 16 },
-  field:  { gap: 6 },
-  label:  { fontSize: 12, fontFamily: fonts.semibold, color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
-
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.bg, borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
-    paddingHorizontal: 14, height: 50,
+  panelScroll: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing['2xl'],
+    paddingBottom: spacing['3xl'],
   },
-  inputIcon: { marginRight: 10 },
-  input: {
-    flex: 1, fontSize: 15, fontFamily: fonts.regular,
-    color: colors.text, padding: 0,
+  panelTitle: {
+    ...ty.h2, color: colors.text,
+  },
+  panelSub: {
+    ...ty.body, color: colors.textMuted,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xl,
   },
 
-  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  errorText: { fontSize: 13, fontFamily: fonts.regular, color: colors.error },
+  fields: { gap: spacing.base },
 
-  signInBtn: {
-    backgroundColor: colors.primary, borderRadius: 14,
-    height: 52, alignItems: 'center', justifyContent: 'center',
-    marginTop: 4,
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
   },
-  signInBtnOff: { opacity: 0.7 },
-  signInText:   { fontSize: 16, fontFamily: fonts.bold, color: '#fff', letterSpacing: 0.5 },
+  forgotText: {
+    ...ty.bodySm, color: colors.primary,
+  },
 
-  forgotBtn:  { alignItems: 'center', paddingVertical: 8 },
-  forgotText: { fontSize: 14, fontFamily: fonts.regular, color: colors.primary },
+  // ── Footer ──
+  footer: {
+    marginTop: spacing['2xl'],
+    gap: spacing.lg,
+  },
+  dividerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+  },
+  dividerLine: {
+    flex: 1, height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+  },
+  dividerText: { ...ty.caption, color: colors.textMuted },
 
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dividerLine:{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  dividerText:{ fontSize: 12, color: colors.textMuted, fontFamily: fonts.regular },
-
-  joinBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 4 },
-  joinText:     { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted },
-  joinTextBold: { fontSize: 14, fontFamily: fonts.bold,    color: colors.primary   },
+  joinBtn: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    paddingVertical: spacing.md,
+    backgroundColor: colors.primaryBg,
+    borderRadius: radius.md,
+  },
+  joinPressed: { opacity: 0.8 },
+  joinText: { ...ty.body, color: colors.textSecond },
+  joinTextBold: { ...ty.bodyBold, color: colors.primary },
 });

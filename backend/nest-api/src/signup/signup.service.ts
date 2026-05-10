@@ -25,17 +25,35 @@ export class SignupService {
 
   // ── Public plans (no auth) ────────────────────────────────────────────────
 
-  async getPlans(): Promise<Array<{ id: number; name: string; priceHkd: number; description: string | null }>> {
+  async getClubs(): Promise<Array<{ id: number; name: string }>> {
+    try {
+      const res = await this.pgm.get<{ value: any[] }>('/odata/Clubs', {
+        $select: 'id,name',
+      });
+      return (res.value ?? [])
+        .filter((c: any) => !c.name?.includes('_'))
+        .map((c: any) => ({ id: c.id, name: c.name }));
+    } catch (e) {
+      this.logger.error('Failed to fetch clubs', e);
+      return [];
+    }
+  }
+
+  async getPlans(): Promise<Array<{
+    id: number; name: string; membershipFee: number;
+    joiningFee: number; adminFee: number; description: string | null;
+  }>> {
     try {
       const res = await this.pgm.get<{ value: any[] }>('/odata/PaymentPlans', {
-        $select: 'id,name,monthlyFee,description',
-        $filter: 'isDeleted eq false',
+        $filter: 'isDeleted eq false and isActive eq true',
       });
       return (res.value ?? []).map((p: any) => ({
-        id:          p.id,
-        name:        p.name ?? 'Plan',
-        priceHkd:    p.monthlyFee ?? 0,
-        description: p.description ?? null,
+        id:            p.id,
+        name:          p.name ?? 'Plan',
+        membershipFee: p.membershipFee?.gross ?? 0,
+        joiningFee:    p.joiningFee?.gross ?? 0,
+        adminFee:      p.adminFee?.gross ?? 0,
+        description:   null,
       }));
     } catch (e) {
       this.logger.error('Failed to fetch plans from PGM', e);
@@ -65,49 +83,82 @@ export class SignupService {
   // ── Complete signup after payment ─────────────────────────────────────────
 
   async completeSignup(dto: SignupCompleteDto): Promise<IssueTokenResult> {
-    // 1. Create member in PGM
-    let pgmMember: any;
+    // 1. Create member in PGM via CQRS command (v2.1)
+    let pgmMemberId: number;
     try {
-      pgmMember = await this.pgm.post<any>('/odata/Members', {
-        firstName:   dto.firstName,
-        lastName:    dto.lastName,
-        email:       dto.email,
-        phone:       dto.phone,
-        dateOfBirth: dto.dateOfBirth,
-      });
+      const res = await this.pgm.post<{ memberId: number }>(
+        '../v2.1/Members/AddGuestMember',
+        {
+          homeClubId: dto.clubId,
+          personalData: {
+            firstName:   dto.firstName,
+            lastName:    dto.lastName,
+            sex:         dto.sex || 'NotSpecified',
+            phoneNumber: dto.phone,
+            email:       dto.email,
+          },
+          addressData: {
+            street: dto.address || '',
+          },
+        },
+      );
+      pgmMemberId = res.memberId;
+      this.logger.log(`PGM member created: ${pgmMemberId}`);
     } catch (e) {
-      this.logger.error('PGM member creation failed', e);
+      this.logger.error('PGM AddGuestMember failed', e);
       throw new BadRequestException('Could not create membership. Please contact staff.');
     }
 
-    if (!pgmMember?.id) {
-      throw new BadRequestException('PGM did not return a member ID.');
-    }
-
-    // 2. Create PGM contract (non-fatal if fails)
+    // 2. Create contract in PGM (v2.2)
+    let contractId: number | null = null;
     try {
-      await this.pgm.post('/odata/Contracts', {
-        memberId:      pgmMember.id,
-        paymentPlanId: dto.planId,
-        startDate:     new Date().toISOString().slice(0, 10),
-      });
+      const contractRes = await this.pgm.post<{ contractId?: number; id?: number }>(
+        '/Contracts/AddContract',
+        {
+          memberId:      pgmMemberId,
+          paymentPlanId: dto.planId,
+          startDate:     new Date().toISOString().slice(0, 10),
+        },
+      );
+      contractId = contractRes.contractId ?? contractRes.id ?? null;
+      this.logger.log(`PGM contract created: ${contractId}`);
     } catch (e) {
-      this.logger.error('PGM contract creation failed — member exists but no contract', e);
+      this.logger.error('PGM AddContract failed — member exists but no contract', e);
     }
 
-    // 3. Create user in our DB
+    // 3. Settle payment in PGM (v2.2)
+    if (contractId) {
+      try {
+        await this.pgm.post('/Transactions/AddContractPayment', {
+          vatRateId:       3,
+          clubId:          dto.clubId,
+          paymentType:     'Online',
+          memberId:        pgmMemberId,
+          contractId,
+          amountGross:     dto.amountHkd ?? 0,
+          description:     "go24fitness-hk-Membership Fee, e-provider='Adyen'",
+          systemType:      'Membership',
+          transactionDate: new Date().toISOString().replace('Z', '+08:00'),
+        });
+        this.logger.log(`PGM payment settled for contract ${contractId}`);
+      } catch (e) {
+        this.logger.error('PGM AddContractPayment failed — contract exists but payment not settled', e);
+      }
+    }
+
+    // 4. Create user in our DB
     const user = await this.auth.createUser({
-      pgmMemberId: pgmMember.id,
-      email:       dto.email,
-      phone:       dto.phone,
+      pgmMemberId,
+      email: dto.email,
+      phone: dto.phone,
     });
 
-    // 4. Submit face to Suprema (async, non-blocking)
-    this.submitFaceToSuprema(user.id, pgmMember.id, dto.facePhotoB64).catch(e =>
+    // 5. Submit face to Suprema (async, non-blocking)
+    this.submitFaceToSuprema(user.id, pgmMemberId, dto.facePhotoB64).catch(e =>
       this.logger.error('Suprema face submission failed', e),
     );
 
-    // 5. Welcome push
+    // 6. Welcome push
     await this.notifications.sendDirectPush(
       user.id,
       '🎉 Welcome to GO24!',
@@ -115,7 +166,7 @@ export class SignupService {
       { type: 'welcome', url: 'go24://home' },
     ).catch(() => {});
 
-    // 6. Issue JWT
+    // 7. Issue JWT
     return this.auth.issueTokensForNewUser(user);
   }
 

@@ -8,15 +8,23 @@ export interface SignupData {
   email: string;
   phone: string;
   dateOfBirth: string;
+  sex: string;
+  address: string;
+  clubId: number;
+  clubName: string;
   planId: number;
   planName: string;
   planPriceHkd: number;
+  joiningFee: number;
+  adminFee: number;
   facePhotoB64: string;
 }
 
 const defaultData: SignupData = {
   firstName: '', lastName: '', email: '', phone: '', dateOfBirth: '',
-  planId: 0, planName: '', planPriceHkd: 0, facePhotoB64: '',
+  sex: '', address: '', clubId: 0, clubName: '',
+  planId: 0, planName: '', planPriceHkd: 0, joiningFee: 0, adminFee: 0,
+  facePhotoB64: '',
 };
 
 interface SignupCtx { data: SignupData; update: (patch: Partial<SignupData>) => void }
