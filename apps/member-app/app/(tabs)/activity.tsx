@@ -36,10 +36,21 @@ interface ActivityResponse {
   errors?: string[];
 }
 
-const TYPE_ICON: Record<ActivityType, string> = {
-  class:   '🏋️',
-  pt:      '💪',
-  checkin: '🚪',
+// Ionicons — no emoji structural icons (ui-ux-pro-max: no-emoji-icons)
+const TYPE_ICON: Record<ActivityType, React.ComponentProps<typeof Ionicons>['name']> = {
+  class:   'barbell-outline',
+  pt:      'fitness-outline',
+  checkin: 'walk-outline',
+};
+const TYPE_COLOR: Record<ActivityType, string> = {
+  class:   colors.indigo,
+  pt:      colors.teal,
+  checkin: colors.primary,
+};
+const TYPE_BG: Record<ActivityType, string> = {
+  class:   colors.indigoBg,
+  pt:      colors.tealBg,
+  checkin: colors.primaryBg,
 };
 
 const TYPE_LABEL: Record<ActivityType, string> = {
@@ -91,7 +102,7 @@ function ClassTypeSummary({ items }: { items: ActivityItem[] }) {
 
 function ClubSummary({ items }: { items: ActivityItem[] }) {
   const counts = new Map<string, number>();
-  for (const item of items.filter(i => i.type === 'checkin' && item.club)) {
+  for (const item of items.filter((i: ActivityItem) => i.type === 'checkin' && i.club)) {
     counts.set(item.club!, (counts.get(item.club!) ?? 0) + 1);
   }
   const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -105,7 +116,7 @@ function ClubSummary({ items }: { items: ActivityItem[] }) {
         <View key={club} style={s.typeRow}>
           <Text style={s.typeName} numberOfLines={1}>{club}</Text>
           <View style={s.typeBarWrap}>
-            <View style={[s.typeBar, { width: `${(count / max) * 100}%` as any, backgroundColor: colors.teal ?? colors.primary }]} />
+            <View style={[s.typeBar, { width: `${(count / max) * 100}%` as any, backgroundColor: colors.teal }]} />
           </View>
           <Text style={s.typeCount}>{count}</Text>
         </View>
@@ -119,24 +130,28 @@ function SummaryCard({ summary }: { summary: Summary }) {
     <View style={s.summaryCard}>
       <View style={s.summaryRow}>
         <View style={s.summaryItem}>
-          <Text style={s.summaryNum}>{summary.thisMonth.checkins}</Text>
-          <Text style={s.summaryLabel}>Check-ins 🚪</Text>
+          <Ionicons name="walk-outline" size={14} color={colors.primary} style={{ marginBottom: 2 }} />
+          <Text style={[s.summaryNum, { color: colors.primary }]}>{summary.thisMonth.checkins}</Text>
+          <Text style={s.summaryLabel}>Check-ins</Text>
         </View>
         <View style={s.summaryDivider} />
         <View style={s.summaryItem}>
-          <Text style={s.summaryNum}>{summary.thisMonth.classes}</Text>
-          <Text style={s.summaryLabel}>Classes 🏋️</Text>
+          <Ionicons name="barbell-outline" size={14} color={colors.indigo} style={{ marginBottom: 2 }} />
+          <Text style={[s.summaryNum, { color: colors.indigo }]}>{summary.thisMonth.classes}</Text>
+          <Text style={s.summaryLabel}>Classes</Text>
         </View>
         <View style={s.summaryDivider} />
         <View style={s.summaryItem}>
-          <Text style={s.summaryNum}>{summary.thisMonth.pt}</Text>
-          <Text style={s.summaryLabel}>PT Sessions 💪</Text>
+          <Ionicons name="fitness-outline" size={14} color={colors.teal} style={{ marginBottom: 2 }} />
+          <Text style={[s.summaryNum, { color: colors.teal }]}>{summary.thisMonth.pt}</Text>
+          <Text style={s.summaryLabel}>PT Sessions</Text>
         </View>
       </View>
 
       {summary.streakDays > 0 && (
         <View style={s.streakBar}>
-          <Text style={s.streakText}>🔥 {summary.streakDays}-day streak</Text>
+          <Ionicons name="flame" size={14} color={colors.cta} />
+          <Text style={s.streakText}>{summary.streakDays}-day streak</Text>
         </View>
       )}
 
@@ -152,8 +167,8 @@ function SummaryCard({ summary }: { summary: Summary }) {
 function ActivityCard({ item }: { item: ActivityItem }) {
   return (
     <View style={s.card}>
-      <View style={s.cardIcon}>
-        <Text style={s.icon}>{TYPE_ICON[item.type]}</Text>
+      <View style={[s.cardIcon, { backgroundColor: TYPE_BG[item.type] }]}>
+        <Ionicons name={TYPE_ICON[item.type]} size={18} color={TYPE_COLOR[item.type]} />
       </View>
       <View style={s.cardBody}>
         <Text style={s.cardTitle}>{item.title}</Text>
@@ -352,10 +367,11 @@ const s = StyleSheet.create({
   summaryLabel: { fontSize: 11, fontFamily: fonts.semibold, color: colors.textMuted, textAlign: 'center' },
   summaryDivider: { width: StyleSheet.hairlineWidth, height: 40, backgroundColor: colors.border },
   streakBar: {
-    backgroundColor: '#FFF5F5', borderRadius: 8,
-    paddingVertical: 8, alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: colors.ctaBg, borderRadius: 8,
+    paddingVertical: 8,
   },
-  streakText:   { color: colors.primary, fontFamily: fonts.bold, fontSize: 14 },
+  streakText: { color: colors.cta, fontFamily: fonts.bold, fontSize: 14 },
   totalRow:     { alignItems: 'center' },
   totalText:    { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted },
 

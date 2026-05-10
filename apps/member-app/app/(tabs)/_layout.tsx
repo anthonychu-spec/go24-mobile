@@ -49,6 +49,10 @@ export default function TabLayout() {
         name="pt"
         options={{ title: 'PT', tabBarIcon: icon('barbell', 'barbell-outline') }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{ title: 'Settings', tabBarIcon: icon('settings', 'settings-outline') }}
+      />
       {/* Hidden tabs — still routable but not shown in tab bar */}
       <Tabs.Screen name="bookings"      options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />

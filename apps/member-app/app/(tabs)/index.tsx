@@ -290,10 +290,11 @@ const ag = StyleSheet.create({
 // ─── Actions data ─────────────────────────────────────────────────────────────
 
 const ACTIONS = [
-  { icon:'calendar' as const, label:'Book a Class', to:'/(tabs)/classes',  color:colors.blue,   bg:colors.blueBg   },
-  { icon:'bookmark' as const, label:'My Bookings',  to:'/(tabs)/bookings', color:colors.indigo, bg:colors.indigoBg },
-  { icon:'barbell'  as const, label:'PT Sessions',  to:'/(tabs)/pt',       color:colors.teal,   bg:colors.tealBg   },
-  { icon:'pulse'    as const, label:'Activity Log', to:'/(tabs)/activity', color:colors.green,  bg:colors.greenBg  },
+  { icon:'calendar'    as const, label:'Book a Class', to:'/(tabs)/classes',  color:colors.blue,   bg:colors.blueBg   },
+  { icon:'bookmark'    as const, label:'My Bookings',  to:'/(tabs)/bookings', color:colors.indigo, bg:colors.indigoBg },
+  { icon:'barbell'     as const, label:'PT Sessions',  to:'/(tabs)/pt',       color:colors.teal,   bg:colors.tealBg   },
+  { icon:'pulse'       as const, label:'Activity Log', to:'/(tabs)/activity', color:colors.green,  bg:colors.greenBg  },
+  { icon:'qr-code'     as const, label:'QR Check-in',  to:'/checkin/qr',      color:colors.amber,  bg:colors.amberBg  },
 ];
 
 // ─── 互動 HUB ─────────────────────────────────────────────────────────────────
@@ -633,7 +634,7 @@ export default function HomeScreen() {
 
       {/* ── Header ── */}
       <View style={s.header}>
-        <Pressable onPress={() => router.push('/profile')} hitSlop={10}>
+        <Pressable onPress={() => router.push('/(tabs)/settings')} hitSlop={10}>
           <View style={s.avatar}>
             <Text style={s.avatarTxt}>{initials(name)}</Text>
           </View>
@@ -657,14 +658,14 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Membership card */}
-        <MemberCard m={m} pt={pt} name={name} memberCode={memberCode} onPress={() => router.push('/profile')} />
+        <MemberCard m={m} pt={pt} name={name} memberCode={memberCode} onPress={() => router.push('/(tabs)/settings')} />
 
         {/* Alerts */}
-        {hasDebt && (
-          <Pressable style={s.alert} onPress={() => router.push('/profile')}>
+        {hasDebt && m && (
+          <Pressable style={s.alert} onPress={() => router.push('/payment/access-blocked')}>
             <Ionicons name="alert-circle" size={16} color={colors.primary} />
             <Text style={s.alertTxt}>
-              Outstanding HK${m!.outstandingBalance.toLocaleString('en-HK',{minimumFractionDigits:2})} — tap to pay
+              Outstanding HK${(m.outstandingBalance || 0).toLocaleString('en-HK',{minimumFractionDigits:2})} — tap to pay
             </Text>
             <Ionicons name="chevron-forward" size={14} color={colors.primary} />
           </Pressable>
@@ -706,7 +707,7 @@ export default function HomeScreen() {
           cardExpired={cardExpired}
           onPay={() => router.push('/payment/access-blocked')}
           onUpdateCard={() => router.push('/payment/update-card')}
-          onProfile={() => router.push('/profile')}
+          onProfile={() => router.push('/(tabs)/settings')}
           onPT={() => router.push('/(tabs)/pt')}
           onClasses={() => router.push('/(tabs)/classes')}
         />

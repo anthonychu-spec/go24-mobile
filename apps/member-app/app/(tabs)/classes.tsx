@@ -215,7 +215,60 @@ const bn = StyleSheet.create({
   cancelText:   { fontSize: 13, fontFamily: fonts.semibold, color: colors.error },
 });
 
-/* ── Filter sheet ── */
+/* ── Filter sheet — Figma circle-selector pattern ── */
+
+// Circle option item (Level/Type style from Figma kit)
+function CircleOption({
+  icon, label, active, onPress,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={fs.circleWrap} onPress={onPress}>
+      <View style={[fs.circle, active && fs.circleActive]}>
+        <Ionicons name={icon} size={26} color={active ? colors.primary : colors.textMuted} />
+      </View>
+      <Text style={[fs.circleLabel, active && fs.circleLabelActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+// Text-only circle (for clubs / class types)
+function TextCircle({
+  label, active, onPress,
+}: {
+  label: string; active: boolean; onPress: () => void;
+}) {
+  // Abbreviate long names: "GO24 Fitness Wong Tai Sin" → "WTS"
+  const abbr = label
+    .replace(/go24\s+fitness\s*/i, '')
+    .replace(/onyx\s+by\s+go24\s*/i, 'ONYX ')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
+    || label.slice(0, 2).toUpperCase();
+
+  // Short label for below circle
+  const short = label.length > 14
+    ? label.replace(/go24\s+fitness\s*/i, '').replace(/onyx\s+by\s+go24\s*/i, 'ONYX ').trim()
+    : label;
+
+  return (
+    <Pressable style={fs.circleWrap} onPress={onPress}>
+      <View style={[fs.circle, active && fs.circleActive]}>
+        <Text style={[fs.circleAbbr, active && fs.circleAbbrActive]}>{abbr}</Text>
+      </View>
+      <Text style={[fs.circleLabel, active && fs.circleLabelActive]} numberOfLines={2}>{short}</Text>
+    </Pressable>
+  );
+}
+
 function FilterSheet({
   visible, filters, allClasses, onApply, onClose, onSaveDefault,
 }: {
@@ -257,118 +310,166 @@ function FilterSheet({
       <Pressable style={fs.overlay} onPress={onClose} />
       <View style={fs.sheet}>
         <View style={fs.handle} />
+
+        {/* Header */}
         <View style={fs.header}>
           <Text style={fs.title}>Filter Classes</Text>
-          <Pressable onPress={() => { setDraft(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS); onClose(); }}>
-            <Text style={fs.reset}>Reset all</Text>
+          <Pressable onPress={() => { setDraft(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS); onClose(); }}
+            hitSlop={10}>
+            <Text style={fs.reset}>Reset</Text>
           </Pressable>
         </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={fs.row}>
-            <View style={fs.rowLeft}>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={fs.scrollContent}>
+
+          {/* Available only toggle */}
+          <View style={fs.toggleRow}>
+            <View style={fs.toggleLeft}>
               <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />
-              <Text style={fs.rowLabel}>Available spots only</Text>
+              <Text style={fs.toggleLabel}>Available spots only</Text>
             </View>
-            <Switch value={draft.availableOnly} onValueChange={v => setDraft(d => ({ ...d, availableOnly: v }))}
-              trackColor={{ true: colors.primary, false: colors.border }} thumbColor="#fff" />
+            <Switch value={draft.availableOnly}
+              onValueChange={v => setDraft(d => ({ ...d, availableOnly: v }))}
+              trackColor={{ true: colors.primary, false: colors.border }}
+              thumbColor="#fff" />
           </View>
 
-          <Text style={fs.sectionLabel}>Time of day</Text>
-          <View style={fs.chips}>
-            {TIME_SLOTS.map(ts => (
-              <Pressable key={ts.key} style={[fs.chip, draft.timeSlot === ts.key && fs.chipActive]}
-                onPress={() => setDraft(d => ({ ...d, timeSlot: ts.key }))}>
-                <Ionicons name={ts.icon} size={15} color={draft.timeSlot === ts.key ? '#fff' : colors.textMuted} />
-                <Text style={[fs.chipText, draft.timeSlot === ts.key && fs.chipTextActive]}>{ts.label}</Text>
-              </Pressable>
-            ))}
+          {/* ── Time of day — circles ── */}
+          <View style={fs.section}>
+            <View style={fs.sectionHeader}>
+              <Text style={fs.sectionTitle}>Time</Text>
+            </View>
+            <View style={fs.circleRow}>
+              {TIME_SLOTS.map(ts => (
+                <CircleOption
+                  key={ts.key}
+                  icon={ts.icon}
+                  label={ts.label}
+                  active={draft.timeSlot === ts.key}
+                  onPress={() => setDraft(d => ({ ...d, timeSlot: ts.key }))}
+                />
+              ))}
+            </View>
           </View>
 
-          {clubs.length > 0 && (<>
-            <Text style={fs.sectionLabel}>
-              Club{draft.clubIds.length > 0 ? ` · ${draft.clubIds.length} selected` : ''}
-            </Text>
-            <View style={fs.chips}>
-              {clubs.map(club => {
-                const active = draft.clubIds.includes(club.id);
-                return (
-                  <Pressable key={club.id} style={[fs.chip, active && fs.chipActive]} onPress={() => toggleClub(club.id)}>
-                    <Ionicons name="location-outline" size={13} color={active ? '#fff' : colors.textMuted} />
-                    <Text style={[fs.chipText, active && fs.chipTextActive]} numberOfLines={1}>{club.name}</Text>
-                  </Pressable>
-                );
-              })}
+          {/* ── Club — circles ── */}
+          {clubs.length > 0 && (
+            <View style={fs.section}>
+              <View style={fs.sectionHeader}>
+                <Text style={fs.sectionTitle}>Club</Text>
+                {draft.clubIds.length > 0 && (
+                  <Text style={fs.sectionCount}>{draft.clubIds.length} selected</Text>
+                )}
+              </View>
+              <View style={fs.circleRow}>
+                {clubs.map(club => (
+                  <TextCircle
+                    key={club.id}
+                    label={club.name}
+                    active={draft.clubIds.includes(club.id)}
+                    onPress={() => toggleClub(club.id)}
+                  />
+                ))}
+              </View>
             </View>
-          </>)}
+          )}
 
-          {classTypes.length > 0 && (<>
-            <Text style={fs.sectionLabel}>
-              Class type{draft.classTypes.length > 0 ? ` · ${draft.classTypes.length} selected` : ''}
-            </Text>
-            <View style={fs.chips}>
-              {classTypes.map(ct => {
-                const active = draft.classTypes.includes(ct);
-                return (
-                  <Pressable key={ct} style={[fs.chip, active && fs.chipActive]} onPress={() => toggleClassType(ct)}>
-                    <Text style={[fs.chipText, active && fs.chipTextActive]} numberOfLines={1}>{ct}</Text>
-                  </Pressable>
-                );
-              })}
+          {/* ── Class type — circles ── */}
+          {classTypes.length > 0 && (
+            <View style={fs.section}>
+              <View style={fs.sectionHeader}>
+                <Text style={fs.sectionTitle}>Class type</Text>
+                {draft.classTypes.length > 0 && (
+                  <Text style={fs.sectionCount}>{draft.classTypes.length} selected</Text>
+                )}
+              </View>
+              <View style={fs.circleRow}>
+                {classTypes.map(ct => (
+                  <TextCircle
+                    key={ct}
+                    label={ct}
+                    active={draft.classTypes.includes(ct)}
+                    onPress={() => toggleClassType(ct)}
+                  />
+                ))}
+              </View>
             </View>
-          </>)}
+          )}
 
           {/* Save as default */}
-          <Pressable style={fs.saveDefaultBtn} onPress={() => { onSaveDefault(draft); }}>
-            <Ionicons name="bookmark-outline" size={14} color={colors.primary} />
-            <Text style={fs.saveDefaultText}>Save as default</Text>
+          <Pressable style={fs.saveBtn} onPress={() => onSaveDefault(draft)}>
+            <Ionicons name="bookmark-outline" size={14} color={colors.textMuted} />
+            <Text style={fs.saveBtnText}>Save as my default</Text>
           </Pressable>
         </ScrollView>
 
+        {/* Apply CTA */}
         <Pressable style={fs.applyBtn} onPress={() => { onApply(draft); onClose(); }}>
           <Text style={fs.applyText}>
-            Show Results{activeFilterCount(draft) > 0 ? ` · ${activeFilterCount(draft)} active` : ''}
+            Show Results{activeFilterCount(draft) > 0 ? `  ·  ${activeFilterCount(draft)} filter${activeFilterCount(draft) > 1 ? 's' : ''} on` : ''}
           </Text>
         </Pressable>
       </View>
     </Modal>
   );
 }
-const fs = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: {
-    backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 36,
-    position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '80%',
-  },
-  handle:       { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  title:        { fontSize: 18, fontFamily: fonts.black, color: colors.text },
-  reset:        { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
-  row:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  rowLeft:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowLabel:     { fontSize: 15, fontFamily: fonts.regular, color: colors.text },
-  sectionLabel: { fontSize: 12, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginTop: 20, marginBottom: 12 },
-  chips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card,
-  },
-  chipActive:     { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText:       { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted },
-  chipTextActive: { color: '#fff', fontFamily: fonts.semibold },
-  applyBtn: {
-    backgroundColor: colors.primary, borderRadius: 14,
-    height: 52, alignItems: 'center', justifyContent: 'center', marginTop: 24,
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
-  },
-  applyText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold },
 
-  saveDefaultBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginTop: 20, paddingVertical: 10, justifyContent: 'center',
+const CIRCLE_SIZE = 72;
+
+const fs = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 24, paddingTop: 12, paddingBottom: 36,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    maxHeight: '82%',
   },
-  saveDefaultText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
+  handle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 20 },
+  header:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  title:   { fontSize: 20, fontFamily: fonts.black, color: colors.text },
+  reset:   { fontSize: 14, fontFamily: fonts.semibold, color: colors.primary },
+
+  scrollContent: { paddingBottom: 8, gap: 4 },
+
+  toggleRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, marginBottom: 4 },
+  toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  toggleLabel:{ fontSize: 15, fontFamily: fonts.regular, color: colors.text },
+
+  section:       { marginTop: 20 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  sectionTitle:  { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
+  sectionCount:  { fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
+
+  // Circle grid — 4 across for time, wraps for clubs/types
+  circleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+
+  circleWrap:  { alignItems: 'center', width: CIRCLE_SIZE, gap: 8 },
+  circle: {
+    width: CIRCLE_SIZE, height: CIRCLE_SIZE, borderRadius: CIRCLE_SIZE / 2,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.bg,
+    borderWidth: 1.5, borderColor: colors.border,
+  },
+  circleActive: {
+    borderColor: colors.primary, borderWidth: 2,
+    backgroundColor: colors.primaryBg,
+  },
+  circleLabel:       { fontSize: 11, fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center', lineHeight: 14 },
+  circleLabelActive: { fontFamily: fonts.semibold, color: colors.primary },
+  circleAbbr:        { fontSize: 18, fontFamily: fonts.black, color: colors.textMuted },
+  circleAbbrActive:  { color: colors.primary },
+
+  saveBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingVertical: 16, marginTop: 8 },
+  saveBtnText: { fontSize: 13, fontFamily: fonts.regular, color: colors.textMuted },
+
+  applyBtn: {
+    backgroundColor: colors.primary, borderRadius: 16,
+    height: 54, alignItems: 'center', justifyContent: 'center', marginTop: 16,
+    shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+  },
+  applyText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold, letterSpacing: 0.3 },
 });
 
 /* ── Class row ── */
