@@ -57,8 +57,11 @@ export class SignupService {
         description:   null as string | null,
       }));
 
-      // Filter to online-purchasable plans only
-      const online = all.filter(p => p.name.includes('Online'));
+      // Filter to online-purchasable plans only, exclude renewal/upgrade plans
+      const online = all.filter(p =>
+        p.name.includes('Online') &&
+        !/(renewal|upgrade)/i.test(p.name)
+      );
 
       if (!clubId) return online;
 
