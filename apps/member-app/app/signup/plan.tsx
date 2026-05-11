@@ -46,7 +46,7 @@ export default function SignupStep2() {
       joiningFee: selectedPlan.joiningFee,
       adminFee: selectedPlan.adminFee,
     });
-    router.push('/signup/selfie');
+    router.push('/signup/startdate');
   };
 
   return (
@@ -106,7 +106,7 @@ export default function SignupStep2() {
           </View>
         )}
 
-        <Button label={t.signup.nextSelfie} variant="primary" size="lg" fullWidth
+        <Button label="Next: Choose Start Date" variant="primary" size="lg" fullWidth
           disabled={!selected} onPress={next} icon="arrow-forward" iconPosition="right" />
       </ScrollView>
     </ScreenWrapper>

@@ -156,7 +156,7 @@ export class SignupService {
         {
           memberId:      pgmMemberId,
           paymentPlanId: dto.planId,
-          startDate:     new Date().toISOString().slice(0, 10),
+          startDate:     dto.startDate || new Date().toISOString().slice(0, 10),
         },
       );
       contractId = contractRes.contractId ?? contractRes.id ?? null;

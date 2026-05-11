@@ -14,6 +14,7 @@ export class SignupCompleteDto {
   address!: string;
   clubId!: number;
   planId!: number;
+  startDate!: string;
   amountHkd!: number;
   facePhotoB64!: string;
   adyenPspReference!: string;

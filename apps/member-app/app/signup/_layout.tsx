@@ -17,6 +17,7 @@ export interface SignupData {
   planPriceHkd: number;
   joiningFee: number;
   adminFee: number;
+  startDate: string;
   facePhotoB64: string;
 }
 
@@ -24,6 +25,7 @@ const defaultData: SignupData = {
   firstName: '', lastName: '', email: '', phone: '', dateOfBirth: '',
   sex: '', address: '', clubId: 0, clubName: '',
   planId: 0, planName: '', planPriceHkd: 0, joiningFee: 0, adminFee: 0,
+  startDate: '',
   facePhotoB64: '',
 };
 
