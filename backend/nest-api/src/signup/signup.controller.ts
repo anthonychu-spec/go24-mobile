@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { SignupService } from './signup.service';
@@ -15,8 +15,8 @@ export class SignupController {
 
   @ApiOperation({ summary: 'List active membership plans (public)' })
   @Get('public/plans')
-  getPlans() {
-    return this.svc.getPlans();
+  getPlans(@Query('clubId') clubId?: string) {
+    return this.svc.getPlans(clubId ? Number(clubId) : undefined);
   }
 
   @ApiOperation({ summary: 'List clubs (public)' })

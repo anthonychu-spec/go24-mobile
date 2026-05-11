@@ -39,7 +39,7 @@ export class SignupService {
     }
   }
 
-  async getPlans(): Promise<Array<{
+  async getPlans(clubId?: number): Promise<Array<{
     id: number; name: string; membershipFee: number;
     joiningFee: number; adminFee: number; description: string | null;
   }>> {
@@ -47,14 +47,50 @@ export class SignupService {
       const res = await this.pgm.get<{ value: any[] }>('/odata/PaymentPlans', {
         $filter: 'isDeleted eq false and isActive eq true',
       });
-      return (res.value ?? []).map((p: any) => ({
+
+      const all = (res.value ?? []).map((p: any) => ({
         id:            p.id,
-        name:          p.name ?? 'Plan',
+        name:          p.name as string ?? 'Plan',
         membershipFee: p.membershipFee?.gross ?? 0,
         joiningFee:    p.joiningFee?.gross ?? 0,
         adminFee:      p.adminFee?.gross ?? 0,
-        description:   null,
+        description:   null as string | null,
       }));
+
+      // Filter to online-purchasable plans only
+      const online = all.filter(p => p.name.includes('Online'));
+
+      if (!clubId) return online;
+
+      // Determine club type from club list
+      let clubName = '';
+      try {
+        const clubs = await this.getClubs();
+        clubName = clubs.find(c => c.id === clubId)?.name ?? '';
+      } catch { /* fall through — show all online */ }
+
+      if (!clubName) return online;
+
+      const isOnyx = clubName.includes('ONYX');
+      const brand  = isOnyx ? 'ONYX' : 'GO24';
+
+      return online.filter(p => {
+        const n = p.name.toUpperCase();
+        // Keep plans matching club brand
+        if (!n.includes(brand)) return false;
+        // For Day Pass: only keep club-specific ones where applicable
+        if (n.includes('DAY PASS')) {
+          // Admiralty club (id 39) → Admiralty Day Pass
+          if (clubId === 39) return n.includes('ADMIRALTY');
+          // Central club (id 36) → Central Day Pass
+          if (clubId === 36) return n.includes('CENTRAL');
+          // Other ONYX clubs → generic ONYX Online Day Pass
+          if (isOnyx) return n === 'ONYX ONLINE DAY PASS 2026';
+          // GO24 clubs → GO24 Online Day Pass
+          return n === 'GO24 ONLINE DAY PASS';
+        }
+        return true;
+      });
     } catch (e) {
       this.logger.error('Failed to fetch plans from PGM', e);
       return [];

@@ -24,7 +24,9 @@ export default function SignupStep2() {
 
   const load = useCallback(async () => {
     try {
-      const { data: d } = await publicClient.get<Plan[]>('/public/plans');
+      const { data: d } = await publicClient.get<Plan[]>('/public/plans', {
+        params: data.clubId ? { clubId: data.clubId } : undefined,
+      });
       setPlans(d);
     } catch {
       setError(t.signup.couldNotLoadPlans);
