@@ -273,16 +273,15 @@ export class DashboardService {
           $select: 'id,firstName,lastName',
           $top: 1,
         }),
-        this.pgm.get<{ value: any[] }>('/odata/Invoices', {
-          $filter: `memberId eq ${pgmMemberId} and isPaid eq false`,
-          $select: 'id,totalAmount',
-          $top: 20,
+        this.pgm.get<{ value: any[] }>('/odata/MemberBalances', {
+          $filter: `memberId eq ${pgmMemberId}`,
+          $top: 1,
         }),
       ]);
 
       const m = memberRes.status === 'fulfilled' ? memberRes.value.value?.[0] : null;
-      const invs = invoicesRes.status === 'fulfilled' ? (invoicesRes.value.value ?? []) : [];
-      const outstanding = invs.reduce((s: number, i: any) => s + (i.totalAmount ?? 0), 0);
+      const balance = invoicesRes.status === 'fulfilled' ? (invoicesRes.value.value?.[0] ?? null) : null;
+      const outstanding = balance ? Math.max(0, -(balance.currentBalance ?? 0)) : 0;
       const name = m ? `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim() || null : null;
 
       return { name, outstanding };
