@@ -77,6 +77,9 @@ export class BookingsService {
         pgmMemberId: input.pgmId,
         classId: input.classId,
         classDate,
+        className: cls.name,
+        clubName: cls.clubName ?? null,
+        startTime: cls.startTime,
         idempotencyKey: input.idempotencyKey,
         status: 'pending',
       });

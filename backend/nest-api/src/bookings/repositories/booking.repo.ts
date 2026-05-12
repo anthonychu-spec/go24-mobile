@@ -19,6 +19,9 @@ export class BookingRepository {
     pgmMemberId: number;
     classId: number;
     classDate?: string;
+    className?: string;
+    clubName?: string | null;
+    startTime?: string;
     idempotencyKey: string;
     status: BookingStatus;
   }): Promise<Booking> {
@@ -27,6 +30,9 @@ export class BookingRepository {
       pgmMemberId: input.pgmMemberId,
       classId: input.classId,
       classDate: input.classDate ?? null,
+      className: input.className ?? null,
+      clubName: input.clubName ?? null,
+      startTime: input.startTime ? new Date(input.startTime) : null,
       idempotencyKey: input.idempotencyKey,
       status: input.status,
       source: 'local',

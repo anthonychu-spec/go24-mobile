@@ -33,6 +33,15 @@ export class Booking {
   @Column({ name: 'class_date', type: 'date', nullable: true })
   classDate: string | null;
 
+  @Column({ name: 'class_name', type: 'varchar', length: 200, nullable: true })
+  className: string | null;
+
+  @Column({ name: 'club_name', type: 'varchar', length: 100, nullable: true })
+  clubName: string | null;
+
+  @Column({ name: 'start_time', type: 'timestamptz', nullable: true })
+  startTime: Date | null;
+
   @Column({ name: 'error_code', nullable: true, type: 'varchar', length: 50 })
   errorCode: string | null;
 

@@ -5,7 +5,6 @@ import { Pool } from 'pg';
 import { Booking } from '../bookings/entities/booking.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
-import type { PgmBooking } from '../booking/booking.interfaces';
 import { GYM_DATA_POOL } from './activity.constants';
 
 export type ActivityType = 'class' | 'pt' | 'checkin';
@@ -105,29 +104,20 @@ export class ActivityService {
         }))
       : (this.logger.warn('gym_data studio query failed', (dbResult as PromiseRejectedResult).reason), []);
 
-    // Enrich bookings with class name — use PGM cache (fast, already cached in memory)
+    // Use local booking data (class_name, club_name, start_time saved at booking time)
     const bookings = upcomingBookings.status === 'fulfilled' ? upcomingBookings.value : [];
-    const pgmMap = this.gymPool
-      ? new Map<number, PgmBooking>()
-      : new Map<number, PgmBooking>(
-          (await this.pgmBooking.listHistoricalBookings(pgmMemberId, since).catch((): PgmBooking[] => []))
-            .map(b => [b.classId, b]),
-        );
 
-    const bookingItems: ActivityItem[] = bookings.map(b => {
-      const pgm = pgmMap.get(b.classId);
-      return {
-        id: `class-${b.id}`,
-        type: 'class' as ActivityType,
-        title: pgm?.className ?? `Class #${b.classId}`,
-        subtitle: b.status === 'attended' ? 'Attended'
-                : b.status === 'waitlist' ? 'Waitlisted'
-                : b.status === 'pending_verify' ? 'Verifying'
-                : 'Upcoming',
-        at: pgm?.startTime ?? b.createdAt.toISOString(),
-        club: pgm?.clubName ?? null,
-      };
-    });
+    const bookingItems: ActivityItem[] = bookings.map(b => ({
+      id: `class-${b.id}`,
+      type: 'class' as ActivityType,
+      title: b.className ?? `Class #${b.classId}`,
+      subtitle: b.status === 'attended' ? 'Attended'
+              : b.status === 'waitlist' ? 'Waitlisted'
+              : b.status === 'pending_verify' ? 'Verifying'
+              : 'Upcoming',
+      at: b.startTime?.toISOString() ?? b.createdAt.toISOString(),
+      club: b.clubName ?? null,
+    }));
 
     // When DB available: merge DB attended + bookings (dedup by date)
     const dbDates = new Set(historicalItems.map(i => i.at.slice(0, 10)));
