@@ -112,7 +112,12 @@ export class ActivityService {
     // Use local booking data (class_name, club_name, start_time saved at booking time)
     const bookings = upcomingBookings.status === 'fulfilled' ? upcomingBookings.value : [];
 
-    const bookingItems: ActivityItem[] = bookings.map(b => ({
+    // Skip old bookings without class_name when gym_data covers them
+    const relevantBookings = this.gymPool
+      ? bookings.filter(b => b.className != null)
+      : bookings;
+
+    const bookingItems: ActivityItem[] = relevantBookings.map(b => ({
       id: `class-${b.id}`,
       type: 'class' as ActivityType,
       title: b.className ?? `Class #${b.classId}`,
