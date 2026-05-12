@@ -158,6 +158,13 @@ export class AuthService {
       user.status = input.status;
       user.lastPgmSyncAt = new Date();
     }
+
+    // Backfill memberCode (PGM user_number) if missing
+    if (!user.memberCode) {
+      const memberNumber = await this.pgm.getMemberNumber(input.pgmMemberId);
+      if (memberNumber) user.memberCode = memberNumber;
+    }
+
     return this.userRepo.save(user);
   }
 

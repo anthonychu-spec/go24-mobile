@@ -68,7 +68,6 @@ export class PgmAuthAdapter {
       throw new AppError('NOT_FOUND', 'invalid email');
     }
     try {
-      // PGM OData: /odata/Members?$filter=Email eq 'foo@bar.com'&$select=Id
       const escaped = email.replace(/'/g, "''");
       const res = await this.client.get<{ value?: Array<{ Id: number }> }>(
         '/odata/Members',
@@ -77,6 +76,19 @@ export class PgmAuthAdapter {
       return res.value?.[0]?.Id ?? null;
     } catch (err) {
       throw normalizePgmError(err);
+    }
+  }
+
+  /** Fetch member Number (user_number) by PGM member Id */
+  async getMemberNumber(memberId: number): Promise<string | null> {
+    try {
+      const res = await this.client.get<{ value?: Array<{ Id: number; Number: string }> }>(
+        '/odata/Members',
+        { $filter: `Id eq ${memberId}`, $select: 'Id,Number', $top: 1 },
+      );
+      return res.value?.[0]?.Number ?? null;
+    } catch {
+      return null;
     }
   }
 }

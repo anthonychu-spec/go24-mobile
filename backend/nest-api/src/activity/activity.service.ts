@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Pool } from 'pg';
 import { Booking } from '../bookings/entities/booking.entity';
+import { User } from '../auth/entities/user.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
 import { GYM_DATA_POOL } from './activity.constants';
@@ -32,6 +33,7 @@ export class ActivityService {
 
   constructor(
     @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly pgm: PgmClient,
     private readonly pgmBooking: PgmBookingAdapter,
     @Inject(GYM_DATA_POOL) private readonly gymPool: Pool | null,
@@ -48,10 +50,14 @@ export class ActivityService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Resolve user_number (memberCode) for gym_data queries
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    const gymUserNumber = user?.memberCode ?? pgmMemberId.toString();
+
     const [classes, checkins, ptSessions] = await Promise.allSettled([
-      this.fetchClasses(pgmMemberId, userId, since, today),
-      this.fetchCheckins(pgmMemberId, since, today),
-      this.fetchPt(pgmMemberId, since),
+      this.fetchClasses(gymUserNumber, userId, since, today),
+      this.fetchCheckins(gymUserNumber, pgmMemberId, since, today),
+      this.fetchPt(gymUserNumber, since),
     ]);
 
     const errors: string[] = [];
@@ -71,7 +77,7 @@ export class ActivityService {
     return { summary, items: allItems, errors };
   }
 
-  private async fetchClasses(pgmMemberId: number, userId: string, since: Date, today: Date): Promise<ActivityItem[]> {
+  private async fetchClasses(gymUserNumber: string, userId: string, since: Date, today: Date): Promise<ActivityItem[]> {
     const [dbResult, upcomingBookings] = await Promise.allSettled([
       // Historical attended classes (before today) → studio.by_member DB
       this.gymPool?.query(
@@ -80,7 +86,7 @@ export class ActivityService {
          AND class_date >= $2 AND class_date < $3
          AND has_presence = true
          ORDER BY class_date DESC LIMIT 300`,
-        [pgmMemberId.toString(), since, today],
+        [gymUserNumber, since, today],
       ),
       // Upcoming + recent bookings → local bookings table (full 2-month window)
       this.bookingRepo
@@ -128,16 +134,16 @@ export class ActivityService {
     return [...filteredBookings, ...historicalItems];
   }
 
-  private async fetchCheckins(pgmMemberId: number, since: Date, today: Date): Promise<ActivityItem[]> {
+  private async fetchCheckins(gymUserNumber: string, pgmMemberId: number, since: Date, today: Date): Promise<ActivityItem[]> {
     // Historical (before today) → local gym_data DB
     const [dbResult, todayResult] = await Promise.allSettled([
       this.gymPool?.query(
         `SELECT id, enter_date, club FROM pgm.visits
          WHERE user_number = $1 AND enter_date >= $2 AND enter_date < $3
          ORDER BY enter_date DESC LIMIT 300`,
-        [pgmMemberId.toString(), since, today],
+        [gymUserNumber, since, today],
       ),
-      // Today → PGM API (live)
+      // Today → PGM API (live) — uses pgmMemberId (PGM API id)
       this.pgm.get<{ value: any[] }>('/odata/Visits', {
         $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${today.toISOString().slice(0, 19)}'`,
         $select: 'id,enterDate',
@@ -173,16 +179,16 @@ export class ActivityService {
     return [...todayItems, ...dbItems];
   }
 
-  private async fetchPt(pgmMemberId: number, since: Date): Promise<ActivityItem[]> {
+  private async fetchPt(gymUserNumber: string, since: Date): Promise<ActivityItem[]> {
     if (!this.gymPool) return [];
     try {
       const result = await this.gymPool.query(
         `SELECT done_date, product_name, club FROM commissions.done
-         WHERE CAST(SPLIT_PART(user_number, '.', 1) AS BIGINT) = $1
+         WHERE SPLIT_PART(user_number, '.', 1) = $1
          AND commission_category = 'PT'
          AND done_date >= $2
          ORDER BY done_date DESC LIMIT 200`,
-        [pgmMemberId, since],
+        [gymUserNumber, since],
       );
       return result.rows.map((r: any) => ({
         id: `pt-${new Date(r.done_date).toISOString()}-${r.product_name}`,
