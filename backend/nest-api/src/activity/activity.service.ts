@@ -27,6 +27,19 @@ export interface ActivitySummary {
   thisMonth: { classes: number; pt: number; checkins: number };
 }
 
+/** gym_data stores timestamps WITHOUT timezone — they are HKT (UTC+8). Append offset so JS treats them correctly. */
+function toHktIso(d: Date | string): string {
+  const raw = typeof d === 'string' ? d : d.toISOString();
+  // If already has timezone info, return as-is
+  if (raw.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(raw)) {
+    // Raw is UTC but actual value is HKT — subtract 8h
+    const utc = new Date(raw);
+    utc.setHours(utc.getHours() - 8);
+    return utc.toISOString();
+  }
+  return new Date(raw + '+08:00').toISOString();
+}
+
 @Injectable()
 export class ActivityService {
   private readonly logger = new Logger(ActivityService.name);
@@ -100,11 +113,11 @@ export class ActivityService {
 
     const historicalItems: ActivityItem[] = dbResult.status === 'fulfilled' && dbResult.value
       ? dbResult.value.rows.map((r: any) => ({
-          id: `class-db-${new Date(r.class_date).toISOString()}-${r.class_name}`,
+          id: `class-db-${toHktIso(r.class_date)}-${r.class_name}`,
           type: 'class' as ActivityType,
           title: r.class_name ?? 'Class',
           subtitle: r.has_presence ? 'Attended' : 'Booked',
-          at: new Date(r.class_date).toISOString(),
+          at: toHktIso(r.class_date),
           club: r.club ?? null,
         }))
       : (this.logger.warn('gym_data studio query failed', (dbResult as PromiseRejectedResult).reason), []);
@@ -164,7 +177,7 @@ export class ActivityService {
           type: 'checkin' as ActivityType,
           title: 'Check-in',
           subtitle: null,
-          at: new Date(v.enter_date).toISOString(),
+          at: toHktIso(v.enter_date),
           club: v.club ?? null,
         }))
       : (this.logger.warn('gym_data visits query failed', (dbResult as PromiseRejectedResult).reason), []);
@@ -195,11 +208,11 @@ export class ActivityService {
         [gymUserNumber, since],
       );
       return result.rows.map((r: any) => ({
-        id: `pt-${new Date(r.done_date).toISOString()}-${r.product_name}`,
+        id: `pt-${toHktIso(r.done_date)}-${r.product_name}`,
         type: 'pt' as ActivityType,
         title: r.product_name ?? 'PT Session',
         subtitle: r.club ?? null,
-        at: new Date(r.done_date).toISOString(),
+        at: toHktIso(r.done_date),
         club: r.club ?? null,
       }));
     } catch (err) {

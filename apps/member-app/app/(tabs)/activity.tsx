@@ -131,19 +131,19 @@ function SummaryCard({ summary }: { summary: Summary }) {
       <View style={s.summaryRow}>
         <View style={s.summaryItem}>
           <Ionicons name="walk-outline" size={14} color={colors.primary} style={{ marginBottom: 2 }} />
-          <Text style={[s.summaryNum, { color: colors.primary }]}>{summary.thisMonth.checkins}</Text>
+          <Text style={[s.summaryNum, { color: colors.primary }]}>{summary.checkinsTotal}</Text>
           <Text style={s.summaryLabel}>Check-ins</Text>
         </View>
         <View style={s.summaryDivider} />
         <View style={s.summaryItem}>
           <Ionicons name="barbell-outline" size={14} color={colors.indigo} style={{ marginBottom: 2 }} />
-          <Text style={[s.summaryNum, { color: colors.indigo }]}>{summary.thisMonth.classes}</Text>
+          <Text style={[s.summaryNum, { color: colors.indigo }]}>{summary.classesTotal}</Text>
           <Text style={s.summaryLabel}>Classes</Text>
         </View>
         <View style={s.summaryDivider} />
         <View style={s.summaryItem}>
           <Ionicons name="fitness-outline" size={14} color={colors.teal} style={{ marginBottom: 2 }} />
-          <Text style={[s.summaryNum, { color: colors.teal }]}>{summary.thisMonth.pt}</Text>
+          <Text style={[s.summaryNum, { color: colors.teal }]}>{summary.ptTotal}</Text>
           <Text style={s.summaryLabel}>PT Sessions</Text>
         </View>
       </View>
@@ -157,7 +157,7 @@ function SummaryCard({ summary }: { summary: Summary }) {
 
       <View style={s.totalRow}>
         <Text style={s.totalText}>
-          Last 3 months: {summary.checkinsTotal} check-ins · {summary.classesTotal} classes · {summary.ptTotal} PT
+          This month: {summary.thisMonth.checkins} check-ins · {summary.thisMonth.classes} classes · {summary.thisMonth.pt} PT
         </Text>
       </View>
     </View>
@@ -243,7 +243,7 @@ export default function ActivityScreen() {
       <View style={s.header}>
         <View>
           <Text style={s.title}>Activity</Text>
-          <Text style={s.subtitle}>Last 3 months</Text>
+          <Text style={s.subtitle}>Last 12 months</Text>
         </View>
         <Pressable
           style={[s.viewToggle, view === 'calendar' && s.viewToggleActive]}
