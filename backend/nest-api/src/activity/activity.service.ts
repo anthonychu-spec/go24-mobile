@@ -45,7 +45,7 @@ export class ActivityService {
     errors: string[];
   }> {
     const since = new Date();
-    since.setMonth(since.getMonth() - 2);
+    since.setMonth(since.getMonth() - 12);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -81,10 +81,9 @@ export class ActivityService {
     const [dbResult, upcomingBookings] = await Promise.allSettled([
       // Historical attended classes (before today) → studio.by_member DB
       this.gymPool?.query(
-        `SELECT class_date, class_name, club FROM studio.by_member
+        `SELECT class_date, class_name, club, has_presence FROM studio.by_member
          WHERE user_number = $1
          AND class_date >= $2 AND class_date < $3
-         AND has_presence = true
          ORDER BY class_date DESC LIMIT 300`,
         [gymUserNumber, since, today],
       ),
@@ -104,7 +103,7 @@ export class ActivityService {
           id: `class-db-${new Date(r.class_date).toISOString()}-${r.class_name}`,
           type: 'class' as ActivityType,
           title: r.class_name ?? 'Class',
-          subtitle: 'Attended',
+          subtitle: r.has_presence ? 'Attended' : 'Booked',
           at: new Date(r.class_date).toISOString(),
           club: r.club ?? null,
         }))
