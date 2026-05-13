@@ -37,7 +37,7 @@ export class BookingController {
   ) {
     return this.svc.listWeekClasses({
       clubId: clubId ? Number(clubId) : undefined,
-      days: days ? Number(days) : 7,
+      days: days ? Number(days) : 9,
     });
   }
 
