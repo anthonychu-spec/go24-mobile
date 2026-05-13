@@ -56,7 +56,7 @@ const LIVE_REFRESH_FAST_MS   = 10_000;
 const LIVE_REFRESH_NORMAL_MS = 30_000;
 const LIVE_REFRESH_SLOW_MS   = 60_000;
 const BOOKING_WINDOW_H = 168;
-const DISPLAY_DAYS = 9;        // show 9 days (216h)
+const DISPLAY_DAYS = 14;        // show 14 days (336h)
 const RUSH_CLASS_KEYWORDS = ['reformer', 'bodypump', 'bodycombat', 'hiit'];
 const PEAK_HOURS = [[11, 14], [18, 21]] as const;
 
