@@ -1,14 +1,17 @@
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Pressable,
+  ActivityIndicator, Alert, Animated, Modal, Pressable,
   ScrollView, StyleSheet, Text, View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../src/api/client';
-import { colors, spacing, type as t, radius, shadows } from '../../src/theme';
-import { Avatar, Badge, Button, Card, EmptyState, ListRow, SectionHeader, ScreenWrapper } from '../../src/components';
+import { colors, fonts, spacing, radius, shadows } from '../../src/theme';
+import { ScreenWrapper, EmptyState } from '../../src/components';
 import { useAuth } from '../../src/auth/context';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ProfileData {
   hasMembership: boolean;
@@ -24,13 +27,7 @@ interface ProfileData {
   balance: {
     outstanding: number;
     currency: string;
-    invoices: Array<{
-      id: number;
-      description: string | null;
-      amount: number;
-      dueDate: string | null;
-      status: string;
-    }>;
+    invoices: Array<{ id: number; description: string | null; amount: number; dueDate: string | null; status: string }>;
   };
   savedCard: {
     brand: string | null;
@@ -40,19 +37,10 @@ interface ProfileData {
   } | null;
 }
 
-function fmtDate(iso: string | null) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString('en-HK', {
-      day: 'numeric', month: 'short', year: 'numeric',
-    });
-  } catch { return iso; }
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtHkd(amount: number) {
-  return `HK$${amount.toLocaleString('en-HK', {
-    minimumFractionDigits: 2, maximumFractionDigits: 2,
-  })}`;
+  return `HK$${amount.toLocaleString('en-HK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function getInitials(name: string | null): string {
@@ -62,25 +50,187 @@ function getInitials(name: string | null): string {
   return (name[0] ?? '?').toUpperCase();
 }
 
+// ─── Toggle Switch ────────────────────────────────────────────────────────────
+
+function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const anim = useState(new Animated.Value(value ? 1 : 0))[0];
+  const handlePress = () => {
+    const next = !value;
+    Animated.timing(anim, { toValue: next ? 1 : 0, duration: 220, useNativeDriver: false }).start();
+    onChange(next);
+  };
+  const left = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] });
+  const bg   = anim.interpolate({ inputRange: [0, 1], outputRange: [colors.border, colors.primary] });
+  return (
+    <Pressable onPress={handlePress} hitSlop={6}>
+      <Animated.View style={[tg.track, { backgroundColor: bg as any }]}>
+        <Animated.View style={[tg.thumb, { left }]} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+const tg = StyleSheet.create({
+  track: { width: 48, height: 28, borderRadius: 14, justifyContent: 'center' },
+  thumb: { position: 'absolute', top: 2, width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
+           shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 2, elevation: 2 },
+});
+
+// ─── Row Icon ─────────────────────────────────────────────────────────────────
+
+function RowIcon({ icon }: { icon: React.ComponentProps<typeof Ionicons>['name'] }) {
+  return (
+    <View style={ri.box}>
+      <Ionicons name={icon} size={14} color={colors.text} />
+    </View>
+  );
+}
+const ri = StyleSheet.create({
+  box: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+});
+
+// ─── Toggle Row ───────────────────────────────────────────────────────────────
+
+function ToggleRow({ icon, label, hint, value, onChange }: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string; hint?: string; value: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <View style={rs.row}>
+      <RowIcon icon={icon} />
+      <View style={{ flex: 1 }}>
+        <Text style={rs.label} numberOfLines={1}>{label}</Text>
+        {hint && <Text style={rs.hint} numberOfLines={1}>{hint}</Text>}
+      </View>
+      <Toggle value={value} onChange={onChange} />
+    </View>
+  );
+}
+
+// ─── Nav Row ──────────────────────────────────────────────────────────────────
+
+function NavRow({ icon, label, value, onPress }: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string; value?: string; onPress?: () => void;
+}) {
+  return (
+    <Pressable style={rs.row} onPress={onPress}>
+      <RowIcon icon={icon} />
+      <Text style={[rs.label, { flex: 1 }]} numberOfLines={1}>{label}</Text>
+      {value && <Text style={rs.value} numberOfLines={1}>{value}</Text>}
+      <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
+    </Pressable>
+  );
+}
+
+const rs = StyleSheet.create({
+  row:   { flexDirection: 'row', alignItems: 'center', gap: spacing.md - 2, paddingHorizontal: spacing.base, paddingVertical: spacing.md },
+  label: { fontSize: 13, fontFamily: fonts.black, color: colors.text },
+  hint:  { fontSize: 11, fontFamily: fonts.bold, color: colors.textMuted, marginTop: 2 },
+  value: { fontSize: 11, fontFamily: fonts.bold, color: colors.textMuted, maxWidth: 120 },
+});
+
+// ─── Group Card ───────────────────────────────────────────────────────────────
+
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  const arr = Array.isArray(children) ? children.filter(Boolean) : [children];
+  return (
+    <View>
+      <Text style={gs.label}>{label.toUpperCase()}</Text>
+      <View style={gs.card}>
+        {arr.map((child, i) => (
+          <View key={i}>
+            {child}
+            {i < arr.length - 1 && <View style={gs.divider} />}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+const gs = StyleSheet.create({
+  label:   { fontSize: 10, fontFamily: fonts.black, color: colors.textMuted, letterSpacing: 1.5, paddingHorizontal: 4, marginBottom: spacing.sm },
+  card:    { backgroundColor: colors.card, borderRadius: radius.xl + 4, overflow: 'hidden', ...shadows.card },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 64 },
+});
+
+// ─── Logout Sheet ─────────────────────────────────────────────────────────────
+
+function LogoutSheet({ visible, onCancel, onConfirm, loading }: {
+  visible: boolean; onCancel: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+      <Pressable style={ls.backdrop} onPress={loading ? undefined : onCancel} />
+      <View style={ls.sheet}>
+        <View style={ls.handle} />
+        <View style={ls.row}>
+          <View style={ls.iconBox}>
+            <Ionicons name="log-out-outline" size={18} color={colors.cta} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={ls.title}>Log out of GO24?</Text>
+            <Text style={ls.sub}>You'll need to sign in again to view your bookings.</Text>
+          </View>
+        </View>
+        <View style={ls.btnRow}>
+          <Pressable style={[ls.btn, ls.cancelBtn, loading && { opacity: 0.5 }]} onPress={onCancel} disabled={loading}>
+            <Text style={ls.cancelTxt}>Cancel</Text>
+          </Pressable>
+          <Pressable style={[ls.btn, ls.confirmBtn, loading && { opacity: 0.8 }]} onPress={onConfirm} disabled={loading}>
+            <Text style={ls.confirmTxt}>{loading ? 'Logging out…' : 'Log out'}</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+const ls = StyleSheet.create({
+  backdrop:  { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,24,27,0.4)' },
+  sheet:     { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card,
+               borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: spacing.xl,
+               paddingTop: spacing.lg, paddingBottom: spacing['2xl'] },
+  handle:    { alignSelf: 'center', width: 48, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: spacing.base },
+  row:       { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  iconBox:   { width: 44, height: 44, borderRadius: radius.md + 2, backgroundColor: colors.cta + '22', alignItems: 'center', justifyContent: 'center' },
+  title:     { fontSize: 15, fontFamily: fonts.black, color: colors.text },
+  sub:       { fontSize: 11, fontFamily: fonts.bold, color: colors.textMuted, marginTop: 2 },
+  btnRow:    { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  btn:       { flex: 1, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { backgroundColor: colors.bg },
+  confirmBtn:{ backgroundColor: colors.cta, ...shadows.card },
+  cancelTxt: { fontSize: 13, fontFamily: fonts.black, color: colors.text },
+  confirmTxt:{ fontSize: 13, fontFamily: fonts.black, color: '#fff' },
+});
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { logout } = useAuth();
-  const [data, setData]   = useState<ProfileData | null>(null);
+  const [data, setData]       = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying]   = useState(false);
   const [error, setError]     = useState('');
 
+  // Preferences (local state, future: persist + sync)
+  const [pushNotif, setPushNotif]               = useState(true);
+  const [bookingReminders, setBookingReminders] = useState(true);
+  const [marketing, setMarketing]               = useState(false);
+  const [darkMode, setDarkMode]                 = useState(false);
+  const [healthSync, setHealthSync]             = useState(true);
+
+  // Logout state
+  const [showLogout, setShowLogout]   = useState(false);
+  const [loggingOut, setLoggingOut]   = useState(false);
+
   const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const { data: d } = await apiClient.get<ProfileData>('/me/profile');
       setData(d);
     } catch {
       setError('Unable to load profile');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -95,264 +245,191 @@ export default function SettingsScreen() {
         : `Pay ${fmtHkd(data.balance.outstanding)} outstanding balance?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Pay Now',
-          onPress: async () => {
+        { text: 'Pay Now', onPress: async () => {
             setPaying(true);
             try {
-              const { data: result } = await apiClient.post<{
-                success: boolean;
-                resultCode: string;
-                amountCharged: number;
-              }>('/me/pay-outstanding', {});
-
-              if (result.success) {
-                Alert.alert(
-                  '✅ Payment Successful',
-                  `${fmtHkd(result.amountCharged)} charged successfully.`,
-                  [{ text: 'OK', onPress: load }],
-                );
-              } else {
-                Alert.alert('Payment Failed', `Result: ${result.resultCode}. Please contact staff.`);
-              }
-            } catch {
-              Alert.alert('Error', 'Payment failed. Please try again or contact staff.');
-            } finally {
-              setPaying(false);
-            }
+              const { data: r } = await apiClient.post<{ success: boolean; resultCode: string; amountCharged: number }>('/me/pay-outstanding', {});
+              if (r.success) Alert.alert('Payment Successful', `${fmtHkd(r.amountCharged)} charged successfully.`, [{ text: 'OK', onPress: load }]);
+              else Alert.alert('Payment Failed', `Result: ${r.resultCode}. Please contact staff.`);
+            } catch { Alert.alert('Error', 'Payment failed. Please try again or contact staff.'); }
+            finally { setPaying(false); }
           },
         },
       ],
     );
   };
 
-  const handleDayPass = () => {
-    if (!data?.savedCard) {
-      Alert.alert('No Card Saved', 'Please add a payment card first.', [
-        { text: 'Add Card', onPress: () => router.push('/payment/update-card') },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-      return;
-    }
-    const DAY_PASS_PRICE = 'HK$150';
-    Alert.alert('Day Pass', `Charge ${DAY_PASS_PRICE} for a day pass?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Buy Now',
-        onPress: async () => {
-          setPaying(true);
-          try {
-            const { data: result } = await apiClient.post<{
-              success: boolean; resultCode: string; amountCharged: number;
-            }>('/payments/pay-daypass', {});
-            if (result.success) {
-              Alert.alert('✅ Day Pass Active', 'You can enter GO24 today.', [
-                { text: 'OK', onPress: load },
-              ]);
-            } else {
-              Alert.alert('Payment Failed', `Result: ${result.resultCode}. Please try again.`);
-            }
-          } catch {
-            Alert.alert('Error', 'Payment failed. Please contact staff.');
-          } finally { setPaying(false); }
-        },
-      },
-    ]);
-  };
+  function handleConfirmLogout() {
+    setLoggingOut(true);
+    setTimeout(() => {
+      setShowLogout(false);
+      setLoggingOut(false);
+      logout();
+    }, 400);
+  }
 
-  // Semantic icon colors per action type (ui-ux-pro-max: color-semantic)
-  const LINKS: Array<{
-    icon: React.ComponentProps<typeof Ionicons>['name'];
-    label: string;
-    to: string;
-    color: string;
-    bg: string;
-  }> = [
-    { icon: 'card-outline',          label: 'My Memberships',      to: '/membership',            color: colors.primary, bg: colors.primaryBg },
-    { icon: 'receipt-outline',       label: 'Payment History',     to: '/payments/history',      color: colors.amber,   bg: colors.amberBg   },
-    { icon: 'star-outline',          label: 'Favourite Classes',   to: '/favourites',            color: colors.rose,    bg: colors.roseBg    },
-    { icon: 'wallet-outline',        label: 'Update Payment Card', to: '/payment/update-card',   color: colors.green,   bg: colors.greenBg   },
-    { icon: 'notifications-outline', label: 'Notifications',       to: '/(tabs)/notifications',  color: colors.indigo,  bg: colors.indigoBg  },
-  ];
+  const memberName  = data?.member.name ?? 'Member';
+  const memberCode  = data?.member.memberCode ?? data?.member.pgmId ?? '—';
+  const tier        = data?.hasMembership ? 'Premium' : 'Day pass';
 
   return (
-    <ScreenWrapper>
+    <ScreenWrapper barStyle="dark-content">
       {loading ? (
-        <View style={s.center}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
+        <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
       ) : error ? (
         <View style={s.center}>
-          <EmptyState
-            icon="cloud-offline-outline"
-            title="Unable to load"
-            subtitle={error}
-            action="Try Again"
-            onAction={load}
-          />
+          <EmptyState icon="cloud-offline-outline" title="Unable to load" subtitle={error} action="Try Again" onAction={load} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          {/* Header */}
+          <View style={s.header}>
+            <Text style={s.title}>Settings</Text>
+            <Text style={s.subtitle}>Personalise your experience</Text>
+          </View>
 
-          {/* ── Profile hero ── */}
-          <Card rounded="xl" style={s.profileCard}>
-            <Avatar name={data?.member.name} size="xl" style={{ borderRadius: 16 }} />
-            <Text style={[t.h3, { color: colors.text, marginTop: spacing.md }]}>
-              {data?.member.name ?? '—'}
-            </Text>
-            <Text style={[t.bodySm, { color: colors.textMuted, marginTop: 2 }]}>
-              Member #{data?.member.pgmId}
-            </Text>
-            {data?.member.memberCode && (
-              <Badge label={data.member.memberCode} variant="primary" style={{ marginTop: spacing.sm }} />
-            )}
-          </Card>
-
-          {/* ── Outstanding balance ── */}
-          {data && data.balance.outstanding > 0 ? (
-            <View style={s.balanceCard}>
-              <View style={s.balanceTop}>
-                <View>
-                  <Text style={[t.labelSm, { color: 'rgba(255,255,255,0.65)' }]}>Outstanding Balance</Text>
-                  <Text style={[t.stat, { color: '#fff', marginTop: 2 }]}>{fmtHkd(data.balance.outstanding)}</Text>
-                </View>
-                <Ionicons name="alert-circle" size={32} color="rgba(255,255,255,0.8)" />
+          {/* Profile card */}
+          <Pressable
+            style={s.profileCard}
+            onPress={() => router.push('/membership' as any)}
+          >
+            <LinearGradient
+              colors={[colors.primaryMid, colors.primaryDark]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.avatar}
+            >
+              <Text style={s.avatarTxt}>{getInitials(data?.member.name ?? null)}</Text>
+            </LinearGradient>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={s.profileName} numberOfLines={1}>{memberName}</Text>
+              <Text style={s.profileMeta} numberOfLines={1}>
+                Member #{memberCode} · {tier}
+              </Text>
+              <View style={s.vipPill}>
+                <Ionicons name="sparkles" size={9} color={colors.primary} />
+                <Text style={s.vipTxt}>VIP</Text>
               </View>
-
-              {data.balance.invoices.map(inv => (
-                <View key={inv.id} style={s.invoiceRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[t.label, { color: '#fff' }]}>{inv.description ?? 'Invoice'}</Text>
-                    {inv.dueDate && (
-                      <Text style={[t.caption, { color: 'rgba(255,255,255,0.6)', marginTop: 2 }]}>
-                        Due {fmtDate(inv.dueDate)}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={[t.bodyBold, { color: '#fff' }]}>{fmtHkd(inv.amount)}</Text>
-                </View>
-              ))}
-
-              <Button
-                label={data.savedCard
-                  ? `Pay Now — ···· ${data.savedCard.summary}`
-                  : 'Add Card to Pay'}
-                icon={data.savedCard ? 'card-outline' : 'add-circle-outline'}
-                variant="ghost"
-                loading={paying}
-                onPress={data.savedCard ? handlePayNow : () => router.push('/payment/update-card')}
-                style={s.payBtn}
-              />
             </View>
-          ) : (
-            <View style={s.clearRow}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-              <Text style={[t.label, { color: colors.success }]}>No outstanding balance</Text>
-            </View>
-          )}
-
-          {/* ── Day pass (no membership) ── */}
-          {data && !data.hasMembership && (
-            <Card onPress={handleDayPass} rounded="lg" style={s.dayPassCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={[t.bodyBold, { color: colors.amber }]}>No active membership</Text>
-                <Text style={[t.bodySm, { color: colors.amber, marginTop: 2 }]}>
-                  Buy a day pass to enter GO24 today
-                </Text>
-              </View>
-              <View style={s.dayPassPrice}>
-                <Text style={[t.btnMd, { color: '#fff' }]}>HK$150</Text>
-              </View>
-            </Card>
-          )}
-
-          {/* ── Account details ── */}
-          <Card rounded="lg" padding={spacing.base} style={s.detailsSection}>
-            <SectionHeader title="Account Details" style={{ marginBottom: spacing.md }} />
-            <ListRow icon="mail-outline" iconColor={colors.textMuted} iconBg={colors.bg}
-              label="Email" value={data?.member.email ?? '—'} showChevron={false} />
-            <ListRow icon="call-outline" iconColor={colors.textMuted} iconBg={colors.bg}
-              label="Phone" value={data?.member.phone ?? '—'} showChevron={false} divider={false} />
-          </Card>
-
-          {/* ── Saved card ── */}
-          <Card rounded="lg" padding={spacing.base} onPress={() => router.push('/payment/update-card')}>
-            <ListRow
-              icon="card-outline"
-              iconColor={data?.savedCard ? colors.primary : colors.textMuted}
-              iconBg={data?.savedCard ? colors.primaryBg : colors.bg}
-              label={data?.savedCard
-                ? `${data.savedCard.brand?.toUpperCase() ?? 'CARD'} ···· ${data.savedCard.summary}`
-                : 'No card saved'}
-              sublabel={data?.savedCard?.expiryMonth
-                ? `Exp ${data.savedCard.expiryMonth}/${data.savedCard.expiryYear}`
-                : 'Tap to add a payment card'}
-              divider={false}
-            />
-          </Card>
-
-          {/* ── Navigation links ── */}
-          <Card rounded="xl" padding={0} style={s.linksCard}>
-            {LINKS.map((l, i) => (
-              <ListRow
-                key={l.label}
-                icon={l.icon}
-                iconColor={l.color}
-                iconBg={l.bg}
-                label={l.label}
-                onPress={() => router.push(l.to as any)}
-                divider={i < LINKS.length - 1}
-                style={s.linkRow}
-              />
-            ))}
-          </Card>
-
-          {/* ── Logout — spatially separated (P9 destructive-nav-separation) ── */}
-          <Pressable style={s.logoutRow} onPress={logout} hitSlop={8}>
-            <Ionicons name="log-out-outline" size={18} color={colors.cta} />
-            <Text style={[t.label, { color: colors.cta }]}>Log Out</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </Pressable>
 
+          {/* Outstanding balance — only when there's debt */}
+          {data && data.balance.outstanding > 0 && (
+            <View style={s.balanceCard}>
+              <View style={s.balanceTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.balanceLbl}>OUTSTANDING BALANCE</Text>
+                  <Text style={s.balanceAmt}>{fmtHkd(data.balance.outstanding)}</Text>
+                </View>
+                <Ionicons name="alert-circle" size={28} color="rgba(255,255,255,0.85)" />
+              </View>
+              <Pressable
+                style={[s.payBtn, paying && { opacity: 0.7 }]}
+                onPress={data.savedCard ? handlePayNow : () => router.push('/payment/update-card')}
+                disabled={paying}
+              >
+                <Text style={s.payTxt}>
+                  {paying ? 'Processing…' : data.savedCard
+                    ? `Pay Now — ···· ${data.savedCard.summary}`
+                    : 'Add Card to Pay'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Notifications */}
+          <Group label="Notifications">
+            <ToggleRow icon="notifications-outline" label="Push notifications" hint="Class reminders, achievements"
+              value={pushNotif} onChange={setPushNotif} />
+            <ToggleRow icon="phone-portrait-outline" label="Booking reminders" hint="30 min before each session"
+              value={bookingReminders} onChange={setBookingReminders} />
+            <ToggleRow icon="heart-outline" label="Marketing & offers"
+              value={marketing} onChange={setMarketing} />
+          </Group>
+
+          {/* Preferences */}
+          <Group label="Preferences">
+            <ToggleRow icon="moon-outline" label="Dark mode"
+              value={darkMode} onChange={setDarkMode} />
+            <NavRow icon="globe-outline" label="Language" value="English" />
+            <ToggleRow icon="heart-outline" label="Apple Health sync" hint="Sessions, calories, heart rate"
+              value={healthSync} onChange={setHealthSync} />
+          </Group>
+
+          {/* Account */}
+          <Group label="Account">
+            <NavRow icon="person-outline" label="Personal info" onPress={() => router.push('/membership' as any)} />
+            <NavRow
+              icon="card-outline"
+              label="Payment methods"
+              value={data?.savedCard ? `${data.savedCard.brand?.toUpperCase() ?? 'CARD'} •• ${data.savedCard.summary}` : 'Add card'}
+              onPress={() => router.push('/payment/update-card')}
+            />
+            <NavRow icon="receipt-outline" label="Payment history" onPress={() => router.push('/payments/history')} />
+            <NavRow icon="lock-closed-outline" label="Password & security" />
+          </Group>
+
+          {/* Support */}
+          <Group label="Support">
+            <NavRow icon="help-circle-outline" label="Help center" />
+            <NavRow icon="document-text-outline" label="Terms & privacy" />
+          </Group>
+
+          {/* Logout */}
+          <Pressable style={s.logoutBtn} onPress={() => setShowLogout(true)}>
+            <Ionicons name="log-out-outline" size={14} color={colors.cta} />
+            <Text style={s.logoutTxt}>Log out</Text>
+          </Pressable>
+
+          <Text style={s.version}>GO24 FITNESS · v1.4.2</Text>
         </ScrollView>
       )}
+
+      <LogoutSheet
+        visible={showLogout}
+        loading={loggingOut}
+        onCancel={() => setShowLogout(false)}
+        onConfirm={handleConfirmLogout}
+      />
     </ScreenWrapper>
   );
 }
 
 const s = StyleSheet.create({
-  center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll:      { padding: spacing.base, paddingBottom: spacing['3xl'], gap: spacing.md },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scroll: { paddingHorizontal: spacing.base, paddingTop: spacing.md, paddingBottom: 40, gap: spacing.lg },
 
-  profileCard: { alignItems: 'center', paddingVertical: spacing.xl },
+  header:   { paddingHorizontal: 4 },
+  title:    { fontSize: 26, fontFamily: fonts.black, color: colors.text },
+  subtitle: { fontSize: 12, fontFamily: fonts.bold, color: colors.textMuted, marginTop: 3 },
 
-  balanceCard: {
-    backgroundColor: colors.primary, borderRadius: radius.xl,
-    padding: spacing.lg, gap: spacing.sm, ...shadows.card,
+  // Profile card
+  profileCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md + 2,
+    backgroundColor: colors.card, borderRadius: radius.xl + 4,
+    padding: spacing.base, ...shadows.card,
   },
-  balanceTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  invoiceRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: radius.md,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
-  },
-  payBtn:     { backgroundColor: '#fff', borderRadius: radius.md, marginTop: spacing.xs },
+  avatar:      { width: 56, height: 56, borderRadius: radius.md + 4, alignItems: 'center', justifyContent: 'center' },
+  avatarTxt:   { fontSize: 18, fontFamily: fonts.black, color: '#fff' },
+  profileName: { fontSize: 15, fontFamily: fonts.black, color: colors.text },
+  profileMeta: { fontSize: 11, fontFamily: fonts.bold, color: colors.textMuted, marginTop: 2 },
+  vipPill:     { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start',
+                 paddingHorizontal: spacing.sm, paddingVertical: 2,
+                 borderRadius: radius.full, backgroundColor: colors.primaryBg, marginTop: 6 },
+  vipTxt:      { fontSize: 10, fontFamily: fonts.black, color: colors.primary, letterSpacing: 1 },
 
-  clearRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.success + '15', borderRadius: radius.md,
-    paddingHorizontal: spacing.base, paddingVertical: spacing.md,
-  },
+  // Balance
+  balanceCard: { backgroundColor: colors.primary, borderRadius: radius.xl + 4, padding: spacing.base, gap: spacing.md, ...shadows.card },
+  balanceTop:  { flexDirection: 'row', alignItems: 'flex-start' },
+  balanceLbl:  { fontSize: 10, fontFamily: fonts.black, color: 'rgba(255,255,255,0.7)', letterSpacing: 1.2 },
+  balanceAmt:  { fontSize: 24, fontFamily: fonts.black, color: '#fff', marginTop: 4 },
+  payBtn:      { backgroundColor: '#fff', height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  payTxt:      { fontSize: 13, fontFamily: fonts.black, color: colors.primary },
 
-  dayPassCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.amberBg },
-  dayPassPrice: { backgroundColor: colors.amber, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  // Logout
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+               height: 48, borderRadius: radius.full, backgroundColor: colors.card, ...shadows.card },
+  logoutTxt: { fontSize: 13, fontFamily: fonts.black, color: colors.cta },
 
-  detailsSection: { gap: 0 },
-
-  linksCard: { overflow: 'hidden' },
-  linkRow:   { paddingHorizontal: spacing.base },
-
-  logoutRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.sm, paddingVertical: spacing.base, marginTop: spacing.sm,
-  },
+  version:   { fontSize: 10, fontFamily: fonts.bold, color: colors.textMuted, textAlign: 'center', marginTop: -spacing.sm },
 });

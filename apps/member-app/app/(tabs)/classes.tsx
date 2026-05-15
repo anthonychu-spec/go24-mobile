@@ -981,7 +981,7 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 13, fontFamily: fonts.semibold, color: colors.text, padding: 0 },
 
   // Club chips
-  clubChipsRow:        { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
+  clubChipsRow:        { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, gap: 8, alignItems: 'center' },
   clubChip:            { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.bg },
   clubChipActive:      { backgroundColor: colors.text },
   clubChipLabel:       { fontSize: 12, fontFamily: fonts.black, color: colors.text },
@@ -996,12 +996,12 @@ const s = StyleSheet.create({
   slotLine:    { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 4 },
 
   dayPickerWrap: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  dayPicker:     { paddingHorizontal: 12, paddingBottom: 8, paddingTop: 6, gap: 4 },
+  dayPicker:     { paddingHorizontal: 12, paddingBottom: 12, paddingTop: 10, gap: 4, alignItems: 'center' },
   dayCell: {
     width: 42, height: 60, borderRadius: 24,
     alignItems: 'center', justifyContent: 'center', gap: 2,
   },
-  dayCellActive:  { backgroundColor: colors.primary, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  dayCellActive:  { backgroundColor: colors.primary, shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
   dayLabel:       { fontSize: 9, fontFamily: fonts.black, color: colors.textMuted, letterSpacing: 1 },
   dayLabelActive: { color: 'rgba(255,255,255,0.8)' },
   dayNum:         { fontSize: 15, fontFamily: fonts.black, color: colors.text },
