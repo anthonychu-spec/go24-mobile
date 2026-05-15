@@ -1,8 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Animated, Modal, Pressable,
+  ActivityIndicator, Alert, Animated, Linking, Modal, Pressable,
   ScrollView, StyleSheet, Text, View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +11,24 @@ import { apiClient } from '../../src/api/client';
 import { colors, fonts, spacing, radius, shadows } from '../../src/theme';
 import { ScreenWrapper, EmptyState } from '../../src/components';
 import { useAuth } from '../../src/auth/context';
+
+const PREFS_KEY = 'go24:prefs:v1';
+const SUPPORT_EMAIL = 'support@go24.fitness';
+const TERMS_URL     = 'https://go24.fitness/terms';
+const HELP_URL      = 'https://go24.fitness/help';
+
+interface Prefs {
+  pushNotif:        boolean;
+  bookingReminders: boolean;
+  marketing:        boolean;
+  darkMode:         boolean;
+  healthSync:       boolean;
+  language:         'en' | 'zh';
+}
+const DEFAULT_PREFS: Prefs = {
+  pushNotif: true, bookingReminders: true, marketing: false,
+  darkMode: false, healthSync: true, language: 'en',
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -206,18 +225,28 @@ const ls = StyleSheet.create({
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [data, setData]       = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying]   = useState(false);
   const [error, setError]     = useState('');
 
-  // Preferences (local state, future: persist + sync)
-  const [pushNotif, setPushNotif]               = useState(true);
-  const [bookingReminders, setBookingReminders] = useState(true);
-  const [marketing, setMarketing]               = useState(false);
-  const [darkMode, setDarkMode]                 = useState(false);
-  const [healthSync, setHealthSync]             = useState(true);
+  // Persisted preferences
+  const [prefs, setPrefs]     = useState<Prefs>(DEFAULT_PREFS);
+  useEffect(() => {
+    AsyncStorage.getItem(PREFS_KEY).then(raw => {
+      if (!raw) return;
+      try { setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(raw) }); } catch { /* ignore */ }
+    });
+  }, []);
+  function updatePref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
+    setPrefs(p => {
+      const next = { ...p, [key]: value };
+      AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next)).catch(() => {});
+      apiClient.patch('/me/preferences', { [key]: value }).catch(() => {}); // best-effort sync
+      return next;
+    });
+  }
 
   // Logout state
   const [showLogout, setShowLogout]   = useState(false);
@@ -268,9 +297,37 @@ export default function SettingsScreen() {
     }, 400);
   }
 
-  const memberName  = data?.member.name ?? 'Member';
-  const memberCode  = data?.member.memberCode ?? data?.member.pgmId ?? '—';
+  const memberName  = data?.member.name ?? user?.email?.split('@')[0] ?? 'Member';
+  const memberCode  = data?.member.memberCode ?? user?.memberCode ?? data?.member.pgmId ?? '—';
   const tier        = data?.hasMembership ? 'Premium' : 'Day pass';
+
+  // ── Row handlers ──
+  function showPersonalInfo() {
+    Alert.alert(
+      'Personal Info',
+      `Name: ${memberName}\nEmail: ${data?.member.email ?? user?.email ?? '—'}\nPhone: ${data?.member.phone ?? '—'}\nMember Code: ${memberCode}`,
+      [{ text: 'Close' }],
+    );
+  }
+  function showLanguageSwitch() {
+    Alert.alert('Language', undefined, [
+      { text: 'English',    onPress: () => updatePref('language', 'en') },
+      { text: '繁體中文',    onPress: () => updatePref('language', 'zh') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+  function showPasswordSecurity() {
+    Alert.alert('Password & Security', 'To change your password, contact GO24 staff or use the web portal.', [
+      { text: 'Email Support', onPress: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Password%20Reset`) },
+      { text: 'Close', style: 'cancel' },
+    ]);
+  }
+  function openHelp() {
+    Linking.openURL(HELP_URL).catch(() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`));
+  }
+  function openTerms() {
+    Linking.openURL(TERMS_URL).catch(() => {});
+  }
 
   return (
     <ScreenWrapper barStyle="dark-content">
@@ -340,39 +397,45 @@ export default function SettingsScreen() {
           {/* Notifications */}
           <Group label="Notifications">
             <ToggleRow icon="notifications-outline" label="Push notifications" hint="Class reminders, achievements"
-              value={pushNotif} onChange={setPushNotif} />
+              value={prefs.pushNotif}        onChange={v => updatePref('pushNotif', v)} />
             <ToggleRow icon="phone-portrait-outline" label="Booking reminders" hint="30 min before each session"
-              value={bookingReminders} onChange={setBookingReminders} />
+              value={prefs.bookingReminders} onChange={v => updatePref('bookingReminders', v)} />
             <ToggleRow icon="heart-outline" label="Marketing & offers"
-              value={marketing} onChange={setMarketing} />
+              value={prefs.marketing}        onChange={v => updatePref('marketing', v)} />
           </Group>
 
           {/* Preferences */}
           <Group label="Preferences">
             <ToggleRow icon="moon-outline" label="Dark mode"
-              value={darkMode} onChange={setDarkMode} />
-            <NavRow icon="globe-outline" label="Language" value="English" />
+              value={prefs.darkMode}   onChange={v => updatePref('darkMode', v)} />
+            <NavRow icon="globe-outline" label="Language"
+              value={prefs.language === 'zh' ? '繁中' : 'English'}
+              onPress={showLanguageSwitch} />
             <ToggleRow icon="heart-outline" label="Apple Health sync" hint="Sessions, calories, heart rate"
-              value={healthSync} onChange={setHealthSync} />
+              value={prefs.healthSync} onChange={v => updatePref('healthSync', v)} />
           </Group>
 
           {/* Account */}
           <Group label="Account">
-            <NavRow icon="person-outline" label="Personal info" onPress={() => router.push('/membership' as any)} />
+            <NavRow icon="person-outline"        label="Personal info"         onPress={showPersonalInfo} />
+            <NavRow icon="card-outline"          label="My Memberships"        onPress={() => router.push('/membership' as any)} />
             <NavRow
-              icon="card-outline"
+              icon="wallet-outline"
               label="Payment methods"
               value={data?.savedCard ? `${data.savedCard.brand?.toUpperCase() ?? 'CARD'} •• ${data.savedCard.summary}` : 'Add card'}
               onPress={() => router.push('/payment/update-card')}
             />
-            <NavRow icon="receipt-outline" label="Payment history" onPress={() => router.push('/payments/history')} />
-            <NavRow icon="lock-closed-outline" label="Password & security" />
+            <NavRow icon="receipt-outline"       label="Payment history"       onPress={() => router.push('/payments/history')} />
+            <NavRow icon="star-outline"          label="Favourite classes"     onPress={() => router.push('/favourites' as any)} />
+            <NavRow icon="lock-closed-outline"   label="Password & security"   onPress={showPasswordSecurity} />
           </Group>
 
           {/* Support */}
           <Group label="Support">
-            <NavRow icon="help-circle-outline" label="Help center" />
-            <NavRow icon="document-text-outline" label="Terms & privacy" />
+            <NavRow icon="help-circle-outline"   label="Help center"           onPress={openHelp} />
+            <NavRow icon="mail-outline"          label="Contact support"       value={SUPPORT_EMAIL}
+              onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} />
+            <NavRow icon="document-text-outline" label="Terms & privacy"       onPress={openTerms} />
           </Group>
 
           {/* Logout */}
