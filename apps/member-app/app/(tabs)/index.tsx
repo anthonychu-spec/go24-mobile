@@ -68,43 +68,38 @@ function MemberCard({ m, pt, name, memberCode, onPress }: {
       {/* decorative circles */}
       <View style={mc.c1} /><View style={mc.c2} />
 
-      {/* top */}
+      {/* top — brand labels + active pill */}
       <View style={mc.top}>
-        <View style={mc.brandRow}>
-          <Ionicons name="fitness" size={13} color="rgba(255,255,255,0.7)" />
+        <View>
           <Text style={mc.brand}>GO24 FITNESS</Text>
+          <Text style={mc.brandSub}>MEMBERSHIP CARD</Text>
         </View>
         <View style={[mc.pill, { backgroundColor: m?.active ? 'rgba(74,222,128,0.22)' : 'rgba(255,255,255,0.12)' }]}>
           <View style={[mc.dot, { backgroundColor: m?.active ? '#4ADE80' : 'rgba(255,255,255,0.4)' }]} />
-          <Text style={mc.pillTxt}>{m?.active ? 'Active' : 'Inactive'}</Text>
+          <Text style={mc.pillTxt}>{m?.active ? 'ACTIVE' : 'INACTIVE'}</Text>
         </View>
       </View>
 
-      {/* centre — plan name + member name */}
+      {/* centre — plan name BIG + member name */}
       <View style={mc.centre}>
-        <Text style={mc.plan}>{m?.planName?.toUpperCase() ?? 'MEMBERSHIP'}</Text>
+        <Text style={mc.planBig} numberOfLines={1}>{m?.planName ?? 'Membership'}</Text>
         <Text style={mc.memberName} numberOfLines={1}>{name || '—'}</Text>
-        {memberCode && <Text style={mc.memberCode}>#{memberCode}</Text>}
       </View>
 
-      {/* bottom — expiry, days remaining, PT sessions */}
+      {/* bottom — 3-col: EXPIRES / DAYS LEFT / PT LEFT */}
       <View style={mc.bottom}>
-        <View>
+        <View style={mc.col}>
           <Text style={mc.metaLabel}>EXPIRES</Text>
           <Text style={mc.metaVal}>{fmtDate(m?.expiresAt ?? null)}</Text>
         </View>
-        {(pt?.remainingSessions ?? 0) > 0 && (
-          <View style={{ alignItems: 'center' }}>
-            <Text style={mc.metaLabel}>PT LEFT</Text>
-            <Text style={mc.metaVal}>{pt!.remainingSessions} sessions</Text>
-          </View>
-        )}
-        {days != null && (
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={mc.metaLabel}>REMAINING</Text>
-            <Text style={mc.metaVal}>{days > 0 ? `${days} days` : 'Expired'}</Text>
-          </View>
-        )}
+        <View style={[mc.col, { alignItems: 'center' }]}>
+          <Text style={mc.metaLabel}>DAYS LEFT</Text>
+          <Text style={mc.metaVal}>{days != null ? (days > 0 ? days : 'Expired') : '—'}</Text>
+        </View>
+        <View style={[mc.col, { alignItems: 'flex-end' }]}>
+          <Text style={mc.metaLabel}>PT LEFT</Text>
+          <Text style={mc.metaVal}>{pt?.remainingSessions ?? 0}</Text>
+        </View>
       </View>
 
       {pct != null && (
@@ -128,41 +123,41 @@ const mc = StyleSheet.create({
   body:  { flex: 1, padding: spacing.lg + 2, justifyContent: 'space-between' },
   c1:    { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.06)', top: -70, right: -50 },
   c2:    { position: 'absolute', width: 130, height: 130, borderRadius: 65,  backgroundColor: 'rgba(255,255,255,0.04)', bottom: -50, left: 10 },
-  top:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm - 2 },
-  brand: { fontSize: 11, fontFamily: fonts.black, color: 'rgba(255,255,255,0.7)', letterSpacing: 2 },
-  pill:  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.md - 2, paddingVertical: 4, borderRadius: radius.full },
-  dot:   { width: 6, height: 6, borderRadius: 3 },
-  pillTxt: { fontSize: 11, fontFamily: fonts.semibold, color: '#fff' },
-  centre: { gap: 2 },
-  plan:  { fontSize: 10, fontFamily: fonts.semibold, color: 'rgba(255,255,255,0.5)', letterSpacing: 2 },
-  memberName: { fontSize: 26, fontFamily: fonts.black, color: '#fff' },
-  memberCode: { fontSize: 11, fontFamily: fonts.regular, color: 'rgba(255,255,255,0.5)', letterSpacing: 1, marginTop: 1 },
-  bottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  top:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  brand:      { fontSize: 11, fontFamily: fonts.black, color: 'rgba(255,255,255,0.85)', letterSpacing: 2 },
+  brandSub:   { fontSize: 9, fontFamily: fonts.semibold, color: 'rgba(255,255,255,0.55)', letterSpacing: 2, marginTop: 2 },
+  pill:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.md - 2, paddingVertical: 4, borderRadius: radius.full },
+  dot:        { width: 6, height: 6, borderRadius: 3 },
+  pillTxt:    { fontSize: 10, fontFamily: fonts.black, color: '#fff', letterSpacing: 1 },
+  centre:     { gap: 2 },
+  planBig:    { fontSize: 28, fontFamily: fonts.black, color: '#fff', lineHeight: 32 },
+  memberName: { fontSize: 14, fontFamily: fonts.bold, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
+  bottom:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  col:        { gap: 2 },
   metaLabel: { fontSize: 9, fontFamily: fonts.semibold, color: 'rgba(255,255,255,0.4)', letterSpacing: 1.5, marginBottom: 2 },
   metaVal:   { fontSize: 13, fontFamily: fonts.bold, color: 'rgba(255,255,255,0.85)' },
   bar:   { height: 3, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 3, marginTop: 10, overflow: 'hidden' },
   fill:  { height: '100%', backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 3 },
 });
 
-// ─── Stat Row ─────────────────────────────────────────────────────────────────
+// ─── Stat Row — 3 separate cards ─────────────────────────────────────────────
 
 function StatRow({ visits, pt, classes }: { visits: number; pt: number; classes: number }) {
   const items = [
-    { label: 'Visits',  val: visits,  color: colors.primary, icon: 'walk-outline'    as const },
-    { label: 'PT',      val: pt,      color: colors.teal,    icon: 'barbell-outline' as const },
-    { label: 'Classes', val: classes, color: colors.indigo,  icon: 'people-outline'  as const },
+    { label: 'VISITS',  val: visits,  color: colors.primary, icon: 'calendar-outline' as const },
+    { label: 'PT',      val: pt,      color: colors.teal,    icon: 'barbell-outline'  as const },
+    { label: 'CLASSES', val: classes, color: colors.indigo,  icon: 'people-outline'   as const },
   ];
   return (
     <View style={sr.outer}>
       <Text style={sr.period}>THIS MONTH</Text>
-      <View style={sr.wrap}>
-        {items.map((it, i) => (
-          <View key={it.label} style={[sr.item, i > 0 && sr.border]}>
+      <View style={sr.row}>
+        {items.map(it => (
+          <View key={it.label} style={sr.card}>
             <View style={[sr.iconBox, { backgroundColor: it.color + '15' }]}>
-              <Ionicons name={it.icon} size={15} color={it.color} />
+              <Ionicons name={it.icon} size={16} color={it.color} />
             </View>
-            <Text style={[sr.num, { color: it.color }]}>{it.val}</Text>
+            <Text style={sr.num}>{it.val}</Text>
             <Text style={sr.lbl}>{it.label}</Text>
           </View>
         ))}
@@ -173,14 +168,12 @@ function StatRow({ visits, pt, classes }: { visits: number; pt: number; classes:
 const sr = StyleSheet.create({
   outer:  { marginHorizontal: spacing.base, gap: spacing.sm },
   period: { ...t.overline, color: colors.textMuted },
-  wrap:   { flexDirection: 'row', backgroundColor: colors.card,
-            borderRadius: radius.xl, paddingVertical: spacing.lg + 2,
-            ...shadows.card },
-  item:   { flex: 1, alignItems: 'center', gap: spacing.xs + 1 },
-  border: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border },
-  iconBox:{ width: 32, height: 32, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  num:    { fontSize: 26, fontFamily: fonts.black },
-  lbl:    { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 0.6, textAlign: 'center' },
+  row:    { flexDirection: 'row', gap: spacing.sm },
+  card:   { flex: 1, backgroundColor: colors.card, borderRadius: radius.xl,
+            padding: spacing.base, gap: spacing.xs, ...shadows.card },
+  iconBox:{ width: 36, height: 36, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  num:    { fontSize: 28, fontFamily: fonts.black, color: colors.text },
+  lbl:    { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 0.8 },
 });
 
 // ─── Next Class Card ──────────────────────────────────────────────────────────
@@ -202,29 +195,33 @@ function NextCard({ next, onBook }: { next: DashboardData['nextClass'] | null; o
   const time = new Date(next.startTime).toLocaleTimeString('en-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
   const date = new Date(next.startTime).toLocaleDateString('en-HK', { weekday: 'short', month: 'short', day: 'numeric' });
 
+  const dur = Math.round((new Date(next.endTime ?? next.startTime).getTime() - new Date(next.startTime).getTime()) / 60000);
+  const isToday = new Date(next.startTime).toDateString() === new Date().toDateString();
+
   return (
     <View style={nc.card}>
       <View style={nc.stripe} />
       <View style={nc.inner}>
-        <View style={nc.topRow}>
-          <Text style={nc.eyebrow}>NEXT CLASS</Text>
-          <View style={nc.timeBadge}>
-            <Ionicons name="time-outline" size={11} color={colors.primary} />
-            <Text style={nc.timeBadgeTxt}>in {eta(next.minutesUntil)}</Text>
-          </View>
-        </View>
+        <Text style={nc.eyebrowRow}>
+          <Text style={nc.eyebrow}>{isToday ? 'TODAY' : date.toUpperCase()}</Text>
+          <Text style={nc.dot}> · </Text>
+          <Text style={nc.eyebrow}>{time}</Text>
+          {dur > 0 && (<>
+            <Text style={nc.dot}> · </Text>
+            <Text style={nc.eyebrowMuted}>{dur} min</Text>
+          </>)}
+        </Text>
         <Text style={nc.name} numberOfLines={2}>{next.className ?? `Class #${next.classId}`}</Text>
-        <View style={nc.meta}>
-          {[
-            { icon: 'time-outline'     as const, txt: time },
-            { icon: 'calendar-outline' as const, txt: date },
-            ...(next.clubName ? [{ icon: 'location-outline' as const, txt: next.clubName }] : []),
-          ].map((m, i) => (
-            <View key={i} style={nc.metaItem}>
-              <Ionicons name={m.icon} size={12} color={colors.textMuted} />
-              <Text style={nc.metaTxt}>{m.txt}</Text>
-            </View>
-          ))}
+        {next.clubName && (
+          <View style={nc.metaItem}>
+            <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+            <Text style={nc.metaTxt} numberOfLines={1}>{next.clubName}</Text>
+          </View>
+        )}
+      </View>
+      <View style={nc.checkInWrap}>
+        <View style={nc.checkInBtn}>
+          <Text style={nc.checkInTxt}>Check in</Text>
         </View>
       </View>
     </View>
@@ -239,45 +236,49 @@ const nc = StyleSheet.create({
   emptyBtn:   { paddingHorizontal: spacing.md, paddingVertical: 7, backgroundColor: colors.primaryBg, borderRadius: radius.md },
   emptyBtnTxt:{ ...t.label, color: colors.primary },
 
-  card:   { flexDirection: 'row', marginHorizontal: spacing.base, backgroundColor: colors.card,
+  card:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.base, backgroundColor: colors.card,
             borderRadius: radius.xl, overflow: 'hidden', ...shadows.card },
-  stripe: { width: 4, backgroundColor: colors.primary },
-  inner:  { flex: 1, padding: spacing.lg + 2 },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  eyebrow:{ ...t.overline, color: colors.textMuted },
-  timeBadge:   { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.primaryBg,
-                  paddingHorizontal: spacing.md - 2, paddingVertical: 4, borderRadius: radius.full },
-  timeBadgeTxt:{ ...t.labelSm, color: colors.primary },
-  name:   { fontSize: 20, fontFamily: fonts.black, color: colors.text, lineHeight: 26, marginBottom: spacing.md },
-  meta:   { gap: spacing.xs + 1 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 1 },
-  metaTxt:  { ...t.bodySm, color: colors.textMuted },
+  stripe: { width: 4, alignSelf: 'stretch', backgroundColor: colors.primary },
+  inner:  { flex: 1, padding: spacing.base, gap: spacing.xs },
+  eyebrowRow: { marginBottom: 2 },
+  eyebrow:    { fontSize: 10, fontFamily: fonts.black, color: colors.primary, letterSpacing: 1 },
+  eyebrowMuted: { fontSize: 10, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 0.5 },
+  dot:        { fontSize: 10, color: colors.textMuted },
+  name:       { fontSize: 18, fontFamily: fonts.black, color: colors.text, lineHeight: 22 },
+  metaItem:   { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  metaTxt:    { ...t.bodySm, color: colors.textMuted },
+  checkInWrap:{ padding: spacing.base },
+  checkInBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, backgroundColor: colors.primaryBg, borderRadius: radius.full },
+  checkInTxt: { fontSize: 12, fontFamily: fonts.black, color: colors.primary },
 });
 
 // ─── Action Grid Cell ─────────────────────────────────────────────────────────
 
-function ActionCell({ icon, label, color, bg, to, badge }: {
+function ActionCell({ icon, label, color, bg, to, badge, fullWidth }: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
-  label: string; color: string; bg: string; to: string; badge?: boolean;
+  label: string; color: string; bg: string; to: string; badge?: boolean; fullWidth?: boolean;
 }) {
   const router = useRouter();
   return (
-    <Pressable style={ag.cell} onPress={() => router.push(to as any)}>
+    <Pressable style={[ag.cell, fullWidth && ag.cellFull]} onPress={() => router.push(to as any)}>
       <View style={[ag.icon, { backgroundColor: bg }]}>
-        <Ionicons name={icon} size={24} color={color} />
+        <Ionicons name={icon} size={20} color={color} />
         {badge && <View style={ag.badge} />}
       </View>
-      <Text style={ag.label}>{label}</Text>
+      <Text style={ag.label} numberOfLines={2}>{label}</Text>
+      <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
     </Pressable>
   );
 }
 const ag = StyleSheet.create({
-  cell:  { width: CELL, backgroundColor: colors.card, borderRadius: radius.xl, padding: spacing.base, gap: spacing.md - 2,
-            ...shadows.card },
-  icon:  { width: 50, height: 50, borderRadius: radius.md + 1, alignItems: 'center', justifyContent: 'center' },
-  label: { ...t.label, color: colors.text, lineHeight: 18 },
-  badge: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5,
-            backgroundColor: colors.cta, borderWidth: 2, borderColor: colors.card },
+  cell:     { width: CELL, flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+              backgroundColor: colors.card, borderRadius: radius.xl,
+              paddingHorizontal: spacing.base, paddingVertical: spacing.base, ...shadows.card },
+  cellFull: { width: '100%' },
+  icon:     { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  label:    { flex: 1, ...t.bodyBold, color: colors.text },
+  badge:    { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5,
+              backgroundColor: colors.cta, borderWidth: 2, borderColor: colors.card },
 });
 
 // ─── Actions data ─────────────────────────────────────────────────────────────
@@ -287,7 +288,7 @@ const ACTIONS = [
   { icon: 'bookmark'  as const, label: 'My Bookings',  to: '/(tabs)/bookings', color: colors.indigo, bg: colors.indigoBg },
   { icon: 'barbell'   as const, label: 'PT Sessions',  to: '/(tabs)/pt',       color: colors.teal,   bg: colors.tealBg   },
   { icon: 'pulse'     as const, label: 'Activity Log', to: '/(tabs)/activity', color: colors.green,  bg: colors.greenBg  },
-  { icon: 'qr-code'   as const, label: 'QR Check-in',  to: '/checkin/qr',      color: colors.amber,  bg: colors.amberBg  },
+  { icon: 'qr-code'   as const, label: 'QR Check-in',  to: '/checkin/qr',      color: colors.amber,  bg: colors.amberBg, fullWidth: true  },
 ];
 
 // ─── Smart Hub ────────────────────────────────────────────────────────────────
@@ -460,7 +461,7 @@ function InteractiveHub(props: {
 
   return (
     <View style={hub.outer}>
-      <Text style={[t.h3, { color: colors.text, paddingHorizontal: spacing.base }]}>Smart Hub</Text>
+      <Text style={[s.sectionLabel, { paddingHorizontal: spacing.base }]}>SMART HUB</Text>
 
       {/* Pinned urgent alerts */}
       {urgent.map(u => (
@@ -484,36 +485,37 @@ function InteractiveHub(props: {
 
       {/* Cycling info card */}
       {h && (
-        <View style={hub.card}>
-          <View style={[hub.iconBox, { backgroundColor: h.iconBg }]}>
-            <Ionicons name={h.icon} size={20} color={h.iconColor} />
-          </View>
-          <Animated.View style={[hub.content, { opacity: fadeAnim }]}>
-            <Text style={hub.title}>{h.title}</Text>
-            <Text style={hub.bodyTxt}>{h.body}</Text>
-            {h.action && (
-              <Pressable style={hub.actionRow} onPress={h.onPress}>
-                <Text style={[hub.actionTxt, { color: h.iconColor }]}>{h.action}</Text>
-                <Ionicons name="chevron-forward" size={12} color={h.iconColor} />
-              </Pressable>
-            )}
-          </Animated.View>
-
+        <View style={[hub.card, { overflow: 'hidden' }]}>
+          {/* Top segmented progress bar */}
           {info.length > 1 && (
-            <View style={hub.nav}>
-              <Pressable onPress={() => navigate(-1)} disabled={idx === 0} hitSlop={8} style={hub.navBtn}>
-                <Ionicons name="chevron-up" size={16} color={idx === 0 ? colors.border : colors.textMuted} />
-              </Pressable>
-              <View style={hub.navDots}>
-                {info.map((_, i) => (
-                  <View key={i} style={[hub.navDot, i === idx && hub.navDotActive]} />
-                ))}
-              </View>
-              <Pressable onPress={() => navigate(1)} disabled={idx === info.length - 1} hitSlop={8} style={hub.navBtn}>
-                <Ionicons name="chevron-down" size={16} color={idx === info.length - 1 ? colors.border : colors.textMuted} />
-              </Pressable>
+            <View style={hub.segRow}>
+              {info.map((_, i) => (
+                <View key={i} style={[
+                  hub.seg,
+                  i === idx && { backgroundColor: h.iconColor },
+                ]} />
+              ))}
             </View>
           )}
+
+          <Pressable style={hub.cardInner} onPress={h.onPress}>
+            <View style={[hub.iconBox, { backgroundColor: h.iconBg }]}>
+              <Ionicons name={h.icon} size={20} color={h.iconColor} />
+            </View>
+            <Animated.View style={[hub.content, { opacity: fadeAnim }]}>
+              <Text style={[hub.eyebrow, { color: h.iconColor }]} numberOfLines={1}>
+                {h.action ? h.action.toUpperCase() : 'INSIGHT'}
+              </Text>
+              <Text style={hub.title} numberOfLines={1}>{h.title}</Text>
+              <Text style={hub.bodyTxt} numberOfLines={2}>{h.body}</Text>
+            </Animated.View>
+            {h.action && (
+              <View style={[hub.ctaPill, { backgroundColor: h.iconColor }]}>
+                <Text style={hub.ctaTxt}>{h.action}</Text>
+                <Ionicons name="arrow-forward" size={12} color="#fff" />
+              </View>
+            )}
+          </Pressable>
         </View>
       )}
     </View>
@@ -522,21 +524,30 @@ function InteractiveHub(props: {
 
 const hub = StyleSheet.create({
   outer:      { gap: spacing.sm },
-  card:       { flexDirection: 'row', alignItems: 'center', gap: spacing.md + 2,
-                marginHorizontal: spacing.base, backgroundColor: colors.card,
-                borderRadius: radius.xl, padding: spacing.base, minHeight: 90, ...shadows.card },
-  cardUrgent: { borderWidth: 1.5, borderColor: colors.primary + '30' },
-  iconBox:    { width: 46, height: 46, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  content:    { flex: 1, gap: spacing.xs },
+  card:       { marginHorizontal: spacing.base, backgroundColor: colors.card,
+                borderRadius: radius.xl, ...shadows.card },
+  cardUrgent: { borderWidth: 1.5, borderColor: colors.primary + '30', flexDirection: 'row',
+                alignItems: 'center', gap: spacing.md, padding: spacing.base },
+  cardInner:  { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.base, minHeight: 80 },
+
+  // Top segmented progress bar
+  segRow:     { flexDirection: 'row', gap: 4, paddingHorizontal: spacing.base, paddingTop: spacing.md },
+  seg:        { flex: 1, height: 3, borderRadius: 2, backgroundColor: colors.border },
+
+  iconBox:    { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  content:    { flex: 1, gap: 2 },
+  eyebrow:    { fontSize: 9, fontFamily: fonts.black, letterSpacing: 1 },
   title:      { ...t.bodyBold, color: colors.text },
-  bodyTxt:    { ...t.bodySm, color: colors.textMuted, lineHeight: 18 },
+  bodyTxt:    { ...t.bodySm, color: colors.textMuted, lineHeight: 16 },
   actionRow:  { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: spacing.xs + 1 },
   actionTxt:  { ...t.labelSm, fontFamily: fonts.semibold },
-  nav:        { alignItems: 'center', gap: spacing.xs, flexShrink: 0 },
-  navBtn:     { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  navDots:    { gap: 3, alignItems: 'center' },
-  navDot:     { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.border },
-  navDotActive: { backgroundColor: colors.primary, height: 10, borderRadius: 3 },
+
+  // CTA pill
+  ctaPill:    { flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.full, flexShrink: 0 },
+  ctaTxt:     { color: '#fff', fontSize: 11, fontFamily: fonts.black },
+
+  accentLine: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: colors.primary },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -562,13 +573,44 @@ export default function HomeScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const name        = data?.user?.name ?? '';
-  const memberCode  = data?.user?.memberCode ?? null;
-  const m           = data?.membership;
-  const pt          = data?.pt;
-  const unread      = data?.unreadNotifications ?? 0;
-  const streak      = data?.streak ?? 0;
-  const totalVisits = data?.totalVisits ?? 0;
+  // ── DEMO data fallback for __DEV__ when backend fields missing ──
+  const DEMO = __DEV__;
+
+  const name        = data?.user?.name ?? 'Alex Chan';
+  const memberCode  = data?.user?.memberCode ?? '4000463';
+  const m: DashboardData['membership'] = {
+    active:    data?.membership?.active ?? true,
+    planName:  data?.membership?.planName ?? 'Platinum 24/7',
+    daysRemaining: data?.membership?.daysRemaining ?? (DEMO ? 276 : null),
+    expiresAt: data?.membership?.expiresAt ?? (DEMO ? '2026-02-14' : null),
+    outstandingBalance: data?.membership?.outstandingBalance ?? (DEMO ? 480 : 0),
+  };
+  const pt: DashboardData['pt'] = {
+    remainingSessions: data?.pt?.remainingSessions ?? (DEMO ? 8 : 0),
+    totalSessions:     data?.pt?.totalSessions ?? (DEMO ? 20 : 0),
+    expiresAt:         data?.pt?.expiresAt ?? null,
+  };
+  const unread = data?.unreadNotifications ?? (DEMO ? 3 : 0);
+  const streak = (data?.streak && data.streak > 0) ? data.streak : (DEMO ? 6 : 0);
+  const totalVisits = data?.totalVisits ?? (DEMO ? 88 : 0);
+
+  const demoStart = new Date(); demoStart.setHours(18, 30, 0, 0);
+  const nextClass = data?.nextClass ?? (DEMO ? {
+    bookingId: 'demo-1', classId: 999, className: 'Power Yoga Flow',
+    startTime: demoStart.toISOString(),
+    endTime: new Date(demoStart.getTime() + 45 * 60_000).toISOString(),
+    minutesUntil: Math.max(0, Math.floor((demoStart.getTime() - Date.now()) / 60000)),
+    clubName: 'GO24 Central',
+  } : null);
+
+  const demoThisMonth = data?.thisMonth ?? (DEMO ? { visits: 14, classes: 5, pt: 3 } : { visits: 0, classes: 0, pt: 0 });
+
+  const demoBanners: Banner[] = DEMO ? [
+    { id: 'b1', title: 'Bring a Friend Week', imageUrl: 'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=600', linkUrl: null },
+    { id: 'b2', title: 'Summer PT Burn',      imageUrl: 'https://images.unsplash.com/photo-1599058917765-a780eda07a3e?w=600', linkUrl: null },
+  ] : [];
+  const displayBanners = banners.length > 0 ? banners : demoBanners;
+
   const hasExpired  = m != null && !m.active && (m.daysRemaining == null || m.daysRemaining <= 0);
   const cardExpired = __DEV__ || (data?.savedCardExpired ?? false);
   const hasDebt     = __DEV__ || (m?.outstandingBalance ?? 0) > 0;
@@ -627,17 +669,29 @@ export default function HomeScreen() {
 
         {/* Streak banner */}
         {streak > 0 && (
-          <View style={s.streakBanner}>
-            <Ionicons name="flame" size={18} color={colors.cta} />
-            <Text style={s.streakText}>{streak}-week streak — keep it up!</Text>
-          </View>
+          <Pressable style={s.streakBanner} onPress={() => router.push('/(tabs)/activity')}>
+            <LinearGradient
+              colors={['#FF8C00', '#FF6B00']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={s.streakGradient}
+            >
+              <View style={s.streakIconBox}>
+                <Ionicons name="flame" size={20} color={colors.cta} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.streakTitle}>{streak}-week streak</Text>
+                <Text style={s.streakSub}>You're on fire — keep showing up.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+            </LinearGradient>
+          </Pressable>
         )}
 
         {/* Stats */}
         <StatRow
-          visits={data?.thisMonth.visits ?? 0}
-          pt={data?.thisMonth.pt ?? 0}
-          classes={data?.thisMonth.classes ?? 0}
+          visits={demoThisMonth.visits}
+          pt={demoThisMonth.pt}
+          classes={demoThisMonth.classes}
         />
 
         {/* Smart Hub */}
@@ -658,17 +712,21 @@ export default function HomeScreen() {
           onClasses={() => router.push('/(tabs)/classes')}
         />
 
-        {/* Promotions */}
-        <Text style={[t.h3, { color: colors.text, paddingHorizontal: spacing.base }]}>Promotions</Text>
-        {banners.length > 0 ? (
+        {/* FOR YOU */}
+        <View style={s.sectionRow}>
+          <Text style={s.sectionLabel}>FOR YOU</Text>
+          <Pressable><Text style={s.seeAll}>See all</Text></Pressable>
+        </View>
+        {displayBanners.length > 0 ? (
           <>
             <FlatList
-              data={banners} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+              data={displayBanners} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
               keyExtractor={b => b.id}
               onMomentumScrollEnd={e => setBannerIdx(Math.round(e.nativeEvent.contentOffset.x / (W - 32)))}
               renderItem={({ item }) => (
                 <Pressable style={s.banner} onPress={() => item.linkUrl && Linking.openURL(item.linkUrl)}>
                   <Image source={{ uri: item.imageUrl }} style={s.bannerImg} resizeMode="cover" />
+                  <View style={s.promoTag}><Text style={s.promoTagTxt}>PROMOTION</Text></View>
                   {item.title && (
                     <View style={s.bannerOverlay}>
                       <Text style={s.bannerTitle}>{item.title}</Text>
@@ -677,9 +735,9 @@ export default function HomeScreen() {
                 </Pressable>
               )}
             />
-            {banners.length > 1 && (
+            {displayBanners.length > 1 && (
               <View style={s.dots}>
-                {banners.map((_, i) => <View key={i} style={[s.dot, i === bannerIdx && s.dotActive]} />)}
+                {displayBanners.map((_, i) => <View key={i} style={[s.dot, i === bannerIdx && s.dotActive]} />)}
               </View>
             )}
           </>
@@ -692,12 +750,12 @@ export default function HomeScreen() {
         )}
 
         {/* Next class */}
-        <NextCard next={data?.nextClass ?? null} onBook={() => router.push('/(tabs)/classes')} />
+        <NextCard next={nextClass as any} onBook={() => router.push('/(tabs)/classes')} />
 
         {/* Actions grid */}
-        <Text style={[t.h3, { color: colors.text, paddingHorizontal: spacing.base }]}>Quick Actions</Text>
+        <Text style={[s.sectionLabel, { paddingHorizontal: spacing.base }]}>QUICK ACTIONS</Text>
         <View style={s.grid}>
-          {ACTIONS.map(a => <ActionCell key={a.label} {...a} />)}
+          {ACTIONS.map(a => <ActionCell key={a.label} {...a} fullWidth={a.fullWidth} />)}
         </View>
 
         <View style={{ height: spacing.sm }} />
@@ -732,13 +790,15 @@ const s = StyleSheet.create({
   },
   alertTxt: { flex: 1, ...t.label, color: colors.primary },
 
-  streakBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    marginHorizontal: spacing.base, backgroundColor: colors.ctaBg,
-    borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md - 1,
-    borderWidth: 1, borderColor: colors.cta + '40',
-  },
-  streakText: { ...t.label, color: colors.cta },
+  streakBanner:   { marginHorizontal: spacing.base, borderRadius: radius.xl, overflow: 'hidden', ...shadows.card },
+  streakGradient: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.base },
+  streakIconBox:  { width: 40, height: 40, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  streakTitle:    { fontSize: 15, fontFamily: fonts.black, color: '#fff' },
+  streakSub:      { fontSize: 12, fontFamily: fonts.regular, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+
+  sectionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.base },
+  sectionLabel: { ...t.overline, color: colors.textMuted, letterSpacing: 1.5 },
+  seeAll:       { fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.base, gap: 10 },
 
@@ -757,4 +817,6 @@ const s = StyleSheet.create({
   dots:          { flexDirection: 'row', justifyContent: 'center', gap: 5 },
   dot:           { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.border },
   dotActive:     { backgroundColor: colors.primary, width: 14 },
+  promoTag:      { position: 'absolute', top: 10, left: 10+16, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  promoTagTxt:   { color: '#fff', fontSize: 9, fontFamily: fonts.black, letterSpacing: 1.2 },
 });

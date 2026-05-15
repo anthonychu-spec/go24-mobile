@@ -196,7 +196,7 @@ export default function SettingsScreen() {
 
           {/* ── Profile hero ── */}
           <Card rounded="xl" style={s.profileCard}>
-            <Avatar name={data?.member.name} size="xl" />
+            <Avatar name={data?.member.name} size="xl" style={{ borderRadius: 16 }} />
             <Text style={[t.h3, { color: colors.text, marginTop: spacing.md }]}>
               {data?.member.name ?? '—'}
             </Text>
@@ -309,8 +309,8 @@ export default function SettingsScreen() {
 
           {/* ── Logout — spatially separated (P9 destructive-nav-separation) ── */}
           <Pressable style={s.logoutRow} onPress={logout} hitSlop={8}>
-            <Ionicons name="log-out-outline" size={18} color={colors.error} />
-            <Text style={[t.label, { color: colors.error }]}>Log Out</Text>
+            <Ionicons name="log-out-outline" size={18} color={colors.cta} />
+            <Text style={[t.label, { color: colors.cta }]}>Log Out</Text>
           </Pressable>
 
         </ScrollView>

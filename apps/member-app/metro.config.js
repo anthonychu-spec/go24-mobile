@@ -6,7 +6,6 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// pnpm workspace: watch monorepo root + all packages
 config.watchFolders = [workspaceRoot];
 
 // Resolve modules from workspace root first, then project
