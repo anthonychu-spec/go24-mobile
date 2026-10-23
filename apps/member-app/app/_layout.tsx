@@ -14,7 +14,8 @@ function RouteGuard() {
   useEffect(() => {
     if (loading) return;
     const inAuth = segments[0] === '(auth)';
-    if (!user && !inAuth) router.replace('/(auth)/login');
+    const inSignup = segments[0] === 'signup';
+    if (!user && !inAuth && !inSignup) router.replace('/(auth)/login');
     if (user && inAuth) router.replace('/(tabs)/');
   }, [user, loading, segments]);
 
