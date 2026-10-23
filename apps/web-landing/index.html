@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GO24 Fitness — Join Hong Kong's Premium 24/7 Gym</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:        #E8192C;
+      --red-mid:    #C8001F;
+      --red-dark:   #9A0018;
+      --red-bg:     #FFF0F1;
+      --orange:     #FF6B00;
+      --text:       #18181B;
+      --text2:      #52525B;
+      --muted:      #A1A1AA;
+      --border:     #EBEBF0;
+      --bg:         #F4F4F8;
+      --card:       #FFFFFF;
+      --blue:       #2563EB;
+      --blue-bg:    #EFF6FF;
+      --teal:       #0891B2;
+      --teal-bg:    #ECFEFF;
+      --indigo:     #4F46E5;
+      --indigo-bg:  #EEF2FF;
+      --amber:      #D97706;
+      --amber-bg:   #FFFBEB;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(232,25,44,0.97);
+      backdrop-filter: blur(12px);
+      padding: 0 24px;
+      height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .nav-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .nav-wordmark { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: 3px; }
+    .nav-sub { font-size: 8px; font-weight: 700; color: rgba(255,255,255,0.6); letter-spacing: 3px; line-height: 1; }
+    .nav-cta {
+      background: #fff; color: var(--red);
+      padding: 8px 20px; border-radius: 20px;
+      font-weight: 700; font-size: 14px;
+      text-decoration: none; border: none; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .nav-cta:hover { opacity: 0.88; }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(135deg, var(--red) 0%, var(--red-mid) 50%, var(--red-dark) 100%);
+      padding: 80px 24px 120px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.9);
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; letter-spacing: 1px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.1;
+      letter-spacing: -0.5px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .hero h1 span { color: rgba(255,255,255,0.65); }
+    .hero-sub {
+      font-size: clamp(16px, 2.5vw, 20px);
+      color: rgba(255,255,255,0.75);
+      max-width: 540px; margin: 0 auto 40px;
+      position: relative;
+    }
+    .hero-actions {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      justify-content: center;
+      position: relative;
+    }
+    .btn-white {
+      background: #fff; color: var(--red);
+      padding: 16px 32px; border-radius: 12px;
+      font-weight: 700; font-size: 16px;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+      transition: transform .15s, box-shadow .15s;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    }
+    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    .btn-outline {
+      background: transparent; color: #fff;
+      padding: 16px 32px; border-radius: 12px;
+      font-weight: 600; font-size: 16px;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+      border: 2px solid rgba(255,255,255,0.4);
+      transition: background .15s, border-color .15s;
+    }
+    .btn-outline:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.7); }
+
+    /* ── STATS STRIP ── */
+    .stats {
+      background: var(--text);
+      padding: 28px 24px;
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 40px;
+    }
+    .stat { text-align: center; }
+    .stat-num {
+      font-size: 32px; font-weight: 900; color: #fff;
+      display: block; line-height: 1;
+    }
+    .stat-num span { color: var(--red); }
+    .stat-label { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+
+    /* ── FEATURES ── */
+    .features {
+      padding: 80px 24px;
+      max-width: 1100px; margin: 0 auto;
+    }
+    .section-label {
+      text-align: center;
+      font-size: 12px; font-weight: 700; letter-spacing: 2px;
+      color: var(--red); text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      text-align: center;
+      font-size: clamp(28px, 4vw, 42px); font-weight: 900;
+      color: var(--text); margin-bottom: 48px; line-height: 1.2;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .feature-card:hover { transform: translateY(-4px); box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+    .feature-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin-bottom: 18px;
+    }
+    .feature-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .feature-desc { font-size: 14px; color: var(--text2); line-height: 1.6; }
+
+    /* ── CLUBS ── */
+    .clubs-section {
+      background: var(--card);
+      padding: 80px 24px;
+    }
+    .clubs-inner { max-width: 1100px; margin: 0 auto; }
+    .clubs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px; margin-top: 40px;
+    }
+    .club-pill {
+      background: var(--bg);
+      border-radius: 12px; padding: 14px 18px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px; font-weight: 600; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .club-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .go24-dot { background: var(--red); }
+    .onyx-dot { background: var(--text); }
+
+    /* ── APP DOWNLOAD ── */
+    .download {
+      background: linear-gradient(135deg, var(--text) 0%, #2d2d35 100%);
+      padding: 80px 24px;
+      text-align: center;
+    }
+    .download h2 {
+      font-size: clamp(28px, 4vw, 42px); font-weight: 900;
+      color: #fff; margin-bottom: 12px; line-height: 1.2;
+    }
+    .download p { font-size: 17px; color: rgba(255,255,255,0.6); margin-bottom: 40px; }
+    .app-badges { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-bottom: 32px; }
+    .badge {
+      background: #fff; color: var(--text);
+      padding: 14px 24px; border-radius: 12px;
+      font-weight: 700; font-size: 15px;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 10px;
+      transition: opacity .15s;
+    }
+    .badge:hover { opacity: 0.9; }
+    .badge-icon { font-size: 22px; }
+    .badge-sub { font-size: 11px; font-weight: 400; color: var(--text2); display: block; }
+    .qr-hint { font-size: 13px; color: rgba(255,255,255,0.4); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--text);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .footer-logo { display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 16px; }
+    .footer-wordmark { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: 3px; }
+    footer p { font-size: 13px; color: rgba(255,255,255,0.35); }
+    footer a { color: rgba(255,255,255,0.5); text-decoration: none; }
+    footer a:hover { color: #fff; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      .hero { padding: 60px 20px 100px; }
+      .stats { gap: 24px; }
+      .features, .clubs-inner { padding-left: 16px; padding-right: 16px; }
+      nav { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-icon">💪</div>
+    <div>
+      <div class="nav-wordmark">GO24</div>
+      <div class="nav-sub">FITNESS</div>
+    </div>
+  </a>
+  <a href="#download" class="nav-cta">Join Now</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">🏆 Hong Kong's Premier 24/7 Gym Network</div>
+  <h1>Train Anytime.<br><span>Anywhere in HK.</span></h1>
+  <p class="hero-sub">Premium gym access across 15 locations in Hong Kong — open 24 hours a day, 365 days a year.</p>
+  <div class="hero-actions">
+    <a href="#download" class="btn-white">
+      <span>🚀</span> Join GO24
+    </a>
+    <a href="#clubs" class="btn-outline">
+      <span>📍</span> Find a Club
+    </a>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat">
+    <span class="stat-num">15<span>+</span></span>
+    <div class="stat-label">Locations in HK</div>
+  </div>
+  <div class="stat">
+    <span class="stat-num">24<span>/7</span></span>
+    <div class="stat-label">Always Open</div>
+  </div>
+  <div class="stat">
+    <span class="stat-num">2<span> Brands</span></span>
+    <div class="stat-label">GO24 & ONYX</div>
+  </div>
+  <div class="stat">
+    <span class="stat-num">1<span> Card</span></span>
+    <div class="stat-label">All Access</div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="section-label">Why GO24</div>
+  <h2 class="section-title">Everything You Need<br>to Train at Your Best</h2>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--blue-bg); color:var(--blue);">🕐</div>
+      <div class="feature-title">24/7 Access</div>
+      <div class="feature-desc">Train on your own schedule — every club is open around the clock, every day of the year.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--teal-bg); color:var(--teal);">👁</div>
+      <div class="feature-title">Face ID Entry</div>
+      <div class="feature-desc">Walk straight in using facial recognition — no card, no fuss, no waiting.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--indigo-bg); color:var(--indigo);">📍</div>
+      <div class="feature-title">Multi-Location</div>
+      <div class="feature-desc">One membership unlocks all GO24 and ONYX clubs across Hong Kong.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--amber-bg); color:var(--amber);">🏋️</div>
+      <div class="feature-title">Premium Equipment</div>
+      <div class="feature-desc">Top-tier machines, free weights, functional zones, and dedicated cardio areas.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:#FFF4EC; color:var(--orange);">📱</div>
+      <div class="feature-title">App Control</div>
+      <div class="feature-desc">Book classes, track workouts, manage your membership — all from your phone.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--red-bg); color:var(--red);">⚡</div>
+      <div class="feature-title">Join in Minutes</div>
+      <div class="feature-desc">Sign up online, pick your plan, and start training the same day.</div>
+    </div>
+  </div>
+</section>
+
+<!-- CLUBS -->
+<section class="clubs-section" id="clubs">
+  <div class="clubs-inner">
+    <div class="section-label">Our Locations</div>
+    <h2 class="section-title">15 Clubs Across Hong Kong</h2>
+    <div class="clubs-grid">
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 Wong Tai Sin</div>
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 Lai Chi Kok</div>
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 Tsuen Wan</div>
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 North Point</div>
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 Kennedy Town</div>
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 Shau Kei Wan</div>
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 Yuen Long</div>
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 Mong Kok</div>
+      <div class="club-pill"><span class="club-dot go24-dot"></span>GO24 Fortress Hill</div>
+      <div class="club-pill"><span class="club-dot onyx-dot"></span>ONYX Taikoo Place</div>
+      <div class="club-pill"><span class="club-dot onyx-dot"></span>ONYX Central</div>
+      <div class="club-pill"><span class="club-dot onyx-dot"></span>ONYX Admiralty</div>
+      <div class="club-pill"><span class="club-dot onyx-dot"></span>ONYX Wan Chai</div>
+      <div class="club-pill"><span class="club-dot onyx-dot"></span>ONYX LHT</div>
+      <div class="club-pill"><span class="club-dot onyx-dot"></span>ONYX Novotel Wan Chai</div>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOAD -->
+<section class="download" id="download">
+  <h2>Start Training Today</h2>
+  <p>Download the GO24 app and join in minutes</p>
+  <div class="app-badges">
+    <a href="https://apps.apple.com/hk/app/go24-fitness/id1494895908" class="badge">
+      <span class="badge-icon">🍎</span>
+      <div>
+        <span class="badge-sub">Download on the</span>
+        App Store
+      </div>
+    </a>
+    <a href="https://play.google.com/store/apps/details?id=com.perfectgym.perfectgymgo2.go24fitness" class="badge">
+      <span class="badge-icon">▶</span>
+      <div>
+        <span class="badge-sub">Get it on</span>
+        Google Play
+      </div>
+    </a>
+  </div>
+  <p class="qr-hint">Free download · Available in Hong Kong</p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">
+    <div class="nav-icon" style="width:32px;height:32px;background:rgba(255,255,255,0.1);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;">💪</div>
+    <span class="footer-wordmark">GO24</span>
+  </div>
+  <p>© 2026 GO24 Fitness Hong Kong. All rights reserved. &nbsp;·&nbsp; <a href="/terms">Terms</a> &nbsp;·&nbsp; <a href="/privacy">Privacy</a></p>
+</footer>
+
+</body>
+</html>
