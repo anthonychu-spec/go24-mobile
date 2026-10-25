@@ -1,0 +1,1 @@
+{"name":"the-lab-member-app-web","version":"1.0.0-preview","private":true,"type":"module","scripts":{"dev":"node server.mjs","check":"node --check site/app.js","pwa":"node scripts/add-pwa.mjs site","pack":"powershell -File scripts/pack.ps1"},"engines":{"node":">=20.11"}}
