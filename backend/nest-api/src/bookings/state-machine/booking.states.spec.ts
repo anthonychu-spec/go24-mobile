@@ -14,6 +14,8 @@ describe('assertValidTransition', () => {
     ['waitlist', 'cancelled'],
     ['pending_verify', 'confirmed'],
     ['pending_verify', 'failed'],
+    ['pending_verify', 'waitlist'],
+    ['pending_verify', 'cancelled'],
   ];
 
   const invalid: [BookingStatus, BookingStatus][] = [
@@ -24,7 +26,7 @@ describe('assertValidTransition', () => {
     ['cancelled', 'confirmed'],
     ['attended', 'cancelled'],
     ['no_show', 'confirmed'],
-    ['pending_verify', 'waitlist'],
+    ['pending_verify', 'pending'],
   ];
 
   it.each(valid)('allows %s → %s', (from, to) => {

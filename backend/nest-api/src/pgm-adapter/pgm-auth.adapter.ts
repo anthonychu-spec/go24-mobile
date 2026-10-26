@@ -9,6 +9,12 @@ export interface VerifyMemberCredentialsResult {
   status: string; // 'Active' | 'Inactive' | 'Frozen' | ...
 }
 
+export interface PgmMemberStatus {
+  exists: boolean;
+  isActive: boolean;
+  isDeleted: boolean;
+}
+
 export interface VerifyOneTimeCodeResult {
   codeMatches: boolean;
   memberId: number;
@@ -67,15 +73,39 @@ export class PgmAuthAdapter {
     if (!isSafeEmailForOData(email)) {
       throw new AppError('NOT_FOUND', 'invalid email');
     }
+    let res: { value?: Array<{ Id: number }> };
     try {
       const escaped = email.replace(/'/g, "''");
-      const res = await this.client.get<{ value?: Array<{ Id: number }> }>(
+      // $top 2: more than one PGM member can share an email (family, re-joins).
+      // Picking the first would send the code to — and sign in as — the wrong member.
+      res = await this.client.get<{ value?: Array<{ Id: number }> }>(
         '/odata/Members',
-        { $filter: `Email eq '${escaped}'`, $select: 'Id', $top: 1 },
+        { $filter: `Email eq '${escaped}'`, $select: 'Id', $top: 2 },
       );
-      return res.value?.[0]?.Id ?? null;
     } catch (err) {
       throw normalizePgmError(err);
+    }
+    const members = res.value ?? [];
+    if (members.length > 1) throw new AppError('AMBIGUOUS_ACCOUNT', 'more than one member uses this email');
+    return members[0]?.Id ?? null;
+  }
+
+  /** Membership state from PGM. Returns null when PGM can't be asked (caller decides). */
+  async getMemberStatus(memberId: number): Promise<PgmMemberStatus | null> {
+    try {
+      const res = await this.client.get<{ value?: Array<Record<string, unknown>> }>(
+        '/odata/Members',
+        { $filter: `Id eq ${memberId}`, $select: 'Id,IsActive,IsDeleted', $top: 1 },
+      );
+      const m = res.value?.[0];
+      if (!m) return { exists: false, isActive: false, isDeleted: false };
+      return {
+        exists: true,
+        isActive: Boolean(m.IsActive ?? m.isActive),
+        isDeleted: Boolean(m.IsDeleted ?? m.isDeleted),
+      };
+    } catch {
+      return null;
     }
   }
 

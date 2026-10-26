@@ -1,7 +1,6 @@
 
 import {
-  Controller, Get, Post, Delete, Query, Param, ParseIntPipe,
-  UseGuards, Req, HttpCode,
+  Controller, Get, Query, Param, ParseIntPipe, UseGuards, Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -54,19 +53,7 @@ export class BookingController {
     return this.svc.listMyBookings(user.pgmId);
   }
 
-  @ApiOperation({ summary: 'Book a class' })
-  @Post('classes/:id/book')
-  @HttpCode(200)
-  bookClass(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
-    const user = req.user as AuthedUser;
-    return this.svc.bookClass(user.pgmId, id);
-  }
-
-  @ApiOperation({ summary: 'Cancel booking for a class' })
-  @Delete('classes/:id/book')
-  @HttpCode(204)
-  cancelBooking(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
-    const user = req.user as AuthedUser;
-    return this.svc.cancelBooking(user.pgmId, id);
-  }
+  // Booking and cancelling go through POST/DELETE /bookings (idempotency key,
+  // 1-per-day limit, 168h window, reconcile). The old /booking/classes/:id/book
+  // routes bypassed all of that and were removed.
 }

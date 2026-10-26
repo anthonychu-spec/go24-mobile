@@ -16,6 +16,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { backgroundJobsEnabled } from '../config/background-jobs';
 
+/** errorCode markers that tell ReconcileJob what to check in PGM */
+export const WAITLIST_DECLINED = 'WAITLIST_DECLINED';
+export const CANCEL_UNKNOWN = 'CANCEL_UNKNOWN';
+
 export interface BookInput {
   userId: string;
   pgmId: number;        // PGM member id for the PGM call
@@ -98,9 +102,9 @@ export class BookingsService {
       if (pgmResult.isStandby) {
         // Waitlist path
         if (!input.acceptWaitlist) {
-          // User did not accept waitlist → treat as full
-          await this.bookingRepo.transition(booking.id, 'failed', { errorCode: 'BOOKING_FULL' });
-          const response: BookResult = { success: false, bookingId: booking.id, status: 'failed', error: 'BOOKING_FULL' };
+          // User did not accept waitlist → treat as full, and release the standby place
+          // PGM just created so the member isn't left on a waitlist they declined.
+          const response = await this.releaseDeclinedStandby(booking.id, pgmResult.bookingId);
           await this.idempotencyRepo.complete(input.userId, input.idempotencyKey, response as any, 'terminal');
           throw new BookingFullError();
         }
@@ -156,6 +160,29 @@ export class BookingsService {
     }
   }
 
+  /**
+   * PGM put the member on standby but they declined the waitlist. Cancel that one
+   * standby booking; if PGM doesn't answer, leave it for reconcile (pending_verify)
+   * rather than claiming it's gone.
+   */
+  private async releaseDeclinedStandby(bookingId: string, pgmBookingId: number): Promise<BookResult> {
+    try {
+      await this.pgm.cancelBooking(pgmBookingId);
+      await this.bookingRepo.transition(
+        bookingId, 'failed', { externalId: String(pgmBookingId), errorCode: 'BOOKING_FULL' },
+        'standby declined and released',
+      );
+      return { success: false, bookingId, status: 'failed', error: 'BOOKING_FULL' };
+    } catch (err) {
+      this.logger.warn(`Could not release declined standby ${pgmBookingId} for booking ${bookingId}: ${mapPgmError(err)}`);
+      await this.bookingRepo.transition(
+        bookingId, 'pending_verify', { externalId: String(pgmBookingId), errorCode: WAITLIST_DECLINED },
+        'standby declined, release failed',
+      );
+      return { success: false, bookingId, status: 'pending_verify', error: 'BOOKING_FULL' };
+    }
+  }
+
   async cancel(bookingId: string, userId: string, idempotencyKey: string): Promise<void> {
     const claim = await this.idempotencyRepo.tryClaim(
       userId, idempotencyKey, 'DELETE /bookings',
@@ -168,8 +195,19 @@ export class BookingsService {
       throw new BadRequestException('Booking not found');
     }
 
-    if (booking.externalId && booking.pgmMemberId) {
-      await this.pgm.cancelBooking(booking.pgmMemberId, booking.classId);
+    if (booking.externalId) {
+      try {
+        await this.pgm.cancelBooking(Number(booking.externalId));
+      } catch (err) {
+        const errorCode = mapPgmError(err);
+        if (isTempFail(errorCode)) {
+          // PGM may or may not have cancelled it. Keep the booking as is, flag it for
+          // reconcile, and let the client retry with a new key once it has settled.
+          await this.bookingRepo.flagError(booking.id, CANCEL_UNKNOWN);
+          await this.idempotencyRepo.complete(userId, idempotencyKey, { cancelled: false, error: errorCode }, 'transient');
+        }
+        throw err;
+      }
     }
 
     await this.bookingRepo.transition(booking.id, 'cancelled', {}, 'user cancel', userId);
@@ -301,7 +339,8 @@ export class BookingsService {
           const s = await this.settings.get(booking.userId);
 
           if (s.autoWaitlistCancel) {
-            await this.pgm.cancelBooking(booking.pgmMemberId ?? 0, booking.classId);
+            if (!booking.externalId) continue;
+            await this.pgm.cancelBooking(Number(booking.externalId));
             await this.bookingRepo.transition(booking.id, 'cancelled', {}, 'auto waitlist cancel');
             await this.notifications.sendDirectPush(
               booking.userId,

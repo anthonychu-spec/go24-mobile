@@ -4,6 +4,7 @@ import { AxiosError } from 'axios';
 export type AppErrorCode =
   | 'INVALID_CREDENTIALS'
   | 'MEMBER_INACTIVE'
+  | 'AMBIGUOUS_ACCOUNT'
   | 'INVALID_OTP'
   | 'OTP_EXPIRED'
   | 'BOOKING_FULL'
@@ -20,6 +21,7 @@ export type AppErrorCode =
 const httpStatus: Record<AppErrorCode, HttpStatus> = {
   INVALID_CREDENTIALS: HttpStatus.UNAUTHORIZED,
   MEMBER_INACTIVE: HttpStatus.FORBIDDEN,
+  AMBIGUOUS_ACCOUNT: HttpStatus.CONFLICT, // email shared by several PGM members — sign in at front desk
   INVALID_OTP: HttpStatus.UNAUTHORIZED,
   OTP_EXPIRED: HttpStatus.GONE,
   BOOKING_FULL: HttpStatus.CONFLICT,

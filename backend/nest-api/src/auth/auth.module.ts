@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 import { Session } from './entities/session.entity';
 import { User } from './entities/user.entity';
 import { JwtStrategy } from './jwt.strategy';
+import { SessionValidator } from './session-validator';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { JwtStrategy } from './jwt.strategy';
     PgmModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, SessionValidator],
+  exports: [AuthService, SessionValidator],
 })
 export class AuthModule {}

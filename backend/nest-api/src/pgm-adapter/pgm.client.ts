@@ -1,13 +1,23 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import axiosRetry from 'axios-retry';
 import CircuitBreaker from 'opossum';
 
 /**
+ * Only reads are retried. A POST (book, cancel, send code) that timed out or
+ * got a 5xx may still have taken effect in PGM; retrying could book twice.
+ * Callers treat those as "result unknown" and reconcile against PGM instead.
+ */
+export function shouldRetryPgmRequest(err: AxiosError): boolean {
+  if ((err.config?.method ?? 'get').toLowerCase() !== 'get') return false;
+  return axiosRetry.isNetworkOrIdempotentRequestError(err) || (err.response?.status ?? 0) >= 500;
+}
+
+/**
  * Low-level PGM HTTP client.
  * - Adds X-Client-Id / X-Client-Secret on every request
- * - 3s timeout, 2x retry (exponential, only 5xx + timeouts)
+ * - 8s timeout, 2x retry for GET only (exponential, 5xx + network errors)
  * - Circuit breaker: open after 50% failure rate over 30 reqs, retry after 30s
  *
  * Higher-level adapters (PgmAuthAdapter, PgmBookingAdapter, ...) use this
@@ -47,9 +57,7 @@ export class PgmClient {
     axiosRetry(this.axios, {
       retries: 2,
       retryDelay: axiosRetry.exponentialDelay,
-      retryCondition: (err) =>
-        axiosRetry.isNetworkOrIdempotentRequestError(err) ||
-        (err.response?.status ?? 0) >= 500,
+      retryCondition: shouldRetryPgmRequest,
     });
 
     this.breaker = new CircuitBreaker(

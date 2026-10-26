@@ -4,7 +4,8 @@ const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   pending:         ['confirmed', 'failed', 'waitlist', 'pending_verify'],
   confirmed:       ['cancelled', 'attended', 'no_show'],
   waitlist:        ['confirmed', 'cancelled'],
-  pending_verify:  ['confirmed', 'failed'],
+  // reconcile settles pending_verify from what PGM actually holds
+  pending_verify:  ['confirmed', 'waitlist', 'cancelled', 'failed'],
   failed:          [],
   cancelled:       [],
   attended:        [],

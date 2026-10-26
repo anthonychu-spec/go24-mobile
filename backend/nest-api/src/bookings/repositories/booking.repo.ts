@@ -91,6 +91,15 @@ export class BookingRepository {
     return this.bookings.find({ where: { status: 'pending_verify' } });
   }
 
+  /** Set or clear errorCode without a status change (e.g. a cancel whose outcome in PGM is unknown). */
+  async flagError(bookingId: string, errorCode: string | null): Promise<void> {
+    await this.bookings.update({ id: bookingId }, { errorCode });
+  }
+
+  async findByErrorCode(errorCode: string): Promise<Booking[]> {
+    return this.bookings.find({ where: { errorCode }, take: 200 });
+  }
+
   private async logEvent(
     bookingId: string,
     from: BookingStatus | null,

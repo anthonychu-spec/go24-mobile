@@ -21,8 +21,4 @@ export class BookingService {
   getClass(id: number) { return this.repo.getClass(id); }
 
   listMyBookings(pgmId: number) { return this.repo.listMyBookings(pgmId); }
-
-  bookClass(pgmId: number, classId: number) { return this.repo.bookClass(pgmId, classId); }
-
-  cancelBooking(pgmId: number, classId: number) { return this.repo.cancelBooking(pgmId, classId); }
 }

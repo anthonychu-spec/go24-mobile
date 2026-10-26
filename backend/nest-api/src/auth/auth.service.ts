@@ -9,9 +9,11 @@ import { AppError } from '../pgm-adapter/error-normalize';
 import { Session } from './entities/session.entity';
 import { User } from './entities/user.entity';
 import { JwtPayload } from './jwt.strategy';
+import { SessionValidator } from './session-validator';
 
 const REFRESH_TTL_DAYS = 30;
 const ACCESS_TTL = '15m';
+const PGM_RECHECK_MS = 24 * 3600_000;
 
 export interface IssueTokenResult {
   accessToken: string;
@@ -30,6 +32,7 @@ export class AuthService {
     private readonly pgm: PgmAuthAdapter,
     private readonly jwt: JwtService,
     private readonly cfg: ConfigService,
+    private readonly sessionValidator: SessionValidator,
   ) {
     // CRITICAL: fail-fast on missing/weak JWT_SECRET
     const secret = this.cfg.get<string>('JWT_SECRET');
@@ -58,6 +61,7 @@ export class AuthService {
     if (status !== 'active' && status !== 'success') {
       throw new AppError('MEMBER_INACTIVE', `status=${result.status || 'unknown'}`);
     }
+    await this.ensureMemberActive(result.memberId);
 
     const user = await this.upsertUser({
       pgmMemberId: result.memberId,
@@ -88,9 +92,19 @@ export class AuthService {
     const memberId = this.verifyMemberIdToken(input.memberIdToken);
     const r = await this.pgm.verifyOneTimeCode(memberId, input.code);
     if (!r.codeMatches) throw new AppError('INVALID_OTP');
+    // PGM echoes the member the code belongs to; it must be the one we sent it to
+    if (r.memberId && r.memberId !== memberId) throw new AppError('INVALID_OTP', 'member mismatch');
+    await this.ensureMemberActive(memberId);
 
     const user = await this.upsertUser({ pgmMemberId: memberId, status: 'active' });
     return this.issueTokens(user, input.deviceFingerprint);
+  }
+
+  /** A correct password or code is not enough: the PGM member must still be active. */
+  private async ensureMemberActive(memberId: number): Promise<void> {
+    const s = await this.pgm.getMemberStatus(memberId);
+    if (!s) throw new AppError('TEMP_FAIL', 'could not check membership status');
+    if (!s.exists || !s.isActive || s.isDeleted) throw new AppError('MEMBER_INACTIVE');
   }
 
   /**
@@ -124,13 +138,44 @@ export class AuthService {
       throw new UnauthorizedException('invalid refresh token');
     }
 
-    const user = await this.userRepo.findOneOrFail({ where: { id: claimed.user_id } });
+    const user = await this.userRepo.findOne({ where: { id: claimed.user_id } });
+    if (!user || user.status !== 'active') {
+      await this.revokeAllSessions(claimed.user_id);
+      throw new UnauthorizedException('account not active');
+    }
+
+    // Re-check the membership with PGM at most once a day. If PGM can't be reached,
+    // don't lock members out — the next refresh tries again.
+    const lastSync = user.lastPgmSyncAt?.getTime() ?? 0;
+    if (Date.now() - lastSync > PGM_RECHECK_MS) {
+      const s = await this.pgm.getMemberStatus(user.pgmMemberId);
+      if (s && (!s.exists || !s.isActive || s.isDeleted)) {
+        user.status = 'inactive';
+        await this.userRepo.save(user);
+        await this.revokeAllSessions(user.id);
+        throw new AppError('MEMBER_INACTIVE');
+      }
+      if (s) {
+        user.lastPgmSyncAt = new Date();
+        await this.userRepo.save(user);
+      } else {
+        this.logger.warn({ event: 'refresh_pgm_check_skipped', userId: user.id });
+      }
+    }
+
     return this.issueTokens(user, claimed.device_fingerprint ?? undefined, claimed.device_platform ?? undefined);
   }
 
   async logout(refreshToken: string): Promise<void> {
     const hash = this.hashRefresh(refreshToken);
-    await this.sessionRepo.update({ refreshTokenHash: hash }, { revoked: true });
+    const session = await this.sessionRepo.findOne({ where: { refreshTokenHash: hash } });
+    if (!session) return;
+    await this.sessionRepo.update({ id: session.id }, { revoked: true });
+    this.sessionValidator.forget(session.id);
+  }
+
+  private async revokeAllSessions(userId: string): Promise<void> {
+    await this.sessionRepo.update({ userId }, { revoked: true });
   }
 
   async getMe(userId: string): Promise<User> {
@@ -173,20 +218,13 @@ export class AuthService {
     deviceFingerprint?: string,
     devicePlatform?: string,
   ): Promise<IssueTokenResult> {
-    const jti = randomUUID();
-    const payload: JwtPayload = {
-      sub: user.id,
-      pgmId: user.pgmMemberId,
-      role: user.role,
-      jti,
-    };
-    const accessToken = await this.jwt.signAsync(payload, { expiresIn: ACCESS_TTL });
     const refreshToken = randomBytes(64).toString('hex');
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TTL_DAYS);
 
-    await this.sessionRepo.save(
+    // Session first: the access token carries its id so revoking the session revokes the token
+    const session = await this.sessionRepo.save(
       this.sessionRepo.create({
         userId: user.id,
         refreshTokenHash: this.hashRefresh(refreshToken),
@@ -196,6 +234,15 @@ export class AuthService {
         lastSeenAt: new Date(),
       }),
     );
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      sid: session.id,
+      pgmId: user.pgmMemberId,
+      role: user.role,
+      jti: randomUUID(),
+    };
+    const accessToken = await this.jwt.signAsync(payload, { expiresIn: ACCESS_TTL });
 
     // (Housekeeping cleanup of expired sessions moved to a scheduled job — Stage 1.5)
 

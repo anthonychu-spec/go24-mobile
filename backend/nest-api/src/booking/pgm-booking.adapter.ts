@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { AppError, normalizePgmError } from '../pgm-adapter/error-normalize';
 import {
-  BookClassResult, IBookingRepo, PgmBooking, PgmClass,
+  BookClassResult, IBookingRepo, PgmBooking, PgmClass, PgmClassBookingState,
 } from './booking.interfaces';
 
 const CACHE_TTL_MS       = 60 * 60 * 1000; // 1 hour  — lookup tables
@@ -45,8 +45,6 @@ interface RawInstructor {
 interface RawBooking {
   id: number;
   classId: number;
-  startDate: string;
-  endDate: string;
   memberId: number;
   isStandby: boolean;
   isCanceled: boolean;   // PGM uses single-l spelling
@@ -236,10 +234,12 @@ export class PgmBookingAdapter implements IBookingRepo {
   async listMyBookings(memberId: number): Promise<PgmBooking[]> {
     try {
       const [bookingsRes, classTypeMap, clubMap] = await Promise.all([
+        // ClassBooking has no start/end date and spells isCanceled with one "l" (swagger
+        // OData.V2_2.Classes.ClassBooking); times come from the class itself.
         this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
           $filter: `memberId eq ${memberId}`,
-          $select: 'id,classId,startDate,endDate,memberId,isStandby,isCancelled',
-          $orderby: 'startDate desc',
+          $select: 'id,classId,memberId,isStandby,isCanceled,isDeleted',
+          $orderby: 'id desc',
           $top: 50,
         }),
         this.getClassTypeMap(),
@@ -258,8 +258,8 @@ export class PgmBookingAdapter implements IBookingRepo {
             bookingId: b.id,
             classId: b.classId,
             className: cls ? (classTypeMap.get(cls.classTypeId) ?? `Class ${b.classId}`) : `Class ${b.classId}`,
-            startTime: b.startDate,
-            endTime: b.endDate,
+            startTime: cls?.startDate ?? '',
+            endTime: cls?.endDate ?? '',
             clubName: cls ? (clubMap.get(cls.clubId) ?? null) : null,
             isStandby: b.isStandby ?? false,
             isCancelled: b.isCanceled ?? false,
@@ -348,9 +348,26 @@ export class PgmBookingAdapter implements IBookingRepo {
     }
   }
 
-  async cancelBooking(memberId: number, classId: number): Promise<void> {
+  async cancelBooking(pgmBookingId: number): Promise<void> {
     try {
-      await this.pgm.post('/ClassBooking/CancelMemberBookingsForClass', { memberId, classId });
+      // CancelSingleBooking, not CancelMemberBookingsForClass (which cancels every booking the
+      // member holds for that class). doNotChargeForLateCancellation is a staff override — never sent.
+      await this.pgm.post('/ClassBooking/CancelSingleBooking', { bookingId: pgmBookingId });
+    } catch (err) {
+      throw normalizePgmError(err);
+    }
+  }
+
+  async findMemberBookingsForClass(memberId: number, classId: number): Promise<PgmClassBookingState[]> {
+    try {
+      const res = await this.pgm.get<{ value: RawBooking[] }>('/odata/ClassBookings', {
+        $filter: `memberId eq ${memberId} and classId eq ${classId}`,
+        $select: 'id,classId,memberId,isStandby,isCanceled,isDeleted',
+        $top: 20,
+      });
+      return (res.value ?? [])
+        .filter(b => !b.isDeleted)
+        .map(b => ({ bookingId: b.id, isStandby: b.isStandby ?? false, isCancelled: b.isCanceled ?? false }));
     } catch (err) {
       throw normalizePgmError(err);
     }
@@ -375,19 +392,6 @@ export class PgmBookingAdapter implements IBookingRepo {
       standbyListLimit: c.standbyListLimit ?? 0,
       isWaitlist: false,
       isCancelled: false,
-    };
-  }
-
-  private mapBooking(b: RawBooking): PgmBooking {
-    return {
-      bookingId: b.id,
-      classId: b.classId,
-      className: 'Class ' + String(b.classId),
-      startTime: b.startDate,
-      endTime: b.endDate,
-      clubName: null,
-      isStandby: b.isStandby ?? false,
-      isCancelled: b.isCanceled ?? false,
     };
   }
 }
