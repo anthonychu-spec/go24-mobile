@@ -45,4 +45,5 @@ COPY --from=build --chown=nest:nodejs /app/backend/nest-api/package.json ./
 
 USER nest
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+# Apply pending migrations (compiled into dist/database/migrations) before the API starts
+CMD ["sh", "-c", "node dist/database/migrate.js && exec node dist/main.js"]
