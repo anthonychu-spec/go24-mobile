@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, type } from '../theme';
+import { colors, fonts, type } from '../theme';
 
 type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -37,5 +37,5 @@ export function Avatar({ name, size = 'md', color = colors.primary }: AvatarProp
 
 const s = StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
-  text:   { fontFamily: 'Inter_900Black', color: '#fff' },
+  text:   { fontFamily: fonts.black, color: colors.onPrimary },
 });

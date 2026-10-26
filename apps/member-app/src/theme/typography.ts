@@ -11,16 +11,16 @@ import { fonts } from './fonts';
  */
 export const type = StyleSheet.create({
   // ── Display ────────────────────────────────────────────────────────────────
-  /** Hero numbers, big stats — Inter Black */
-  display:   { fontSize: 48, fontFamily: fonts.black, lineHeight: 52, letterSpacing: -1 },
+  /** Hero numbers, big stats — brand display face */
+  display:   { fontSize: 48, fontFamily: fonts.display, lineHeight: 52, letterSpacing: -1 },
   /** Large stat numbers */
-  stat:      { fontSize: 34, fontFamily: fonts.black, lineHeight: 38, letterSpacing: -0.5 },
+  stat:      { fontSize: 34, fontFamily: fonts.display, lineHeight: 38, letterSpacing: -0.5 },
   /** Medium stat (card-level) */
-  statSm:    { fontSize: 26, fontFamily: fonts.black, lineHeight: 30 },
+  statSm:    { fontSize: 26, fontFamily: fonts.display, lineHeight: 30 },
 
   // ── Headings ───────────────────────────────────────────────────────────────
-  h1:        { fontSize: 30, fontFamily: fonts.black,   lineHeight: 36 },
-  h2:        { fontSize: 24, fontFamily: fonts.black,   lineHeight: 30 },
+  h1:        { fontSize: 30, fontFamily: fonts.display,   lineHeight: 36 },
+  h2:        { fontSize: 24, fontFamily: fonts.display,   lineHeight: 30 },
   h3:        { fontSize: 20, fontFamily: fonts.bold,    lineHeight: 26 },
   h4:        { fontSize: 17, fontFamily: fonts.bold,    lineHeight: 22 },
 

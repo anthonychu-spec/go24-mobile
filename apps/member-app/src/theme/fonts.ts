@@ -1,6 +1,4 @@
-export const fonts = {
-  regular:   'Inter_400Regular',
-  semibold:  'Inter_600SemiBold',
-  bold:      'Inter_700Bold',
-  black:     'Inter_900Black',
-} as const;
+import { brand } from '../brand';
+
+/** Font families of this build's brand; `display` is for headlines, wordmarks and big numbers. */
+export const fonts = brand.fonts;

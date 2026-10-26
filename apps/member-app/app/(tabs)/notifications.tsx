@@ -167,7 +167,7 @@ export default function NotificationsScreen() {
   const itemsCount = data?.items.length ?? 0;
 
   return (
-    <ScreenWrapper barStyle="dark-content">
+    <ScreenWrapper>
       {/* Header */}
       <View style={s.header}>
         <View style={s.headerTop}>

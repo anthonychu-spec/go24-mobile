@@ -616,7 +616,7 @@ export default function HomeScreen() {
   const hasDebt     = __DEV__ || (m?.outstandingBalance ?? 0) > 0;
 
   return (
-    <ScreenWrapper barStyle="dark-content">
+    <ScreenWrapper>
 
       {/* ── Header ── */}
       <View style={s.header}>

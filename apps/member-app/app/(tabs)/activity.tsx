@@ -391,7 +391,7 @@ export default function ActivityScreen() {
   const tabColor  = tab === 'GX' ? colors.indigo : tab === 'PT' ? colors.teal : colors.primary;
 
   return (
-    <ScreenWrapper barStyle="dark-content">
+    <ScreenWrapper>
       {/* Header */}
       <View style={s.header}>
         <View>

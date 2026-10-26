@@ -348,14 +348,14 @@ export default function PtScreen() {
 
   if (loading) {
     return (
-      <ScreenWrapper barStyle="dark-content">
+      <ScreenWrapper>
         <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
       </ScreenWrapper>
     );
   }
 
   return (
-    <ScreenWrapper barStyle="dark-content">
+    <ScreenWrapper>
       {/* Header */}
       <View style={s.header}>
         <View>

@@ -5,14 +5,14 @@
  */
 import { StatusBar, StyleSheet, View, type ViewProps } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, statusBarStyle } from '../theme';
 
 interface ScreenWrapperProps extends ViewProps {
   /** Which safe area edges to inset. Defaults to all. */
   edges?: Edge[];
   /** Background color. Defaults to colors.bg */
   bg?: string;
-  /** StatusBar style. Defaults to dark-content */
+  /** StatusBar style. Defaults to the brand's (light content on dark brands) */
   barStyle?: 'dark-content' | 'light-content';
 }
 
@@ -20,7 +20,7 @@ export function ScreenWrapper({
   children,
   edges = ['top', 'left', 'right'],
   bg = colors.bg,
-  barStyle = 'dark-content',
+  barStyle = statusBarStyle,
   style,
   ...rest
 }: ScreenWrapperProps) {

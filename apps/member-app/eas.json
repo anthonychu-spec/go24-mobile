@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "base-development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "base-preview": {
+      "distribution": "internal"
+    },
+    "base-production": {
+      "autoIncrement": true
+    },
+
+    "lab-development": { "extends": "base-development", "channel": "lab-development", "env": { "APP_BRAND": "lab" } },
+    "lab-preview": { "extends": "base-preview", "channel": "lab-preview", "env": { "APP_BRAND": "lab" } },
+    "lab-production": { "extends": "base-production", "channel": "lab-production", "env": { "APP_BRAND": "lab" } },
+
+    "foundry-development": { "extends": "base-development", "channel": "foundry-development", "env": { "APP_BRAND": "foundry" } },
+    "foundry-preview": { "extends": "base-preview", "channel": "foundry-preview", "env": { "APP_BRAND": "foundry" } },
+    "foundry-production": { "extends": "base-production", "channel": "foundry-production", "env": { "APP_BRAND": "foundry" } },
+
+    "go24-development": { "extends": "base-development", "channel": "go24-development", "env": { "APP_BRAND": "go24" } },
+    "go24-preview": { "extends": "base-preview", "channel": "go24-preview", "env": { "APP_BRAND": "go24" } },
+    "go24-production": { "extends": "base-production", "channel": "go24-production", "env": { "APP_BRAND": "go24" } }
+  },
+  "submit": {
+    "lab-production": {},
+    "foundry-production": {},
+    "go24-production": {}
+  }
+}

@@ -1,12 +1,12 @@
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
-import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
+import { useFonts } from 'expo-font';
 import { AuthProvider, useAuth } from '../src/auth/context';
 import { registerPushToken } from '../src/notifications/push';
 import { AppConfigProvider, useAppConfig } from '../src/config/AppConfigProvider';
 import { AppStatusScreen } from '../src/config/AppStatusScreen';
-import type { Feature } from '../src/brand';
+import { brandFonts, type Feature } from '../src/brand';
 import { t } from '../src/i18n';
 
 /** Feature a route belongs to, by its first segments (null = always available). */
@@ -41,7 +41,7 @@ function RouteGuard() {
     const inAuth = segments[0] === '(auth)';
     const inSignup = segments[0] === 'signup' && allowed;
     if (!user && !inAuth && !inSignup) router.replace('/(auth)/login');
-    else if (user && inAuth) router.replace('/(tabs)/');
+    else if (user && inAuth) router.replace('/(tabs)');
     else if (user && !allowed) router.replace('/(tabs)');
   }, [user, loading, segments, config.features]);
 
@@ -78,13 +78,9 @@ function AppGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// TODO(Sentry): add @sentry/react-native (config plugin + DSN per brand) once the Sentry org exists.
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_900Black,
-  });
+  const [fontsLoaded] = useFonts(brandFonts);
 
   if (!fontsLoaded) return null;
 

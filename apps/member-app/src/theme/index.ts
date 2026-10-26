@@ -3,7 +3,7 @@
  * Import from here instead of individual files:
  *   import { colors, spacing, type, radius, shadows } from '@/theme';
  */
-export { colors } from './colors';
+export { colors, gradients, statusBarStyle } from './colors';
 export { fonts } from './fonts';
 export { spacing, screenPadding } from './spacing';
 export { radius } from './radius';

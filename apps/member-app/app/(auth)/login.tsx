@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Dimensions, KeyboardAvoidingView, Platform,
+  Dimensions, Image, KeyboardAvoidingView, Platform,
   Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +10,9 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/context';
 import { apiErrorMessage } from '../../src/api/errors';
 import { t } from '../../src/i18n';
-import { colors, fonts, spacing, radius } from '../../src/theme';
+import { colors, fonts, gradients, spacing, radius } from '../../src/theme';
+import { brand, brandLogo } from '../../src/brand';
+import { useFeature } from '../../src/config/AppConfigProvider';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -19,6 +21,7 @@ const mapError = apiErrorMessage;
 export default function LoginScreen() {
   const { login } = useAuth();
   const router    = useRouter();
+  const signupOn  = useFeature('signup');
   const [email, setEmail]           = useState('');
   const [password, setPassword]     = useState('');
   const [showPass, setShowPass]     = useState(false);
@@ -44,8 +47,7 @@ export default function LoginScreen() {
 
       {/* ── Full-screen atmospheric background ── */}
       <LinearGradient
-        colors={['#0D0005', '#1A0008', '#2D000D', '#E8192C']}
-        locations={[0, 0.35, 0.65, 1]}
+        colors={gradients.hero}
         start={{ x: 0.3, y: 0 }}
         end={{ x: 0.7, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -65,17 +67,21 @@ export default function LoginScreen() {
 
       {/* ── Brand section ── */}
       <SafeAreaView style={s.brandArea} edges={['top']}>
-        <View style={s.logoRow}>
-          <View style={s.logoBox}>
-            <Ionicons name="fitness" size={28} color="#fff" />
+        {brandLogo ? (
+          <Image source={brandLogo} style={s.logoImg} resizeMode="contain" accessibilityLabel={brand.name} />
+        ) : (
+          <View style={s.logoRow}>
+            <View style={s.logoBox}>
+              <Ionicons name="fitness" size={28} color={colors.onPrimary} />
+            </View>
+            <View>
+              <Text style={s.wordmark}>{brand.wordmark.title}</Text>
+              {brand.wordmark.sub ? <Text style={s.wordmarkSub}>{brand.wordmark.sub}</Text> : null}
+            </View>
           </View>
-          <View>
-            <Text style={s.wordmark}>GO24</Text>
-            <Text style={s.wordmarkSub}>FITNESS</Text>
-          </View>
-        </View>
-        <Text style={s.heroTitle}>Your Premium{'\n'}Fitness Journey</Text>
-        <Text style={s.heroSub}>Move. Train. Perform.</Text>
+        )}
+        <Text style={s.heroTitle}>{brand.copy.heroTitle}</Text>
+        <Text style={s.heroSub}>{brand.copy.heroSub}</Text>
       </SafeAreaView>
 
       {/* ── White form panel slides up ── */}
@@ -94,7 +100,7 @@ export default function LoginScreen() {
             <View style={s.handle} />
 
             <Text style={s.title}>Welcome back</Text>
-            <Text style={s.subtitle}>Sign in to your GO24 account</Text>
+            <Text style={s.subtitle}>Sign in to your {brand.name} account</Text>
 
             <View style={s.fields}>
               {/* Email */}
@@ -162,30 +168,34 @@ export default function LoginScreen() {
                 disabled={submitting}
               >
                 <LinearGradient
-                  colors={['#E8192C', '#9A0018']}
+                  colors={gradients.cta}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={s.ctaGradient}
                 >
                   {submitting
-                    ? <Ionicons name="reload-outline" size={20} color="#fff" />
+                    ? <Ionicons name="reload-outline" size={20} color={colors.onPrimary} />
                     : <Text style={s.ctaTxt}>{t.login.submit}</Text>
                   }
                 </LinearGradient>
               </Pressable>
             </View>
 
-            {/* Footer */}
-            <View style={s.divRow}>
-              <View style={s.divLine} />
-              <Text style={s.divTxt}>or</Text>
-              <View style={s.divLine} />
-            </View>
+            {/* Footer — only for brands that sell memberships in the app */}
+            {signupOn ? (
+              <>
+                <View style={s.divRow}>
+                  <View style={s.divLine} />
+                  <Text style={s.divTxt}>or</Text>
+                  <View style={s.divLine} />
+                </View>
 
-            <Pressable style={s.joinBtn} onPress={() => router.push('/signup' as any)}>
-              <Text style={s.joinTxt}>Not a member? </Text>
-              <Text style={s.joinBold}>Join GO24</Text>
-              <Ionicons name="arrow-forward" size={14} color={colors.primary} style={{ marginLeft: 4 }} />
-            </Pressable>
+                <Pressable style={s.joinBtn} onPress={() => router.push('/signup' as any)}>
+                  <Text style={s.joinTxt}>Not a member? </Text>
+                  <Text style={s.joinBold}>Join {brand.name}</Text>
+                  <Ionicons name="arrow-forward" size={14} color={colors.link} style={{ marginLeft: 4 }} />
+                </Pressable>
+              </>
+            ) : null}
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -209,11 +219,11 @@ const s = StyleSheet.create({
   },
   blob1: {
     position: 'absolute', width: 140, height: 140, borderRadius: 70,
-    backgroundColor: 'rgba(232,25,44,0.25)', top: H * 0.05, left: -50,
+    backgroundColor: `${colors.primary}40`, top: H * 0.05, left: -50,
   },
   blob2: {
     position: 'absolute', width: 80, height: 80, borderRadius: 40,
-    backgroundColor: 'rgba(232,25,44,0.15)', top: H * 0.22, right: 20,
+    backgroundColor: `${colors.primary}26`, top: H * 0.22, right: 20,
   },
   line: {
     position: 'absolute', height: 1.5,
@@ -226,6 +236,7 @@ const s = StyleSheet.create({
 
   // ── Brand ──
   brandArea: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.lg, justifyContent: 'center' },
+  logoImg: { width: 150, height: 132, marginBottom: spacing.xl },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xl },
   logoBox: {
     width: 56, height: 56, borderRadius: radius.lg,
@@ -233,10 +244,10 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  wordmark:    { fontSize: 36, fontFamily: fonts.black, color: '#fff', letterSpacing: 5, lineHeight: 40 },
+  wordmark:    { fontSize: 36, fontFamily: fonts.display, color: colors.onPrimary, letterSpacing: 5, lineHeight: 40 },
   wordmarkSub: { fontSize: 10, fontFamily: fonts.bold, color: 'rgba(255,255,255,0.5)', letterSpacing: 5, marginTop: -2 },
   heroTitle: {
-    fontSize: 34, fontFamily: fonts.black, color: '#fff',
+    fontSize: 34, fontFamily: fonts.display, color: colors.onPrimary,
     lineHeight: 42, marginBottom: spacing.sm,
   },
   heroSub: { fontSize: 13, fontFamily: fonts.regular, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 },
@@ -244,7 +255,7 @@ const s = StyleSheet.create({
   // ── Panel ──
   panelWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   panel: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderTopLeftRadius: 32, borderTopRightRadius: 32,
     shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.2, shadowRadius: 24,
     maxHeight: H * 0.65,
@@ -257,7 +268,7 @@ const s = StyleSheet.create({
     alignSelf: 'center', marginTop: spacing.md, marginBottom: spacing.lg,
   },
 
-  title:    { fontSize: 22, fontFamily: fonts.black, color: colors.text },
+  title:    { fontSize: 22, fontFamily: fonts.display, color: colors.text },
   subtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 4, marginBottom: spacing.lg },
 
   fields:     { gap: spacing.md },
@@ -276,11 +287,11 @@ const s = StyleSheet.create({
   errorTxt: { fontSize: 13, fontFamily: fonts.regular, color: colors.error },
 
   forgotBtn: { alignSelf: 'flex-end' },
-  forgotTxt: { fontSize: 13, fontFamily: fonts.semibold, color: colors.primary },
+  forgotTxt: { fontSize: 13, fontFamily: fonts.semibold, color: colors.link },
 
   cta:         { borderRadius: radius.full, overflow: 'hidden', marginTop: spacing.xs },
   ctaGradient: { height: 56, alignItems: 'center', justifyContent: 'center' },
-  ctaTxt:      { fontSize: 16, fontFamily: fonts.black, color: '#fff', letterSpacing: 1 },
+  ctaTxt:      { fontSize: 16, fontFamily: fonts.black, color: colors.onPrimary, letterSpacing: 1 },
 
   divRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg },
   divLine:{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
@@ -288,5 +299,5 @@ const s = StyleSheet.create({
 
   joinBtn:  { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.sm },
   joinTxt:  { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted },
-  joinBold: { fontSize: 14, fontFamily: fonts.bold, color: colors.primary },
+  joinBold: { fontSize: 14, fontFamily: fonts.bold, color: colors.link },
 });

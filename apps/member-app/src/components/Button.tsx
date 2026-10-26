@@ -48,15 +48,15 @@ export function Button({
 
   const textStyle = [
     size === 'sm' ? type.btnSm : size === 'lg' ? type.btnLg : type.btnMd,
-    variant === 'primary'   && { color: '#fff' },
+    variant === 'primary'   && { color: colors.onPrimary },
     variant === 'secondary' && { color: colors.primary },
     variant === 'ghost'     && { color: colors.primary },
-    variant === 'danger'    && { color: '#fff' },
+    variant === 'danger'    && { color: colors.onPrimary },
     isDisabled && s.disabledText,
   ] as any[];
 
   const iconColor =
-    variant === 'primary' || variant === 'danger' ? '#fff'
+    variant === 'primary' || variant === 'danger' ? colors.onPrimary
     : isDisabled ? colors.textMuted
     : colors.primary;
 
@@ -72,7 +72,7 @@ export function Button({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'primary' || variant === 'danger' ? '#fff' : colors.primary}
+          color={variant === 'primary' || variant === 'danger' ? colors.onPrimary : colors.primary}
         />
       ) : (
         <View style={s.inner}>

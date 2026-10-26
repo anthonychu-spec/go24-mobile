@@ -7,13 +7,13 @@ export default function NotFound() {
       <Stack.Screen options={{ title: 'Not Found' }} />
       <View style={s.c}>
         <Text style={s.t}>Page not found</Text>
-        <Link href="/(tabs)/" style={s.l}>Go home</Link>
+        <Link href="/(tabs)" style={s.l}>Go home</Link>
       </View>
     </>
   );
 }
 const s = StyleSheet.create({
   c: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  t: { color: '#fff', fontSize: 18 },
-  l: { color: '#E8FF00', fontSize: 16 },
+  t: { color: colors.text, fontSize: 18 },
+  l: { color: colors.link, fontSize: 16 },
 });

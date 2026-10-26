@@ -330,7 +330,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScreenWrapper barStyle="dark-content">
+    <ScreenWrapper>
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} size="large" /></View>
       ) : error ? (

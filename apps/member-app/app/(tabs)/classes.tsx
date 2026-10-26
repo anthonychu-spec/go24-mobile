@@ -7,7 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../src/api/client';
-import { colors } from '../../src/theme/colors';
+import { colors, statusBarStyle } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 
 interface GymClass {
@@ -770,7 +770,7 @@ export default function ClassesScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={statusBarStyle} />
 
       {/* Header */}
       <View style={s.header}>
