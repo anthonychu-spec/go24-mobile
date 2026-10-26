@@ -26,7 +26,7 @@ export function ScreenWrapper({
 }: ScreenWrapperProps) {
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: bg }]} edges={edges}>
-      <StatusBar barStyle={barStyle} backgroundColor={bg} />
+      <StatusBar barStyle={barStyle} />
       <View style={[s.content, style]} {...rest}>
         {children}
       </View>

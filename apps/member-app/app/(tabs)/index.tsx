@@ -26,7 +26,7 @@ interface DashboardData {
     outstandingBalance: number;
   };
   pt:        { remainingSessions: number; totalSessions: number; expiresAt: string | null };
-  nextClass: { bookingId: string; classId: number; className?: string | null; startTime: string; minutesUntil: number; clubName: string | null } | null;
+  nextClass: { bookingId: string; classId: number; className?: string | null; startTime: string; endTime?: string | null; minutesUntil: number; clubName: string | null } | null;
   thisMonth: { visits: number; classes: number; pt: number };
   totalVisits: number;
   unreadNotifications: number;
@@ -812,7 +812,7 @@ const s = StyleSheet.create({
 
   banner:        { width: W - 32, height: 170, borderRadius: radius.lg, overflow: 'hidden', marginHorizontal: spacing.base },
   bannerImg:     { width: '100%', height: '100%' },
-  bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.28)', justifyContent: 'flex-end', padding: spacing.base },
+  bannerOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.28)', justifyContent: 'flex-end', padding: spacing.base },
   bannerTitle:   { ...t.bodyBold, color: '#fff' },
   dots:          { flexDirection: 'row', justifyContent: 'center', gap: 5 },
   dot:           { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.border },

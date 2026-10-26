@@ -204,7 +204,7 @@ function LogoutSheet({ visible, onCancel, onConfirm, loading }: {
   );
 }
 const ls = StyleSheet.create({
-  backdrop:  { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,24,27,0.4)' },
+  backdrop:  { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(24,24,27,0.4)' },
   sheet:     { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.card,
                borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: spacing.xl,
                paddingTop: spacing.lg, paddingBottom: spacing['2xl'] },

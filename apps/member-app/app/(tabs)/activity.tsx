@@ -443,7 +443,7 @@ export default function ActivityScreen() {
         SectionSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         contentContainerStyle={{ paddingBottom: 40 }}
         ListEmptyComponent={
-          loading ? null : (
+          loading ? undefined : (
             <View style={{ padding: spacing.xl }}>
               <EmptyState
                 icon="pulse-outline"

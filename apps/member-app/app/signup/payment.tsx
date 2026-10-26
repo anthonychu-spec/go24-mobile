@@ -232,7 +232,7 @@ const s = StyleSheet.create({
   error:   { ...ty.body, color: colors.error, marginBottom: spacing.base },
 
   payingOverlay: {
-    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.92)',
+    ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.92)',
     alignItems: 'center', justifyContent: 'center', gap: spacing.md,
   },
   payingText: { ...ty.bodyBold, color: colors.text },

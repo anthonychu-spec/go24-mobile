@@ -144,7 +144,7 @@ const s = StyleSheet.create({
   },
   doneBtnText:  { color: colors.bg, fontWeight: '700', fontSize: 16 },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.7)',
     alignItems: 'center', justifyContent: 'center', gap: 12,
   },

@@ -7,7 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -22,7 +21,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.go24.member"
     },
     "web": {
@@ -31,7 +29,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font",
+      "expo-localization",
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-splash-screen",
+      "@adyen/react-native"
     ],
     "experiments": {
       "typedRoutes": true

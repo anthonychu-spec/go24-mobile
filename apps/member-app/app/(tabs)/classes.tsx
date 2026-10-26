@@ -770,7 +770,7 @@ export default function ClassesScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
+      <StatusBar barStyle="dark-content" />
 
       {/* Header */}
       <View style={s.header}>
