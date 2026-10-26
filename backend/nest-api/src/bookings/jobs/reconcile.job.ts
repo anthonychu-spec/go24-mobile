@@ -5,6 +5,7 @@ import { IsNull, Repository } from 'typeorm';
 import { OutboxEvent } from '../entities/outbox-event.entity';
 import { BookingRepository } from '../repositories/booking.repo';
 import { IdempotencyRepository } from '../repositories/idempotency.repo';
+import { backgroundJobsEnabled } from '../../config/background-jobs';
 
 @Injectable()
 export class ReconcileJob {
@@ -18,6 +19,7 @@ export class ReconcileJob {
 
   @Cron('0 */5 * * * *') // every 5 minutes
   async reconcilePendingVerify(): Promise<void> {
+    if (!backgroundJobsEnabled()) return;
     const bookings = await this.bookingRepo.findPendingVerify();
     if (bookings.length === 0) return;
     this.logger.log(`Reconciling ${bookings.length} pending_verify bookings`);
@@ -40,6 +42,7 @@ export class ReconcileJob {
 
   @Cron('0 */5 * * * *') // same interval — also clear stale pending
   async reconcileStalePending(): Promise<void> {
+    if (!backgroundJobsEnabled()) return;
     const stale = await this.bookingRepo.findStalePending(180); // > 3 min
     for (const booking of stale) {
       this.logger.warn(`Stale pending booking ${booking.id} — marking failed`);

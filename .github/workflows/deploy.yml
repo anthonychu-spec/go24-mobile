@@ -1,27 +1,49 @@
 name: Deploy to Droplet
 
+# Manual only. Production deploys are approved by Anthony and started by hand
+# with the exact commit to ship; nothing deploys on push.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/nest-api/**'
-      - 'packages/**'
-      - 'infra/droplet/**'
-      - '.github/workflows/deploy.yml'
-  workflow_dispatch: # allow manual trigger
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Full commit SHA to deploy (must have a passing CI run)'
+        required: true
+        type: string
 
 concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Check SHA format
+        env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::sha must be a full 40-character commit SHA"
+            exit 1
+          fi
+
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          passed=$(gh run list --repo "${{ github.repository }}" --workflow ci.yml \
+            --commit "$SHA" --status success --json databaseId --jq 'length')
+          if [ "$passed" -lt 1 ]; then
+            echo "::error::No successful CI run for $SHA — refusing to deploy"
+            exit 1
+          fi
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -36,33 +58,53 @@ jobs:
       - name: Deploy via SSH
         env:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          SHA: ${{ inputs.sha }}
         run: |
-          ssh deploy@$DROPLET_HOST << 'EOF'
+          ssh deploy@$DROPLET_HOST "bash -s -- $SHA" << 'EOF'
             set -euo pipefail
+            SHA="$1"
+            COMPOSE="docker compose -f infra/droplet/docker-compose.prod.yml"
             cd /opt/go24
-            echo "→ git fetch"
-            git fetch origin main
-            git reset --hard origin/main
 
-            echo "→ docker compose pull (cache-friendly)"
-            docker compose -f infra/droplet/docker-compose.prod.yml pull --ignore-buildable
+            echo "→ checkout $SHA"
+            git fetch origin
+            git checkout --detach "$SHA"
 
-            echo "→ build + up"
-            docker compose -f infra/droplet/docker-compose.prod.yml up -d --build api
+            echo "→ keep current image as rollback target"
+            if docker image inspect go24/nest-api:latest >/dev/null 2>&1; then
+              docker image tag go24/nest-api:latest go24/nest-api:previous
+            fi
+
+            echo "→ build"
+            $COMPOSE build api
+            docker image tag go24/nest-api:latest "go24/nest-api:$SHA"
+
+            echo "→ migrate (stops the deploy on failure; running API untouched)"
+            $COMPOSE run --rm --no-deps api node dist/database/migrate.js
+
+            echo "→ start new API"
+            $COMPOSE up -d --no-build api
 
             echo "→ wait for API healthy"
+            healthy=0
             for i in {1..30}; do
               if docker exec go24-api wget -q --spider http://localhost:3000/v1/health; then
-                echo "  ✓ API healthy"
+                healthy=1
                 break
               fi
               sleep 2
             done
 
-            echo "→ prune old images"
-            docker image prune -f
+            if [ "$healthy" -ne 1 ]; then
+              echo "✗ API not healthy after 60s — rolling back"
+              if docker image inspect go24/nest-api:previous >/dev/null 2>&1; then
+                docker image tag go24/nest-api:previous go24/nest-api:latest
+                $COMPOSE up -d --no-build api
+              fi
+              exit 1
+            fi
 
-            echo "✓ Deploy done"
+            echo "✓ API healthy on $SHA"
           EOF
 
       - name: Notify on failure

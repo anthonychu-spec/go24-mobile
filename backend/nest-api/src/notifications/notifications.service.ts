@@ -6,6 +6,7 @@ import { DeviceToken } from './entities/device-token.entity';
 import { Notification, NotificationType } from './entities/notification.entity';
 import { User } from '../auth/entities/user.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
+import { backgroundJobsEnabled } from '../config/background-jobs';
 
 const REASON_MESSAGES: Record<string, { title: string; body: string }> = {
   'No Active Contract': { title: '⚠️ 入場失敗', body: '你嘅會籍已到期，請於 App 內續會或聯絡前台。' },
@@ -223,6 +224,7 @@ export class NotificationsService {
 
   @Cron('0 9 1 * *', { timeZone: 'Asia/Hong_Kong' }) // 9 AM HKT, 1st of month
   async sendMonthlySummary(): Promise<void> {
+    if (!backgroundJobsEnabled()) return;
     this.logger.log('Sending monthly summary notifications…');
     const lastMonth = new Date();
     lastMonth.setMonth(lastMonth.getMonth() - 1);

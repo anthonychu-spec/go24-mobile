@@ -14,6 +14,7 @@ import {
 } from './errors/index';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
+import { backgroundJobsEnabled } from '../config/background-jobs';
 
 export interface BookInput {
   userId: string;
@@ -287,6 +288,7 @@ export class BookingsService {
 
   @Cron('*/15 * * * *') // every 15 minutes
   async autoReleaseWaitlistSpots(): Promise<void> {
+    if (!backgroundJobsEnabled()) return;
     const fiveHoursFromNow = new Date(Date.now() + 5 * 3600_000);
     try {
       const waitlisted = await this.bookingRepo.findByStatus('waitlist');
