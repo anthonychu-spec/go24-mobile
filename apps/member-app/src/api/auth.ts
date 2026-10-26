@@ -10,5 +10,6 @@ export const authApi = {
   login: (email: string, password: string) =>
     apiClient.post<LoginResponse>('/auth/login', { email, password }).then((r) => r.data),
   me: () => apiClient.get<LoginResponse['user']>('/auth/me').then((r) => r.data),
-  logout: (refreshToken: string) => apiClient.post('/auth/logout', { refreshToken }).catch(() => {}),
+  logout: (refreshToken: string, pushToken?: string) =>
+    apiClient.post('/auth/logout', { refreshToken, pushToken }).catch(() => {}),
 };

@@ -8,21 +8,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/context';
+import { apiErrorMessage } from '../../src/api/errors';
 import { t } from '../../src/i18n';
 import { colors, fonts, spacing, radius } from '../../src/theme';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-function mapError(err: unknown): string {
-  const data = (err as any)?.response?.data ?? {};
-  const msg: string  = data.message ?? '';
-  const code: string = data.code ?? '';
-  if (code === 'MEMBER_INACTIVE'    || msg.includes('MEMBER_INACTIVE'))                    return t.errors.memberInactive;
-  if (code === 'INVALID_CREDENTIALS'|| msg.includes('INVALID_CREDENTIALS') || msg.toLowerCase().includes('invalid')) return t.errors.invalidCredentials;
-  if (code === 'ACCOUNT_LOCKED'     || msg.includes('ACCOUNT_LOCKED') || msg.includes('locked')) return t.errors.accountLocked;
-  if ((err as any)?.code === 'ECONNABORTED' || (err as any)?.code === 'ERR_NETWORK')       return t.errors.networkError;
-  return t.errors.unknown;
-}
+const mapError = apiErrorMessage;
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -48,7 +40,7 @@ export default function LoginScreen() {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0005" />
+      <StatusBar barStyle="light-content" />
 
       {/* ── Full-screen atmospheric background ── */}
       <LinearGradient
@@ -56,7 +48,7 @@ export default function LoginScreen() {
         locations={[0, 0.35, 0.65, 1]}
         start={{ x: 0.3, y: 0 }}
         end={{ x: 0.7, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
       />
 
       {/* Geometric decoration — simulates depth/motion */}

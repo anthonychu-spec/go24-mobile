@@ -1,7 +1,9 @@
 import { Tabs } from 'expo-router';
+import type { ColorValue } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
+import { useFeature } from '../../src/config/AppConfigProvider';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -17,12 +19,15 @@ const tabBarStyle = {
 const tabBarLabelStyle = { fontSize: 10, fontFamily: fonts.semibold };
 
 function icon(active: IoniconsName, inactive: IoniconsName) {
-  return ({ focused, color }: { focused: boolean; color: string }) => (
-    <Ionicons name={focused ? active : inactive} size={22} color={color} />
+  return ({ focused, color }: { focused: boolean; color: ColorValue }) => (
+    <Ionicons name={focused ? active : inactive} size={22} color={color as string} />
   );
 }
 
 export default function TabLayout() {
+  // Brand-disabled tabs stay declared (routable list) but leave the tab bar
+  const classesOn = useFeature('classes');
+  const ptOn = useFeature('pt');
   return (
     <Tabs
       screenOptions={{
@@ -39,7 +44,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="classes"
-        options={{ title: 'Classes', tabBarIcon: icon('calendar', 'calendar-outline') }}
+        options={{ title: 'Classes', tabBarIcon: icon('calendar', 'calendar-outline'), href: classesOn ? undefined : null }}
       />
       <Tabs.Screen
         name="activity"
@@ -47,7 +52,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="pt"
-        options={{ title: 'PT', tabBarIcon: icon('barbell', 'barbell-outline') }}
+        options={{ title: 'PT', tabBarIcon: icon('barbell', 'barbell-outline'), href: ptOn ? undefined : null }}
       />
       <Tabs.Screen
         name="settings"

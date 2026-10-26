@@ -95,9 +95,17 @@ export const en = {
   errors: {
     invalidCredentials: 'Invalid email or password',
     memberInactive: 'Account is inactive. Please contact the gym.',
+    ambiguousAccount: 'This email is linked to more than one membership. Please sign in at the front desk.',
     accountLocked: 'Account locked. Please try again later.',
+    rateLimited: 'Too many attempts. Please wait a moment and try again.',
     networkError: 'Connection error. Please try again.',
     unknown: 'Something went wrong. Please try again.',
+  },
+  appStatus: {
+    updateTitle: 'Update required',
+    updateBody: 'This version is no longer supported. Please update the app from the App Store or Google Play.',
+    maintenanceTitle: 'Under maintenance',
+    retry: 'Try again',
   },
   auth: { logout: 'Logout' },
 } as const;

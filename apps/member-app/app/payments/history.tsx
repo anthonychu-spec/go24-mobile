@@ -4,8 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
-import { apiClient, API_BASE } from '../../src/api/client';
+import { File, Paths } from 'expo-file-system';
+import { apiClient, API_BASE, BRAND_HEADERS } from '../../src/api/client';
 import { tokenStorage } from '../../src/auth/storage';
 import { colors } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
@@ -45,12 +45,13 @@ export default function PaymentHistoryScreen() {
     setDownloading(id);
     try {
       const token = await tokenStorage.getAccess();
-      const path  = `${FileSystem.cacheDirectory}go24-invoice-${id}.pdf`;
-      await FileSystem.downloadAsync(`${API_BASE}/me/payments/${id}/invoice`, path, {
-        headers: { Authorization: `Bearer ${token ?? ''}` },
+      const dest  = new File(Paths.cache, `invoice-${id}.pdf`);
+      const file  = await File.downloadFileAsync(`${API_BASE}/me/payments/${id}/invoice`, dest, {
+        headers: { ...BRAND_HEADERS, Authorization: `Bearer ${token ?? ''}` },
+        idempotent: true,
       });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(path, { mimeType: 'application/pdf' });
+        await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf' });
       }
     } catch { /* show nothing — sharing is optional */ }
     finally { setDownloading(null); }

@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authApi, type LoginResponse } from '../api/auth';
 import { tokenStorage } from './storage';
+import { pushTokenStorage } from '../notifications/push';
 
 type User = LoginResponse['user'];
 interface AuthState {
@@ -35,9 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    const refresh = await tokenStorage.getRefresh();
-    if (refresh) await authApi.logout(refresh);
-    await tokenStorage.clear();
+    const [refresh, pushToken] = await Promise.all([tokenStorage.getRefresh(), pushTokenStorage.get()]);
+    if (refresh) await authApi.logout(refresh, pushToken ?? undefined);
+    await Promise.all([tokenStorage.clear(), pushTokenStorage.clear()]);
     setUser(null);
   }, []);
 
