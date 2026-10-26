@@ -161,8 +161,8 @@ export class ActivityService {
         [gymUserNumber, since, today],
       ),
       // Today → PGM API (live) — uses pgmMemberId (PGM API id)
-      this.pgm.get<{ value: any[] }>('/odata/Visits', {
-        $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${today.toISOString().slice(0, 19)}'`,
+      this.pgm.get<{ value: any[] }>('/odata/MemberClubVisits', {
+        $filter: `memberId eq ${pgmMemberId} and enterDate ge ${today.toISOString().slice(0, 19)}Z`,
         $select: 'id,enterDate',
         $top: 50,
       }).catch((err: any) => {

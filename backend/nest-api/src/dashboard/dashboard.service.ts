@@ -327,8 +327,8 @@ export class DashboardService {
 
   private async fetchMonthVisits(pgmMemberId: number, since: Date): Promise<number> {
     try {
-      const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
-        $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
+      const res = await this.pgm.get<{ value: any[] }>('/odata/MemberClubVisits', {
+        $filter: `memberId eq ${pgmMemberId} and enterDate ge ${since.toISOString().slice(0, 19)}Z`,
         $select: 'id',
         $top: 200,
       });
@@ -349,7 +349,7 @@ export class DashboardService {
 
   private async fetchTotalVisits(pgmMemberId: number): Promise<number> {
     try {
-      const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
+      const res = await this.pgm.get<{ value: any[] }>('/odata/MemberClubVisits', {
         $filter: `memberId eq ${pgmMemberId}`,
         $select: 'id',
         $top: 500,
@@ -364,8 +364,8 @@ export class DashboardService {
       since.setFullYear(since.getFullYear() - 1);
 
       const [visitsRes, classesRes] = await Promise.allSettled([
-        this.pgm.get<{ value: any[] }>('/odata/Visits', {
-          $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${since.toISOString().slice(0, 19)}'`,
+        this.pgm.get<{ value: any[] }>('/odata/MemberClubVisits', {
+          $filter: `memberId eq ${pgmMemberId} and enterDate ge ${since.toISOString().slice(0, 19)}Z`,
           $select: 'enterDate',
           $top: 500,
         }),

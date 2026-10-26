@@ -211,6 +211,54 @@ PGM 來源只核對過 API 存在，未核對 GO24 tenant 有冇開通或設定�
 
 ---
 
+## 12. PGM 只讀探 — THE LAB（2026-10-26，backend 第 1 星期 W1-5）
+
+用救返嘅 v2.2 key，**只做 GET**；冇讀會員資料（會員／預約只用 `$top=0` 驗證欄位名，或者用唔存在嘅 `memberId eq 0`）。冇 call `goapi2`。
+
+### 分店
+
+- PGM 共 18 間分店。**THE LAB = club ID `45`「The LAB by ONYX」**（時區 `Asia/Shanghai`，即 UTC+8，同香港一樣）。呢個就係 LAB 品牌白名單（G3 嘅分店部分）。
+- BOFA（`44`）喺 PGM 標咗 hidden。
+
+### 班表
+
+- LAB 未來 7 日有 **18 堂**，全部喺 zone `71`（成間 club，類型「Club」）。
+- 6 種堂：THE FORGE (Upper)、THE FORGE (Lower)、THE PULSE、THE HYBRID、Open Gym、THE RANGE。
+- 一般人數上限 16、候補 10；THE FORGE (Upper) 上限 1（似係 1 對 1 時段）。
+- PGM 回傳時間帶 `+08:00`（例如 `2026-10-26T10:30:00+08:00`），唔使自己轉時區。
+
+### Recovery 設施 — **LAB 喺 PGM 冇設定**
+
+- LAB 只有一個 zone（成間 club），**冇 recovery zone、冇 FacilityBookingDefinition、冇 FacilityBookingRule、冇價錢**。
+- 即係原生 Recovery 預約（N2）而家冇嘢可以約。要營運先喺 PGM 開 LAB 嘅 recovery zone、definition 同 rule（G3 嘅 Recovery 部分），否則 v1 直接用降級方案（前台／查詢）。
+- 全 tenant 取消原因只有一個：「Cancel」。
+
+### 入場紀錄（Passport visits）
+
+- **`/odata/Visits` 唔存在（404）**；正確係 `/odata/MemberClubVisits`（`memberId`、`clubId`、`enterDate`、`leaveDate`）。
+- 舊 code 嘅日期 filter `datetime'…'` 係 OData v3 寫法，PGM 回 400；要用 v4 `2026-10-01T00:00:00Z`。
+- 即係 dashboard 入場次數、活動頁、每月總結 push 一直攞唔到數。已改（commit 見 `STATE.md`）。
+- **LAB（club 45）喺 PGM 冇任何 MemberClubVisits 紀錄**（Novotel 有）。LAB 入場可能唔經 PGM 門禁，Passport 嘅入場次數要另外搵來源（決定 B6）。
+
+### 欄位同速度
+
+| 查詢 | 結果 |
+|---|---|
+| `ClassBookings` 舊 `$select`（`startDate,endDate,…isCancelled`） | **400**：ClassBooking 冇 `startDate`，`isCanceled` 得一個 l。舊「我的預約」一直壞咗，已改 |
+| `ClassBookings` 新 `$select`，**冇 filter**，`$top=0` | **60 秒都未返**（全 tenant 大表）。按會員 filter 嘅速度要用 G6 測試會員量 |
+| `Members` `$select=Id,IsActive,IsDeleted`（大細楷都得），`$top=0` | 200，但要 **約 9.5 秒**。登入時查會籍狀態可能慢，要用測試會員量真實 filter 速度 |
+| `Clubs`、`ClubZones` | 約 2 秒 |
+| 其他設定表、`Classes`（filter 咗 LAB 一星期）、`ClassTypes` | 約 0.5–0.7 秒 |
+| `MemberClubVisits` 按會員＋日期 filter | 約 2 秒 |
+
+### 跟住要做
+
+- **G3（營運）**：LAB Recovery 喺 PGM 開 zone／definition／rule，或者決定 v1 用降級方案。
+- **B6**：LAB 入場紀錄來源（PGM 冇）。
+- **G6／G9**：用測試會員量 `ClassBookings`、`Members` 按會員 filter 嘅真實速度；太慢就要 cache 或者改查法。
+
+---
+
 ## Review 完之後
 
 照「你決定」一欄更新 `docs/mvp-plan.md` 嘅範圍同排期，再開工。

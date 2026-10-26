@@ -213,8 +213,8 @@ export class NotificationsService {
     try {
       const start = new Date(month.getFullYear(), month.getMonth(), 1);
       const end   = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-      const res = await this.pgm.get<{ value: any[] }>('/odata/Visits', {
-        $filter: `memberId eq ${pgmMemberId} and enterDate ge datetime'${start.toISOString().slice(0,19)}' and enterDate le datetime'${end.toISOString().slice(0,19)}'`,
+      const res = await this.pgm.get<{ value: any[] }>('/odata/MemberClubVisits', {
+        $filter: `memberId eq ${pgmMemberId} and enterDate ge ${start.toISOString().slice(0,19)}Z and enterDate le ${end.toISOString().slice(0,19)}Z`,
         $select: 'id',
         $top: 200,
       });
