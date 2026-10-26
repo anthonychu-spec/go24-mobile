@@ -9,12 +9,14 @@ import { OutboxEvent } from './entities/outbox-event.entity';
 import { BookingRepository } from './repositories/booking.repo';
 import { IdempotencyRepository } from './repositories/idempotency.repo';
 import {
-  BookingFullError, DuplicateBookingError, InProgressError,
+  BookingFullError, ClassNotFoundError, DuplicateBookingError, InProgressError,
   isTempFail, mapPgmError,
 } from './errors/index';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { backgroundJobsEnabled } from '../config/background-jobs';
+import { BrandService } from '../brand/brand.service';
+import type { BrandId } from '../brand/brand.constants';
 
 /** errorCode markers that tell ReconcileJob what to check in PGM */
 export const WAITLIST_DECLINED = 'WAITLIST_DECLINED';
@@ -26,6 +28,7 @@ export interface BookInput {
   classId: number;
   idempotencyKey: string;
   acceptWaitlist?: boolean;
+  brand: BrandId;       // only the brand's own clubs can be booked
 }
 
 export interface BookResult {
@@ -47,6 +50,7 @@ export class BookingsService {
     @InjectRepository(OutboxEvent) private readonly outbox: Repository<OutboxEvent>,
     private readonly notifications: NotificationsService,
     private readonly settings: SettingsService,
+    private readonly brands: BrandService,
   ) {}
 
   private static readonly BOOKING_WINDOW_MS = 168 * 3600_000; // 168 hours
@@ -54,6 +58,7 @@ export class BookingsService {
   async book(input: BookInput): Promise<BookResult> {
     // 0. Enforce 168-hour booking window
     const cls = await this.pgm.getClass(input.classId);
+    if (!(await this.brands.ownsClub(input.brand, cls.clubId))) throw new ClassNotFoundError();
     const startMs = new Date(cls.startTime).getTime();
     if (startMs > Date.now() + BookingsService.BOOKING_WINDOW_MS) {
       throw new BadRequestException('Class is outside the 168-hour booking window');
@@ -81,6 +86,7 @@ export class BookingsService {
         userId: input.userId,
         pgmMemberId: input.pgmId,
         classId: input.classId,
+        clubId: cls.clubId,
         classDate,
         className: cls.name,
         clubName: cls.clubName ?? null,
@@ -165,6 +171,13 @@ export class BookingsService {
    * standby booking; if PGM doesn't answer, leave it for reconcile (pending_verify)
    * rather than claiming it's gone.
    */
+  /** The booking's club belongs to the caller's brand (looked up in PGM for rows saved before club_id existed). */
+  private async bookingInBrand(booking: { clubId: number | null; classId: number }, brand: BrandId): Promise<boolean> {
+    if (booking.clubId != null) return this.brands.ownsClub(brand, booking.clubId);
+    const cls = await this.pgm.getClass(booking.classId).catch(() => null);
+    return this.brands.ownsClub(brand, cls?.clubId);
+  }
+
   private async releaseDeclinedStandby(bookingId: string, pgmBookingId: number): Promise<BookResult> {
     try {
       await this.pgm.cancelBooking(pgmBookingId);
@@ -183,7 +196,7 @@ export class BookingsService {
     }
   }
 
-  async cancel(bookingId: string, userId: string, idempotencyKey: string): Promise<void> {
+  async cancel(bookingId: string, userId: string, idempotencyKey: string, brand: BrandId): Promise<void> {
     const claim = await this.idempotencyRepo.tryClaim(
       userId, idempotencyKey, 'DELETE /bookings',
     );
@@ -191,7 +204,7 @@ export class BookingsService {
     if (claim.kind === 'in_flight') throw new InProgressError();
 
     const booking = await this.bookingRepo.findById(bookingId);
-    if (!booking || booking.userId !== userId) {
+    if (!booking || booking.userId !== userId || !(await this.bookingInBrand(booking, brand))) {
       throw new BadRequestException('Booking not found');
     }
 
@@ -215,13 +228,15 @@ export class BookingsService {
     await this.emitOutbox('booking.cancelled', { bookingId, classId: booking.classId });
   }
 
-  async listMine(userId: string, status?: string): Promise<object[]> {
+  async listMine(userId: string, brand: BrandId, status?: string): Promise<object[]> {
+    const clubs = new Set(await this.brands.clubIds(brand));
     const bookings = await this.bookingRepo.findByUser(userId, status);
     // Enrich with PGM class details (name, club, times)
     const enriched = await Promise.all(
       bookings.map(async (b) => {
         try {
           const cls = await this.pgm.getClass(b.classId);
+          if (!clubs.has(b.clubId ?? cls.clubId)) return null;
           return {
             ...b,
             className: cls.name,
@@ -231,11 +246,13 @@ export class BookingsService {
             instructorName: cls.instructorName,
           };
         } catch {
+          // Class no longer in PGM's window: keep it only if we know it was this brand's club
+          if (b.clubId == null || !clubs.has(b.clubId)) return null;
           return { ...b, className: null, clubName: null, startTime: null, endTime: null, instructorName: null };
         }
       }),
     );
-    return enriched;
+    return enriched.filter(Boolean) as object[];
   }
 
   private async shadowRead(bookingId: string, pgmId: number, externalBookingId: number): Promise<void> {

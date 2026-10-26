@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { ReferralService } from './referral.service';
 import { Banner } from './entities/banner.entity';
+import { RequiresFeature } from '../brand/brand-feature.guard';
 
 @ApiTags('referral & banners')
 @Controller()
@@ -21,6 +22,7 @@ export class ReferralController {
   @ApiOperation({ summary: 'My referral link + stats' })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard)
+  @RequiresFeature('referral')
   @Get('referral/my')
   myReferral(@Req() req: Request) {
     return this.svc.getMyReferral((req.user as AuthedUser).id);

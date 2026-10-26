@@ -7,7 +7,8 @@ import { OutboxEvent } from './entities/outbox-event.entity';
 import { BOOKING_REPO } from '../booking/booking.interfaces';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
-import { TempFailError, InProgressError, BookingFullError } from './errors/index';
+import { BrandService } from '../brand/brand.service';
+import { TempFailError, InProgressError, BookingFullError, ClassNotFoundError } from './errors/index';
 
 const mockBookingRepo = {
   create: jest.fn(),
@@ -36,6 +37,11 @@ const mockOutboxRepo = {
 };
 
 const mockNotifications = { sendDirectPush: jest.fn().mockResolvedValue(undefined) };
+// LAB owns club 45 only
+const mockBrands = {
+  ownsClub: jest.fn(async (_b: string, clubId: number | null) => clubId === 45),
+  clubIds: jest.fn(async () => [45]),
+};
 const mockSettings = { get: jest.fn().mockResolvedValue({ reminderMinutes: 0, autoWaitlistCancel: false }) };
 
 const BASE_INPUT = {
@@ -43,6 +49,7 @@ const BASE_INPUT = {
   pgmId: 42,
   classId: 100,
   idempotencyKey: 'idem-key-1',
+  brand: 'lab' as const,
 };
 
 async function buildSvc() {
@@ -55,6 +62,7 @@ async function buildSvc() {
       { provide: getRepositoryToken(OutboxEvent), useValue: mockOutboxRepo },
       { provide: NotificationsService, useValue: mockNotifications },
       { provide: SettingsService, useValue: mockSettings },
+      { provide: BrandService, useValue: mockBrands },
     ],
   }).compile();
   return module.get(BookingsService);
@@ -64,7 +72,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   // A class two hours from now — inside the 168h booking window
   mockPgm.getClass.mockResolvedValue({
-    id: 100, name: 'HIIT', clubName: 'LAB', startTime: new Date(Date.now() + 2 * 3600_000).toISOString(),
+    id: 100, name: 'HIIT', clubId: 45, clubName: 'LAB', startTime: new Date(Date.now() + 2 * 3600_000).toISOString(),
   });
 });
 
@@ -185,7 +193,7 @@ describe('BookingsService.cancel', () => {
   it('cancels exactly the stored PGM booking (CancelSingleBooking by id), then transitions to cancelled', async () => {
     mockIdempotencyRepo.tryClaim.mockResolvedValueOnce({ kind: 'claimed' });
     mockBookingRepo.findById.mockResolvedValueOnce({
-      id: 'b1', userId: BASE_INPUT.userId, classId: 100,
+      id: 'b1', userId: BASE_INPUT.userId, classId: 100, clubId: 45,
       externalId: '999', pgmMemberId: 42,
     });
     mockPgm.cancelBooking.mockResolvedValueOnce(undefined);
@@ -193,7 +201,7 @@ describe('BookingsService.cancel', () => {
     mockIdempotencyRepo.complete.mockResolvedValueOnce(undefined);
 
     const svc = await buildSvc();
-    await svc.cancel('b1', BASE_INPUT.userId, 'cancel-key-1');
+    await svc.cancel('b1', BASE_INPUT.userId, 'cancel-key-1', 'lab');
 
     expect(mockPgm.cancelBooking).toHaveBeenCalledTimes(1);
     expect(mockPgm.cancelBooking).toHaveBeenCalledWith(999);
@@ -205,12 +213,12 @@ describe('BookingsService.cancel', () => {
   it('cancel timed out in PGM: keeps the booking, flags it for reconcile, does not mark cancelled', async () => {
     mockIdempotencyRepo.tryClaim.mockResolvedValueOnce({ kind: 'claimed' });
     mockBookingRepo.findById.mockResolvedValueOnce({
-      id: 'b6', userId: BASE_INPUT.userId, classId: 100, externalId: '606', pgmMemberId: 42,
+      id: 'b6', userId: BASE_INPUT.userId, classId: 100, clubId: 45, externalId: '606', pgmMemberId: 42,
     });
     mockPgm.cancelBooking.mockRejectedValueOnce(new TempFailError());
 
     const svc = await buildSvc();
-    await expect(svc.cancel('b6', BASE_INPUT.userId, 'cancel-key-2')).rejects.toBeInstanceOf(TempFailError);
+    await expect(svc.cancel('b6', BASE_INPUT.userId, 'cancel-key-2', 'lab')).rejects.toBeInstanceOf(TempFailError);
 
     expect(mockBookingRepo.flagError).toHaveBeenCalledWith('b6', CANCEL_UNKNOWN);
     expect(mockBookingRepo.transition).not.toHaveBeenCalled();
@@ -226,7 +234,7 @@ describe('BookingsService.cancel', () => {
     });
 
     const svc = await buildSvc();
-    await expect(svc.cancel('b7', BASE_INPUT.userId, 'cancel-key-3')).rejects.toThrow('Booking not found');
+    await expect(svc.cancel('b7', BASE_INPUT.userId, 'cancel-key-3', 'lab')).rejects.toThrow('Booking not found');
     expect(mockPgm.cancelBooking).not.toHaveBeenCalled();
   });
 
@@ -236,8 +244,48 @@ describe('BookingsService.cancel', () => {
     });
 
     const svc = await buildSvc();
-    await svc.cancel('b1', BASE_INPUT.userId, 'cancel-key-1');
+    await svc.cancel('b1', BASE_INPUT.userId, 'cancel-key-1', 'lab');
 
     expect(mockPgm.cancelBooking).not.toHaveBeenCalled();
+  });
+});
+
+describe('BookingsService brand whitelist', () => {
+  it("refuses to book another brand's class, before touching PGM or the DB", async () => {
+    mockPgm.getClass.mockResolvedValueOnce({ id: 200, name: 'GO24 Spin', clubId: 5, startTime: new Date(Date.now() + 3600_000).toISOString() });
+    const svc = await buildSvc();
+    await expect(svc.book({ ...BASE_INPUT, classId: 200 })).rejects.toBeInstanceOf(ClassNotFoundError);
+    expect(mockIdempotencyRepo.tryClaim).not.toHaveBeenCalled();
+    expect(mockPgm.bookClass).not.toHaveBeenCalled();
+  });
+
+  it('stores the club id on the booking', async () => {
+    mockIdempotencyRepo.tryClaim.mockResolvedValueOnce({ kind: 'claimed' });
+    mockBookingRepo.create.mockResolvedValueOnce({ id: 'b8', classId: 100 });
+    mockPgm.bookClass.mockResolvedValueOnce({ bookingId: 808, isStandby: false });
+    const svc = await buildSvc();
+    await svc.book(BASE_INPUT);
+    expect(mockBookingRepo.create).toHaveBeenCalledWith(expect.objectContaining({ clubId: 45 }));
+  });
+
+  it("cannot cancel its own booking at another brand's club through this brand's app", async () => {
+    mockIdempotencyRepo.tryClaim.mockResolvedValueOnce({ kind: 'claimed' });
+    mockBookingRepo.findById.mockResolvedValueOnce({
+      id: 'b9', userId: BASE_INPUT.userId, classId: 300, clubId: 5, externalId: '909', pgmMemberId: 42,
+    });
+    const svc = await buildSvc();
+    await expect(svc.cancel('b9', BASE_INPUT.userId, 'k9', 'lab')).rejects.toThrow('Booking not found');
+    expect(mockPgm.cancelBooking).not.toHaveBeenCalled();
+  });
+
+  it("lists only this brand's bookings", async () => {
+    mockBookingRepo.findByUser.mockResolvedValueOnce([
+      { id: 'lab-1', classId: 100, clubId: 45 },
+      { id: 'go24-1', classId: 200, clubId: 5 },
+    ]);
+    mockPgm.getClass.mockImplementation(async (id: number) => ({ id, name: 'X', clubId: id === 100 ? 45 : 5, startTime: '' }));
+    const svc = await buildSvc();
+    const list = (await svc.listMine(BASE_INPUT.userId, 'lab')) as Array<{ id: string }>;
+    expect(list.map(b => b.id)).toEqual(['lab-1']);
   });
 });

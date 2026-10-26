@@ -8,6 +8,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { PtService } from './pt.service';
+import { RequiresFeature } from '../brand/brand-feature.guard';
 
 class VerifySessionDto {
   @IsString() pgmSessionId: string;
@@ -20,6 +21,7 @@ class VerifySessionDto {
 @ApiTags('pt')
 @ApiBearerAuth('jwt')
 @UseGuards(JwtAuthGuard)
+@RequiresFeature('pt')
 @Controller('pt')
 export class PtController {
   constructor(private readonly svc: PtService) {}

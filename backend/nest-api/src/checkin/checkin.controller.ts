@@ -5,6 +5,7 @@ import type { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
+import { RequiresFeature } from '../brand/brand-feature.guard';
 
 @ApiTags('checkin')
 @ApiBearerAuth('jwt')
@@ -14,6 +15,7 @@ export class CheckinController {
   constructor(private readonly cfg: ConfigService) {}
 
   @ApiOperation({ summary: 'Generate QR check-in payload (valid 30s)' })
+  @RequiresFeature('member_qr')
   @Get('qr')
   getQr(@Req() req: Request) {
     const user = req.user as AuthedUser;

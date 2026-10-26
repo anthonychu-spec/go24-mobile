@@ -8,6 +8,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { PaymentsService } from './payments.service';
+import { RequiresFeature } from '../brand/brand-feature.guard';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -17,6 +18,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Create Adyen session for card update' })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard)
+  @RequiresFeature('payments')
   @Post('card-session')
   @HttpCode(200)
   cardSession(@Req() req: Request) {
@@ -27,6 +29,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Get current saved card (masked)' })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard)
+  @RequiresFeature('payments')
   @Get('card')
   getCard(@Req() req: Request) {
     const user = req.user as AuthedUser;
@@ -36,6 +39,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Buy a day pass using saved card' })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard)
+  @RequiresFeature('payments')
   @Post('pay-daypass')
   @HttpCode(200)
   payDayPass(@Req() req: Request) {
@@ -46,6 +50,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Payment history (charges + PGM invoices)' })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard)
+  @RequiresFeature('payments')
   @Get('/me/payments')
   getPaymentHistory(@Req() req: Request) {
     const user = req.user as AuthedUser;
@@ -55,6 +60,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Download invoice PDF' })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard)
+  @RequiresFeature('payments')
   @Get('/me/payments/:id/invoice')
   async downloadInvoice(
     @Req() req: Request,

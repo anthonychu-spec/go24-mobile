@@ -29,6 +29,10 @@ export class Session {
   @Column({ type: 'boolean', default: false })
   revoked!: boolean;
 
+  /** App brand the member signed in through; carried into every token issued for this session */
+  @Column({ type: 'varchar', length: 20, default: 'go24' })
+  brand!: string;
+
   @Column({ type: 'timestamptz', name: 'last_seen_at', nullable: true })
   lastSeenAt!: Date | null;
 

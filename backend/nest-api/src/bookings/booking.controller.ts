@@ -11,10 +11,12 @@ import { BookDto } from './dto/book.dto';
 import { BookingsService } from './booking.service';
 import { assertWebhookSecret } from '../common/webhook-secret';
 import { RateLimit } from '../common/rate-limit';
+import { RequiresFeature } from '../brand/brand-feature.guard';
 
 @ApiTags('bookings')
 @ApiBearerAuth('jwt')
 @UseGuards(JwtAuthGuard)
+@RequiresFeature('classes')
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly svc: BookingsService) {}
@@ -37,6 +39,7 @@ export class BookingsController {
       classId: dto.classId,
       idempotencyKey: key,
       acceptWaitlist: dto.acceptWaitlist,
+      brand: user.brand,
     });
   }
 
@@ -52,7 +55,7 @@ export class BookingsController {
   ) {
     if (!key) throw new BadRequestException('Idempotency-Key header is required');
     const user = req.user as AuthedUser;
-    await this.svc.cancel(id, user.id, key);
+    await this.svc.cancel(id, user.id, key, user.brand);
   }
 
   @ApiOperation({ summary: 'My bookings' })
@@ -63,7 +66,7 @@ export class BookingsController {
     @Req() req: Request,
   ) {
     const user = req.user as AuthedUser;
-    return this.svc.listMine(user.id, status);
+    return this.svc.listMine(user.id, user.brand, status);
   }
 }
 

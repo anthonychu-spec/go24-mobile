@@ -38,7 +38,7 @@ export class NotificationsController {
   @HttpCode(200)
   async registerDevice(@Body() dto: RegisterTokenDto, @Req() req: Request) {
     const user = req.user as AuthedUser;
-    await this.svc.registerToken(user.id, dto.token, dto.platform ?? 'ios');
+    await this.svc.registerToken(user.id, dto.token, dto.platform ?? 'ios', user.brand);
     return { ok: true };
   }
 

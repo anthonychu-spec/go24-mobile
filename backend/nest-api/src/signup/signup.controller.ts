@@ -7,6 +7,8 @@ import { SignupService } from './signup.service';
 import { FaceRetryDto, SignupCompleteDto, SignupSessionDto } from './dto/signup.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
+import { RequiresFeature } from '../brand/brand-feature.guard';
+import { headerBrand } from '../brand/request-brand';
 
 @ApiTags('signup')
 @Controller()
@@ -19,6 +21,7 @@ export class SignupController {
   // ── Public routes (no JWT guard) ──────────────────────────────────────────
 
   @ApiOperation({ summary: 'List active membership plans (public)' })
+  @RequiresFeature('signup')
   @Get('public/plans')
   getPlans(@Query('clubId') clubId?: string) {
     return this.svc.getPlans(clubId ? Number(clubId) : undefined);
@@ -26,11 +29,12 @@ export class SignupController {
 
   @ApiOperation({ summary: 'List clubs (public)' })
   @Get('public/clubs')
-  getClubs() {
-    return this.svc.getClubs();
+  getClubs(@Req() req: Request) {
+    return this.svc.getClubs(headerBrand(req));
   }
 
   @ApiOperation({ summary: 'Create Adyen session for signup payment (public)' })
+  @RequiresFeature('signup')
   @Post('public/signup/session')
   @HttpCode(200)
   createSession(@Body() dto: SignupSessionDto) {
@@ -38,6 +42,7 @@ export class SignupController {
   }
 
   @ApiOperation({ summary: 'Complete signup after Adyen payment success (public)' })
+  @RequiresFeature('signup')
   @Post('public/signup/complete')
   @HttpCode(200)
   completeSignup(@Body() dto: SignupCompleteDto) {
@@ -57,6 +62,7 @@ export class SignupController {
   @ApiOperation({ summary: 'Retry face enrollment with new photo' })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard)
+  @RequiresFeature('signup')
   @Post('me/face/retry')
   @HttpCode(200)
   retryFace(@Req() req: Request, @Body() body: FaceRetryDto) {
@@ -67,6 +73,7 @@ export class SignupController {
   @ApiOperation({ summary: 'Get face enrollment status' })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard)
+  @RequiresFeature('signup')
   @Get('me/face/status')
   faceStatus(@Req() req: Request) {
     const user = req.user as AuthedUser;

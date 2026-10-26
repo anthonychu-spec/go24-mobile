@@ -5,6 +5,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { MembershipRequestsService } from './membership-requests.service';
+import { RequiresFeature } from '../brand/brand-feature.guard';
 
 class FreezeRequestDto {
   @IsDateString() startDate: string;
@@ -15,6 +16,7 @@ class FreezeRequestDto {
 @ApiTags('membership')
 @ApiBearerAuth('jwt')
 @UseGuards(JwtAuthGuard)
+@RequiresFeature('freeze')
 @Controller('me/membership')
 export class MembershipRequestsController {
   constructor(private readonly svc: MembershipRequestsService) {}

@@ -1,12 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
 import { DeviceToken } from './entities/device-token.entity';
 import { Notification, NotificationType } from './entities/notification.entity';
 import { User } from '../auth/entities/user.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { backgroundJobsEnabled } from '../config/background-jobs';
+
+const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const EXPO_BATCH = 100;
+
+interface ExpoTicket {
+  status: 'ok' | 'error';
+  details?: { error?: string };
+}
+
+/** Tokens whose ticket says the app is no longer installed (tickets come back in send order). */
+export function deadTokens(tokens: string[], tickets: ExpoTicket[] | undefined): string[] {
+  if (!tickets) return [];
+  return tokens.filter((_, i) => tickets[i]?.status === 'error' && tickets[i]?.details?.error === 'DeviceNotRegistered');
+}
 
 const REASON_MESSAGES: Record<string, { title: string; body: string }> = {
   'No Active Contract': { title: '⚠️ 入場失敗', body: '你嘅會籍已到期，請於 App 內續會或聯絡前台。' },
@@ -31,9 +45,9 @@ export class NotificationsService {
 
   // ── Device token ──────────────────────────────────────────────────────────
 
-  async registerToken(userId: string, token: string, platform: string): Promise<void> {
+  async registerToken(userId: string, token: string, platform: string, brand: string): Promise<void> {
     await this.tokenRepo.upsert(
-      { userId, token, platform: platform as 'ios' | 'android' | 'web' },
+      { userId, token, platform: platform as 'ios' | 'android' | 'web', brand },
       { conflictPaths: ['userId', 'token'] },
     );
   }
@@ -224,16 +238,33 @@ export class NotificationsService {
 
   // ── Internal push ─────────────────────────────────────────────────────────
 
+  /**
+   * Sends via Expo in batches of 100 (Expo's per-request limit). Tokens Expo reports
+   * as DeviceNotRegistered (app uninstalled) are deleted so we stop sending to them.
+   * Delivery receipts (errors reported later by Apple/Google) are not polled yet.
+   */
   private async sendPush(tokens: string[], title: string, body: string, data: Record<string, unknown>): Promise<void> {
-    const messages = tokens.map(to => ({ to, title, body, data, sound: 'default' }));
-    try {
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(messages),
-      });
-    } catch (err) {
-      this.logger.error('Push failed', err);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
+    const accessToken = process.env.EXPO_ACCESS_TOKEN;
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+    for (let i = 0; i < tokens.length; i += EXPO_BATCH) {
+      const batch = tokens.slice(i, i + EXPO_BATCH);
+      try {
+        const res = await fetch(EXPO_PUSH_URL, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(batch.map(to => ({ to, title, body, data, sound: 'default' }))),
+        });
+        const json = (await res.json().catch(() => null)) as { data?: ExpoTicket[] } | null;
+        const dead = deadTokens(batch, json?.data);
+        if (dead.length) {
+          await this.tokenRepo.delete({ token: In(dead) });
+          this.logger.log(`Removed ${dead.length} unregistered push token(s)`);
+        }
+      } catch (err) {
+        this.logger.error('Push failed', err);
+      }
     }
   }
 }

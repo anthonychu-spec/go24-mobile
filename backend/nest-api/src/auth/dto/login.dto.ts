@@ -54,4 +54,9 @@ export class LogoutDto {
   @ApiProperty()
   @IsString()
   refreshToken!: string;
+
+  @ApiPropertyOptional({ description: "This device's Expo push token — removed so a signed-out phone gets no more push" })
+  @IsString()
+  @IsOptional()
+  pushToken?: string;
 }

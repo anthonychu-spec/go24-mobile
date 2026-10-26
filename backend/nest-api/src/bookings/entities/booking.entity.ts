@@ -18,6 +18,10 @@ export class Booking {
   @Column({ name: 'class_id', type: 'int' })
   classId: number;
 
+  /** PGM club of the class — lets brand checks run without a PGM lookup (null on old rows) */
+  @Column({ name: 'club_id', type: 'int', nullable: true })
+  clubId: number | null;
+
   @Column({ name: 'external_id', nullable: true, type: 'text' })
   externalId: string | null;
 

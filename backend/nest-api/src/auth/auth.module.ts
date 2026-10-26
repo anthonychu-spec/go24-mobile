@@ -7,13 +7,14 @@ import { PgmModule } from '../pgm-adapter/pgm.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { Session } from './entities/session.entity';
+import { DeviceToken } from '../notifications/entities/device-token.entity';
 import { User } from './entities/user.entity';
 import { JwtStrategy } from './jwt.strategy';
 import { SessionValidator } from './session-validator';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Session]),
+    TypeOrmModule.forFeature([User, Session, DeviceToken]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

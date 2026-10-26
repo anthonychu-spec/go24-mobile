@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { DashboardService } from './dashboard.service';
+import { RequiresFeature } from '../brand/brand-feature.guard';
 
 @ApiTags('dashboard')
 @ApiBearerAuth('jwt')
@@ -34,6 +35,7 @@ export class DashboardController {
   }
 
   @ApiOperation({ summary: 'Charge saved card for outstanding PGM invoices' })
+  @RequiresFeature('payments')
   @Post('pay-outstanding')
   payOutstanding(@Req() req: Request) {
     const user = req.user as AuthedUser;

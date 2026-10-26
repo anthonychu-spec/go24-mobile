@@ -18,6 +18,7 @@ export class BookingRepository {
     userId: string;
     pgmMemberId: number;
     classId: number;
+    clubId?: number | null;
     classDate?: string;
     className?: string;
     clubName?: string | null;
@@ -29,6 +30,7 @@ export class BookingRepository {
       userId: input.userId,
       pgmMemberId: input.pgmMemberId,
       classId: input.classId,
+      clubId: input.clubId ?? null,
       classDate: input.classDate ?? null,
       className: input.className ?? null,
       clubName: input.clubName ?? null,

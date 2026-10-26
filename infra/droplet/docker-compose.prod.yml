@@ -67,6 +67,8 @@ services:
       SUPREMA_WEBHOOK_SECRET: ${SUPREMA_WEBHOOK_SECRET}
       # Browser origins allowed by CORS (comma-separated); native apps need none
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # Expo push access token (only needed if push security is on in the Expo projects)
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
       # Crons that call PGM or send push stay off until explicitly enabled
       BACKGROUND_JOBS_ENABLED: ${BACKGROUND_JOBS_ENABLED:-false}
     depends_on:

@@ -4,6 +4,7 @@ import { DevtoolsModule } from '@nestjs/devtools-integration';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { BrandModule } from './brand/brand.module';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -28,6 +29,7 @@ import { MilestonesModule } from './milestones/milestones.module';
     ConfigModule,
     DatabaseModule,
     ScheduleModule.forRoot(),
+    BrandModule,
     AuthModule,
     HealthModule,
     BookingModule,

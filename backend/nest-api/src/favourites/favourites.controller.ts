@@ -5,6 +5,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { FavouritesService } from './favourites.service';
+import { RequiresFeature } from '../brand/brand-feature.guard';
 
 class AddFavouriteDto {
   @IsString() @IsNotEmpty() @MaxLength(50) classTemplateId: string;
@@ -15,6 +16,7 @@ class AddFavouriteDto {
 @ApiTags('favourites')
 @ApiBearerAuth('jwt')
 @UseGuards(JwtAuthGuard)
+@RequiresFeature('favourites')
 @Controller('me/favourites')
 export class FavouritesController {
   constructor(private readonly svc: FavouritesService) {}

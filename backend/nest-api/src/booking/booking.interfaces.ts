@@ -21,6 +21,7 @@ export interface PgmBooking {
   startTime: string;
   endTime: string;
   clubName: string | null;
+  clubId: number | null;     // null when the class is outside the cached window
   isStandby: boolean;
   isCancelled: boolean;
 }

@@ -10,7 +10,7 @@ const mockSvc = {
 };
 
 const authedReq = () => ({
-  user: { id: 'user-uuid-1', pgmId: 42, role: 'member', jti: 'jti-1' },
+  user: { id: 'user-uuid-1', pgmId: 42, role: 'member', jti: 'jti-1', brand: 'lab' },
 } as any);
 
 async function buildController() {
@@ -44,6 +44,7 @@ describe('BookingsController.book', () => {
       classId: 100,
       idempotencyKey: 'idem-key-1',
       acceptWaitlist: undefined,
+      brand: 'lab',
     });
     expect(result).toEqual({ success: true, bookingId: 'b1', status: 'confirmed' });
   });
@@ -64,7 +65,7 @@ describe('BookingsController.cancel', () => {
     const ctrl = await buildController();
     await ctrl.cancel('booking-id-1', 'cancel-key-1', authedReq());
 
-    expect(mockSvc.cancel).toHaveBeenCalledWith('booking-id-1', 'user-uuid-1', 'cancel-key-1');
+    expect(mockSvc.cancel).toHaveBeenCalledWith('booking-id-1', 'user-uuid-1', 'cancel-key-1', 'lab');
   });
 });
 
@@ -75,7 +76,7 @@ describe('BookingsController.list', () => {
     const ctrl = await buildController();
     const result = await ctrl.list('confirmed', authedReq());
 
-    expect(mockSvc.listMine).toHaveBeenCalledWith('user-uuid-1', 'confirmed');
+    expect(mockSvc.listMine).toHaveBeenCalledWith('user-uuid-1', 'lab', 'confirmed');
     expect(result).toEqual([{ id: 'b1' }]);
   });
 
@@ -85,6 +86,6 @@ describe('BookingsController.list', () => {
     const ctrl = await buildController();
     await ctrl.list(undefined as any, authedReq());
 
-    expect(mockSvc.listMine).toHaveBeenCalledWith('user-uuid-1', undefined);
+    expect(mockSvc.listMine).toHaveBeenCalledWith('user-uuid-1', 'lab', undefined);
   });
 });

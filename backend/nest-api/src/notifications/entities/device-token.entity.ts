@@ -14,6 +14,10 @@ export class DeviceToken {
   @Column({ type: 'varchar', length: 10 })
   platform: 'ios' | 'android' | 'web';
 
+  /** App brand the token was registered from (each brand is its own Expo project) */
+  @Column({ type: 'varchar', length: 20, default: 'go24' })
+  brand: string;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

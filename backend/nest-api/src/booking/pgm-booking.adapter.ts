@@ -261,6 +261,7 @@ export class PgmBookingAdapter implements IBookingRepo {
             startTime: cls?.startDate ?? '',
             endTime: cls?.endDate ?? '',
             clubName: cls ? (clubMap.get(cls.clubId) ?? null) : null,
+            clubId: cls?.clubId ?? null,
             isStandby: b.isStandby ?? false,
             isCancelled: b.isCanceled ?? false,
           };
@@ -324,6 +325,7 @@ export class PgmBookingAdapter implements IBookingRepo {
           startTime:   b.startDate,
           endTime:     b.endDate,
           clubName:    cls ? (cMap.get(cls.clubId) ?? null) : null,
+          clubId:      cls?.clubId ?? null,
           isStandby:   b.isStandby  ?? false,
           isCancelled: b.isCancelled ?? false,
         };

@@ -6,6 +6,7 @@ import { LoginDto, LogoutDto, RefreshDto, RequestOtpDto, VerifyOtpDto } from './
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RateLimit } from '../common/rate-limit';
 import { AuthedUser } from './jwt.strategy';
+import { headerBrand } from '../brand/request-brand';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -16,8 +17,8 @@ export class AuthController {
   @RateLimit({ limit: 10, windowMs: 60_000, by: 'ip' })
   @Post('login')
   @HttpCode(200)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Req() req: Request) {
+    return this.authService.login({ ...dto, brand: headerBrand(req) });
   }
 
   @ApiOperation({ summary: 'Request OTP via email (PGM SendOneTimeCode)' })
@@ -32,8 +33,8 @@ export class AuthController {
   @RateLimit({ limit: 10, windowMs: 10 * 60_000, by: 'ip' })
   @Post('verify-otp')
   @HttpCode(200)
-  verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.authService.verifyOtp(dto);
+  verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
+    return this.authService.verifyOtp({ ...dto, brand: headerBrand(req) });
   }
 
   @ApiOperation({ summary: 'Refresh access token + rotate refresh token' })
@@ -44,11 +45,11 @@ export class AuthController {
     return this.authService.refresh(dto.refreshToken);
   }
 
-  @ApiOperation({ summary: 'Revoke session' })
+  @ApiOperation({ summary: 'Revoke session; pass pushToken to stop push to this device' })
   @Post('logout')
   @HttpCode(204)
   async logout(@Body() dto: LogoutDto) {
-    await this.authService.logout(dto.refreshToken);
+    await this.authService.logout(dto.refreshToken, dto.pushToken);
   }
 
   @ApiBearerAuth('jwt')

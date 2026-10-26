@@ -7,9 +7,11 @@ import { Repository } from 'typeorm';
 import { PgmAuthAdapter, PgmCodeDestination } from '../pgm-adapter/pgm-auth.adapter';
 import { AppError } from '../pgm-adapter/error-normalize';
 import { Session } from './entities/session.entity';
+import { DeviceToken } from '../notifications/entities/device-token.entity';
 import { User } from './entities/user.entity';
 import { JwtPayload } from './jwt.strategy';
 import { SessionValidator } from './session-validator';
+import { BrandId, DEFAULT_BRAND, isBrandId } from '../brand/brand.constants';
 
 const REFRESH_TTL_DAYS = 30;
 const ACCESS_TTL = '15m';
@@ -29,6 +31,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Session) private readonly sessionRepo: Repository<Session>,
+    @InjectRepository(DeviceToken) private readonly deviceTokenRepo: Repository<DeviceToken>,
     private readonly pgm: PgmAuthAdapter,
     private readonly jwt: JwtService,
     private readonly cfg: ConfigService,
@@ -48,6 +51,7 @@ export class AuthService {
     password: string;
     deviceFingerprint?: string;
     devicePlatform?: string;
+    brand?: BrandId;
   }): Promise<IssueTokenResult> {
     const result = await this.pgm.verifyMemberCredentials(input.email, input.password);
     if (!result?.memberId) throw new AppError('INVALID_CREDENTIALS');
@@ -69,7 +73,7 @@ export class AuthService {
       status: 'active',
     });
 
-    return this.issueTokens(user, input.deviceFingerprint, input.devicePlatform);
+    return this.issueTokens(user, input.brand ?? DEFAULT_BRAND, input.deviceFingerprint, input.devicePlatform);
   }
 
   /** Option B step 1 — request OTP. Returns signed memberIdToken to use in step 2. */
@@ -88,6 +92,7 @@ export class AuthService {
     memberIdToken: string;
     code: string;
     deviceFingerprint?: string;
+    brand?: BrandId;
   }): Promise<IssueTokenResult> {
     const memberId = this.verifyMemberIdToken(input.memberIdToken);
     const r = await this.pgm.verifyOneTimeCode(memberId, input.code);
@@ -97,7 +102,7 @@ export class AuthService {
     await this.ensureMemberActive(memberId);
 
     const user = await this.upsertUser({ pgmMemberId: memberId, status: 'active' });
-    return this.issueTokens(user, input.deviceFingerprint);
+    return this.issueTokens(user, input.brand ?? DEFAULT_BRAND, input.deviceFingerprint);
   }
 
   /** A correct password or code is not enough: the PGM member must still be active. */
@@ -122,10 +127,10 @@ export class AuthService {
       .update(Session)
       .set({ revoked: true })
       .where('refresh_token_hash = :hash AND revoked = false AND expires_at > NOW()', { hash })
-      .returning(['id', 'userId', 'deviceFingerprint', 'devicePlatform'])
+      .returning(['id', 'userId', 'deviceFingerprint', 'devicePlatform', 'brand'])
       .execute();
 
-    const claimed = (claimResult.raw as Array<{ id: string; user_id: string; device_fingerprint: string | null; device_platform: string | null }>)[0];
+    const claimed = (claimResult.raw as Array<{ id: string; user_id: string; device_fingerprint: string | null; device_platform: string | null; brand: string }>)[0];
 
     if (!claimed) {
       // No row updated → either token doesn't exist, expired, OR already revoked (replay)
@@ -163,15 +168,19 @@ export class AuthService {
       }
     }
 
-    return this.issueTokens(user, claimed.device_fingerprint ?? undefined, claimed.device_platform ?? undefined);
+    // A session keeps the brand it was opened with
+    const brand = isBrandId(claimed.brand) ? claimed.brand : DEFAULT_BRAND;
+    return this.issueTokens(user, brand, claimed.device_fingerprint ?? undefined, claimed.device_platform ?? undefined);
   }
 
-  async logout(refreshToken: string): Promise<void> {
+  async logout(refreshToken: string, pushToken?: string): Promise<void> {
     const hash = this.hashRefresh(refreshToken);
     const session = await this.sessionRepo.findOne({ where: { refreshTokenHash: hash } });
     if (!session) return;
     await this.sessionRepo.update({ id: session.id }, { revoked: true });
     this.sessionValidator.forget(session.id);
+    // A signed-out phone must not keep receiving this member's push
+    if (pushToken) await this.deviceTokenRepo.delete({ userId: session.userId, token: pushToken });
   }
 
   private async revokeAllSessions(userId: string): Promise<void> {
@@ -215,6 +224,7 @@ export class AuthService {
 
   private async issueTokens(
     user: User,
+    brand: BrandId,
     deviceFingerprint?: string,
     devicePlatform?: string,
   ): Promise<IssueTokenResult> {
@@ -230,6 +240,7 @@ export class AuthService {
         refreshTokenHash: this.hashRefresh(refreshToken),
         deviceFingerprint: deviceFingerprint ?? null,
         devicePlatform: devicePlatform ?? null,
+        brand,
         expiresAt,
         lastSeenAt: new Date(),
       }),
@@ -238,6 +249,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       sid: session.id,
+      brand,
       pgmId: user.pgmMemberId,
       role: user.role,
       jti: randomUUID(),
@@ -327,8 +339,8 @@ export class AuthService {
   }
 
   /** Issue JWT tokens for a newly-created user (called by SignupService). */
-  async issueTokensForNewUser(user: User): Promise<IssueTokenResult> {
-    return this.issueTokens(user);
+  async issueTokensForNewUser(user: User, brand: BrandId = DEFAULT_BRAND): Promise<IssueTokenResult> {
+    return this.issueTokens(user, brand);
   }
 }
 

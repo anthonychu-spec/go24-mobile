@@ -9,6 +9,8 @@ import { AuthService, IssueTokenResult } from '../auth/auth.service';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { AdyenClient } from '../payments/adyen.client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { BrandService } from '../brand/brand.service';
+import type { BrandId } from '../brand/brand.constants';
 
 @Injectable()
 export class SignupService {
@@ -21,17 +23,20 @@ export class SignupService {
     private readonly adyen: AdyenClient,
     private readonly notifications: NotificationsService,
     private readonly cfg: ConfigService,
+    private readonly brands: BrandService,
   ) {}
 
   // ── Public plans (no auth) ────────────────────────────────────────────────
 
-  async getClubs(): Promise<Array<{ id: number; name: string }>> {
+  /** Clubs shown in the brand's app (brand_clubs whitelist). */
+  async getClubs(brand: BrandId): Promise<Array<{ id: number; name: string }>> {
+    const allowed = new Set(await this.brands.clubIds(brand));
     try {
       const res = await this.pgm.get<{ value: any[] }>('/odata/Clubs', {
         $select: 'id,name',
       });
       return (res.value ?? [])
-        .filter((c: any) => !c.name?.includes('_'))
+        .filter((c: any) => allowed.has(c.id) && !c.name?.includes('_'))
         .map((c: any) => ({ id: c.id, name: c.name }));
     } catch (e) {
       this.logger.error('Failed to fetch clubs', e);
@@ -65,16 +70,12 @@ export class SignupService {
 
       if (!clubId) return online;
 
-      // Determine club type from club list
-      let clubName = '';
-      try {
-        const clubs = await this.getClubs();
-        clubName = clubs.find(c => c.id === clubId)?.name ?? '';
-      } catch { /* fall through — show all online */ }
+      // Plan names carry the brand ("GO24 Online …", "ONYX Online …"); match the club's brand
+      // from brand_clubs instead of guessing from the club name
+      const clubBrand = await this.brands.brandOfClub(clubId);
+      if (clubBrand !== 'go24' && clubBrand !== 'onyx') return []; // no online plans set up for other brands
 
-      if (!clubName) return online;
-
-      const isOnyx = clubName.includes('ONYX');
+      const isOnyx = clubBrand === 'onyx';
       const brand  = isOnyx ? 'ONYX' : 'GO24';
 
       return online.filter(p => {

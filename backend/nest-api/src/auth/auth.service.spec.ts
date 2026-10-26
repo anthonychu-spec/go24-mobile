@@ -34,11 +34,12 @@ const sessionRepo = {
   }),
 };
 const sessionValidator = { forget: jest.fn() };
+const deviceTokenRepo = { delete: jest.fn() };
 const cfg = { get: (k: string) => (k === 'JWT_SECRET' ? SECRET : undefined) };
 const jwt = new JwtService({ secret: SECRET });
 
 const svc = new AuthService(
-  userRepo as any, sessionRepo as any, pgm as any, jwt, cfg as any, sessionValidator as any,
+  userRepo as any, sessionRepo as any, deviceTokenRepo as any, pgm as any, jwt, cfg as any, sessionValidator as any,
 );
 
 const ACTIVE = { exists: true, isActive: true, isDeleted: false };
@@ -64,9 +65,19 @@ describe('AuthService.login', () => {
     pgm.getMemberStatus.mockResolvedValueOnce(ACTIVE);
     userRepo.findOne.mockResolvedValueOnce(null);
     const res = await svc.login({ email: 'a@b.co', password: 'secret1' });
-    const payload = jwt.decode(res.accessToken) as { sid: string; sub: string };
+    const payload = jwt.decode(res.accessToken) as { sid: string; sub: string; brand: string };
     expect(payload.sid).toBe('session-1');
     expect(payload.sub).toBe('user-1');
+    expect(payload.brand).toBe('go24'); // no header → default brand
+  });
+
+  it('records the app brand on the session and in the token', async () => {
+    pgm.verifyMemberCredentials.mockResolvedValueOnce({ memberId: 7, status: 'Active' });
+    pgm.getMemberStatus.mockResolvedValueOnce(ACTIVE);
+    userRepo.findOne.mockResolvedValueOnce(null);
+    const res = await svc.login({ email: 'a@b.co', password: 'secret1', brand: 'lab' });
+    expect(sessionRepo.create).toHaveBeenCalledWith(expect.objectContaining({ brand: 'lab' }));
+    expect((jwt.decode(res.accessToken) as { brand: string }).brand).toBe('lab');
   });
 });
 
@@ -100,7 +111,14 @@ describe('AuthService OTP', () => {
 });
 
 describe('AuthService.refresh', () => {
-  const claimed = { raw: [{ id: 'old-session', user_id: 'user-1', device_fingerprint: null, device_platform: null }] };
+  const claimed = { raw: [{ id: 'old-session', user_id: 'user-1', device_fingerprint: null, device_platform: null, brand: 'lab' }] };
+
+  it('keeps the brand the session was opened with', async () => {
+    claimExecute.mockResolvedValueOnce(claimed);
+    userRepo.findOne.mockResolvedValueOnce({ id: 'user-1', status: 'active', role: 'member', pgmMemberId: 7, lastPgmSyncAt: new Date() });
+    const res = await svc.refresh('rt');
+    expect((jwt.decode(res.accessToken) as { brand: string }).brand).toBe('lab');
+  });
 
   it('refuses and revokes every session when the local user is not active', async () => {
     claimExecute.mockResolvedValueOnce(claimed);
@@ -145,6 +163,13 @@ describe('AuthService.logout', () => {
     await svc.logout('rt');
     expect(sessionRepo.update).toHaveBeenCalledWith({ id: 'session-9' }, { revoked: true });
     expect(sessionValidator.forget).toHaveBeenCalledWith('session-9');
+    expect(deviceTokenRepo.delete).not.toHaveBeenCalled();
+  });
+
+  it("removes this device's push token when given", async () => {
+    sessionRepo.findOne.mockResolvedValueOnce({ id: 'session-9', userId: 'user-1' });
+    await svc.logout('rt', 'ExponentPushToken[abc]');
+    expect(deviceTokenRepo.delete).toHaveBeenCalledWith({ userId: 'user-1', token: 'ExponentPushToken[abc]' });
   });
 });
 
