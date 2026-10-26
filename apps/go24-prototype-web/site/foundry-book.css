@@ -1,0 +1,290 @@
+/* Components retained from the latest Foundry four-tab app. */
+
+.h-sports{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+
+.h-sport{position:relative;height:96px;padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--navy);text-align:left;color:#FFFFFF}
+
+.h-sport img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.55) brightness(.9);transition:filter .25s}
+
+.h-sport:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#23252a10,#23252aD9)}
+
+.h-sport>span{position:absolute;z-index:1;left:10px;right:8px;bottom:9px;display:block}
+
+.h-sport strong{display:block;font-weight:400;font-size:12.5px;letter-spacing:.3px}
+
+.h-sport small{display:block;font-size:8.5px;color:#efefee;margin-top:2px}
+
+.h-sport.on{border-color:var(--gold);box-shadow:0 0 0 1.5px var(--gold),0 10px 20px -14px #23252a}
+
+.h-sport.on img{filter:saturate(.9)}
+
+.h-sport.on:before{content:'';position:absolute;z-index:2;top:8px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 2px #23252a66}
+.h-sports{margin-bottom:18px}
+.h-sport{height:108px!important}
+.h-sport span strong{font-size:13px}
+.h-sport span small{font-size:8px}
+.booking-availability-filters{display:flex;align-items:flex-end;gap:8px;margin:3px 0 22px}
+.booking-availability-filters>.v-select{flex:1;height:auto;display:flex;flex-direction:column;align-items:stretch;background:#fff;padding:9px 10px 6px;border:1px solid #23252a20;border-radius:6px}
+.booking-availability-filters>.v-select>span{font-size:7px;letter-spacing:1.2px;text-transform:uppercase;color:#75818a;margin-bottom:5px}
+.booking-availability-filters select{height:26px;padding:0;font-size:11px}
+
+
+/* Foundry's booking voice: editorial introductions, service cards and a compact session planner. */
+.foundry-booking .booking-intro{position:relative;isolation:isolate;padding:9px 22px 24px;overflow:hidden}
+.booking-intro>i{position:absolute;z-index:-1;inset:0;background:none right -35px top -130px/200px auto no-repeat;opacity:.065}
+.booking-intro>.eyebrow{font-size:7px;letter-spacing:1.6px;color:#b91432}
+.booking-intro h1{font:400 43px/1 var(--display)!important;letter-spacing:-1.5px;margin:13px 0 12px}
+.booking-intro>p{font-size:10px;color:#586979;line-height:1.7}
+.booking-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 13px}
+.booking-section-head>span{font-size:7px;letter-spacing:1.4px;color:#586979}
+.booking-section-head>small{font-size:8px;color:#75818a}
+.foundry-booking .h-sports{gap:10px;margin-bottom:25px}
+.foundry-booking .h-sport{height:140px!important;background:transparent;border:0;border-radius:0;color:#23252a;overflow:visible;box-shadow:none!important;padding:0 0 9px;border-bottom:2px solid #23252a20}
+.foundry-booking .h-sport:before,.foundry-booking .h-sport:after{display:none!important}
+.foundry-booking .h-sport .booking-sport-photo{position:relative;display:block;inset:auto;height:86px;border-radius:40px 40px 5px 5px;overflow:hidden;background:#23252a}
+.foundry-booking .h-sport img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.45) brightness(.95)}
+.foundry-booking .h-sport.on{border-bottom-color:#e7193c}
+.foundry-booking .h-sport.on img{filter:saturate(.9)}
+.foundry-booking .h-sport .booking-sport-photo>i{position:absolute;bottom:7px;right:7px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#fff;color:#23252a;font-style:normal}
+.foundry-booking .h-sport.on .booking-sport-photo>i{background:#e7193c;color:#fff}
+.foundry-booking .h-sport .booking-sport-copy{position:static;display:block;margin:9px 0 0}
+.foundry-booking .h-sport strong{font-size:11px;letter-spacing:0}
+.foundry-booking .h-sport small{font-size:7px;margin-top:4px;color:#586979}
+.booking-service-wrap{padding:0 22px 22px}
+.booking-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.booking-service{position:relative;display:block;text-align:left;background:#fff;border:1px solid #23252a18;border-radius:5px;padding:13px 12px 12px;color:#23252a;min-height:100px}
+.booking-service-icon{display:block;margin-bottom:12px;color:#b91432}
+.booking-service>strong{font:400 21px var(--display);display:block;letter-spacing:-.3px;margin-bottom:7px}
+.booking-service>small{display:block;font-size:8px;line-height:1.5;color:#586979;max-width:125px}
+.booking-service-arrow{position:absolute;top:10px;right:12px;font-size:14px;color:#75818a}
+.booking-service.on{background:#23252a;border-color:#23252a;color:#fff}
+.booking-service.on .booking-service-icon,.booking-service.on .booking-service-arrow{color:#e7193c}
+.booking-service.on>small{color:#efefee}
+.booking-view-heading{padding:5px 0 18px;border-top:1px solid #23252a20}
+.booking-view-heading>.eyebrow{display:block;font-size:7px;margin-top:21px;color:#b91432}
+.booking-view-heading h2{font:400 30px/1.08 var(--display);margin:10px 0 12px;letter-spacing:-.8px}
+.booking-view-heading p{font-size:10px;line-height:1.8;color:#586979;margin:0;max-width:290px}
+.booking-plan-panel{background:#fff;border:1px solid #23252a16;padding:15px 14px 18px;border-radius:7px;margin:0 0 25px}
+.foundry-booking .booking-availability-filters{align-items:center;gap:12px;margin:0 0 20px}
+.foundry-booking .booking-availability-filters>.v-select{border:0;padding:0;background:transparent}
+.foundry-booking .booking-availability-filters>.v-select>span{font-size:7px;color:#75818a}
+.foundry-booking .booking-availability-filters select{font-size:11px;max-width:180px}
+.booking-plan-panel>.v-label{font-size:8px;margin:18px 0 12px;letter-spacing:1px}
+.booking-plan-panel>.v-label>b{font-size:8px;letter-spacing:0}
+.booking-plan-panel .v-hscroll{gap:7px;margin-left:0;margin-right:-14px;padding-left:0;padding-right:14px}
+.booking-plan-panel .v-date{width:44px;height:66px;border:0;border-radius:24px;background:#23252a05}
+.booking-plan-panel .v-date strong{font-family:var(--display);font-size:21px}
+.booking-plan-panel .v-date small{font-size:6px}
+.booking-plan-panel .v-date.on{background:#23252a!important;color:#fff;border:0}
+.booking-plan-panel .v-date.today:after{top:auto;bottom:4px;right:20px;width:3px;height:3px;background:#e7193c}
+.booking-plan-panel .v-chips{gap:0;background:#efefee50;border-radius:20px;padding:3px}
+.booking-plan-panel .v-chips .v-chip{flex:1;border:0;border-radius:20px;background:transparent;box-shadow:none!important;font-size:10px}
+.booking-plan-panel .v-chips .v-chip.on{background:#23252a!important;color:#fff}
+.booking-plan-panel .booking-time{height:auto;min-width:69px;display:flex;flex-direction:column;gap:6px;padding:10px 9px;background:transparent;border-radius:5px;border:1px solid #23252a20;box-shadow:none}
+.booking-plan-panel .booking-time strong{font-size:11px;font-weight:400}
+.booking-plan-panel .booking-time small{font-size:7px;color:#75818a}
+.booking-plan-panel .booking-time.on{background:#b91432!important;border-color:#b91432;color:#fff;box-shadow:none}
+.booking-plan-panel .booking-time.on small{color:#efefee}
+.booking-results-heading{display:flex;align-items:center;gap:15px;margin:22px 0 14px}
+.booking-results-heading>div{flex:1}
+.booking-results-heading .eyebrow{font-size:7px;color:#75818a}
+.booking-results-heading h2{font:400 27px/1.15 var(--display);margin:8px 0}
+.booking-results-heading p{font-size:9px;color:#586979;line-height:1.6}
+.booking-results-count{font:400 30px var(--display);color:#b91432;text-align:center}
+.booking-results-count small{font:400 6px var(--body);display:block;letter-spacing:1px;margin-top:4px}
+.foundry-booking .booking-space{padding:17px 0;margin:0;border:0;border-top:1px solid #23252a20;border-radius:0;background:transparent;align-items:center;gap:12px}
+.booking-space-number{font:400 24px var(--display);color:#75818a;min-width:29px;align-self:flex-start;padding-top:11px}
+.booking-space-state{font-size:6px;letter-spacing:1px;text-transform:uppercase;color:#b91432;display:block;margin:0 0 7px}
+.foundry-booking .booking-space h3{font:400 23px/1.1 var(--display)!important;margin:0 0 8px}
+.foundry-booking .booking-space p{font-size:8px;line-height:1.7;display:flex;align-items:flex-start;gap:4px}
+.foundry-booking .booking-space p svg{width:10px;height:13px}
+.foundry-booking .booking-space .price{font-size:9px;margin-top:8px}
+.booking-reserve{border:0;background:#e7193c;color:#fff;border-radius:4px;padding:12px 10px;font-size:9px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.booking-reserve>span{font-size:13px}
+.booking-space-unavailable{font-size:9px;color:#75818a}
+.foundry-booking .booking-space.off{opacity:.55}
+.booking-social-card{display:flex!important;gap:0;border:1px solid #23252a18!important;border-radius:6px!important;background:#fff!important;overflow:hidden;padding:0!important;margin-bottom:13px!important}
+.booking-social-photo{position:relative;display:block;width:91px;flex:none;min-height:157px;background:#23252a}
+.booking-social-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.7)}
+.booking-social-photo:after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,#23252aa0,transparent 60%)}
+.booking-social-photo>span{position:absolute;bottom:12px;left:9px;right:6px;color:#fff;font-size:8px;z-index:1}
+.booking-social-body{display:block;flex:1;min-width:0;padding:13px 12px}
+.booking-social-top{display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
+.booking-social-top>strong{font:400 26px/1 var(--display)}
+.booking-social-top>small{font-size:8px;color:#75818a}
+.booking-social-top>.v-tag{font-size:6px;padding:3px 4px;background:#efefee;color:#586979;margin-left:auto}
+.booking-social-place{display:block;font-size:8px;line-height:1.7;color:#586979;margin-bottom:7px}
+.booking-social-level{display:inline-block;border:1px solid #23252a18;border-radius:12px;padding:4px 8px;font-size:7px;color:#b91432}
+.booking-social-bottom{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-top:13px}
+.booking-social-bottom .v-avs .v-av{width:19px;height:19px;font-size:6px;border:2px solid #fff;margin-left:-5px}
+.booking-social-action{font-size:8px;color:#b91432;white-space:nowrap}
+.booking-social-spots{display:block;font-size:7px;color:#75818a;margin-top:6px}
+
+
+.foundry-booking .booking-intro{padding-bottom:17px}
+.foundry-booking .booking-intro h1{font-size:34px!important;line-height:1.12!important;letter-spacing:-1px;margin:10px 0 8px}
+.foundry-booking .h-sport{height:122px!important}
+.foundry-booking .h-sport .booking-sport-photo{height:75px}
+.foundry-booking .h-sports{margin-bottom:20px}
+.foundry-booking .booking-service-wrap{padding-bottom:18px}
+.booking-service{min-height:95px}
+.booking-service-icon{margin-bottom:9px}
+.booking-service>strong{font-size:20px}
+.booking-view-heading{scroll-margin-top:10px}
+
+
+.booking-social-place{font-size:10px;line-height:1.6}
+.booking-social-level{font-size:8px}
+.booking-social-spots{font-size:8px}
+.booking-social-action{font-size:9px}
+.booking-social-top>small{font-size:9px}
+.booking-social-bottom .v-avs .v-av{width:23px;height:23px;font-size:7px;margin-left:-5px;flex-shrink:0}
+.booking-social-bottom .v-avs .v-av:first-child{margin-left:0}
+
+
+/* Compact service navigation keeps the session planner close to the sport choices. */
+.booking-services{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.booking-services.two-services{grid-template-columns:repeat(2,minmax(0,1fr))}
+.booking-services .booking-service{min-height:65px;height:65px;padding:10px 4px 9px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border-radius:5px}
+.booking-services .booking-service-icon{display:block;margin:0 0 8px;line-height:1}
+.booking-services .booking-service-icon svg{width:16px;height:16px}
+.booking-services .booking-service>strong{font:400 10px/1.2 var(--body);letter-spacing:0;margin:0;white-space:nowrap}
+.booking-services .booking-service>small,.booking-services .booking-service-arrow{display:none}
+.foundry-booking .booking-service-wrap{padding-bottom:16px}
+.foundry-booking .h-sport.on{border-bottom-color:#23252a}
+
+html.app-four-tabs .foundry-booking .h-sport{border-bottom:0!important}
+
+
+/* Venue layout is an explicitly illustrative prototype until a real floor plan is supplied. */
+.booking-layout-link{display:inline-flex;align-items:center;gap:6px;border:0;border-bottom:1px solid #b9143240;background:transparent;color:#b91432;font:400 10px var(--body);padding:0 0 4px;margin-top:12px}
+.booking-space-title{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.foundry-booking .booking-space-title h3{margin:0;flex:1}
+.booking-locate{display:grid;place-items:center;width:28px;height:28px;border:1px solid #23252a20;border-radius:50%;background:#fff;color:#b91432;flex:none}
+.court-layout-sheet{max-height:88%;overflow-y:auto;padding:23px 20px 22px!important}
+.court-layout-sheet>.eyebrow{font-size:7px;margin-top:4px;color:#b91432}
+.court-layout-sheet>h2{font:400 30px/1.15 var(--display);margin:11px 0 18px;letter-spacing:-.6px}
+.court-layout-venues{display:flex;gap:7px;margin-bottom:18px}
+.court-layout-venues>button{flex:1;min-width:0;border:1px solid #23252a20;background:transparent;padding:10px 6px;border-radius:5px;font-size:9px;line-height:1.5;color:#586979}
+.court-layout-venues>button.on{background:#23252a;color:#fff;border-color:#23252a}
+.court-layout-caption{display:flex;flex-direction:column;gap:6px;margin:16px 0 13px}
+.court-layout-caption strong{font-size:12px;font-weight:400}
+.court-layout-caption span{font-size:9px;color:#75818a}
+.court-layout-diagram{border:1px solid #23252a20;border-radius:7px;background:#efefee60;padding:13px 14px 16px}
+.court-layout-demo-label{display:block;text-align:center;font-size:6px;letter-spacing:1.8px;color:#75818a;margin:0 0 14px}
+.court-layout-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;max-width:270px;margin:auto}
+.layout-court{position:relative;min-height:123px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #b9143230;border-radius:5px;background:#fff;color:#b91432;padding:8px 5px;cursor:pointer}
+.layout-court-drawing{display:block;height:65px;margin-bottom:5px;opacity:.6}
+.layout-court-drawing svg{width:48px;height:65px}
+.layout-court>strong{font:400 11px var(--body)}
+.layout-court>small{display:block;font-size:7px;margin-top:4px;opacity:.8}
+.layout-court.unavailable{background:#23252a07;border-color:#23252a15;color:#75818a}
+.layout-court.selected{background:#b91432;border:2px solid #b91432;color:#fff;box-shadow:0 0 0 3px #fff}
+.layout-court.selected .layout-court-drawing{opacity:.85}
+.layout-court.unavailable.selected{background:#586979;border-color:#586979;color:#fff}
+.court-layout-legend{display:flex;justify-content:center;gap:18px;font-size:8px;color:#75818a;margin:13px 0}
+.court-layout-legend>span{display:flex;align-items:center;gap:5px}
+.court-layout-legend i{width:7px;height:7px;border-radius:2px;border:1px solid #b9143240;background:#fff}
+.court-layout-legend i.selected{background:#b91432;border-color:#b91432}
+.court-layout-legend i.taken{background:#23252a15;border-color:#23252a20}
+.court-layout-note{font-size:8px;line-height:1.7;color:#75818a;margin:12px 0 18px}
+.court-layout-selection{display:flex;gap:14px;align-items:center;border-top:1px solid #23252a18;padding:16px 0 19px}
+.court-layout-selection>div{flex:1}
+.court-layout-selection span{display:block;font-size:7px;letter-spacing:.5px;color:#b91432}
+.court-layout-selection h3{font:400 25px var(--display);margin:7px 0}
+.court-layout-selection p{font-size:8px;line-height:1.7;color:#75818a;margin:0}
+.court-layout-selection>strong{font:400 10px/1.7 var(--body);max-width:102px;text-align:right}
+.court-layout-sheet>.v-cta{background:#e7193c;color:#fff}
+.court-layout-sheet>.v-cta:disabled{background:#75818a;opacity:.5;cursor:default}
+
+.court-layout-sheet>h2{font-size:27px;margin:8px 0 13px}
+.court-layout-venues{margin-bottom:12px}
+.court-layout-caption{margin:10px 0;gap:4px}
+.court-layout-diagram{padding:11px 12px 12px}
+.court-layout-demo-label{margin-bottom:10px}
+.court-layout-grid{gap:10px;max-width:270px}
+.layout-court{min-height:94px;padding:7px 5px}
+.layout-court-drawing{height:43px;margin-bottom:5px}
+.layout-court-drawing svg{width:34px;height:43px}
+.court-layout-legend{margin:10px 0}
+.court-layout-note{font-size:7px;line-height:1.6;margin:8px 0 10px}
+.court-layout-selection{padding:11px 0 13px}
+.court-layout-selection h3{font-size:23px;margin:5px 0}
+.court-layout-sheet .v-cta{min-height:40px;height:40px}
+
+.court-layout-sheet{padding:16px 20px 16px!important}
+.court-layout-sheet>.eyebrow,.court-layout-caption strong{display:none}
+.court-layout-venues>button{padding:8px 6px}
+.court-layout-caption{margin:8px 0}
+.court-layout-sheet>.grab{margin-top:0}
+
+
+/* Small shortcuts for regular visits; preferences remain a list in Settings. */
+.booking-shortcuts{display:flex;align-items:center;gap:7px;padding:0 20px;margin:-6px 0 22px}
+.booking-shortcuts>button{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:#fff;border:1px solid #23252a18;border-radius:20px;height:34px;color:#23252a;font:400 10px var(--body)}
+.booking-shortcuts>button svg{color:#b91432;width:13px;height:13px}
+.booking-shortcuts>button small{font-size:8px;color:#75818a}
+.booking-shortcuts>a{display:grid;place-items:center;width:31px;height:31px;border:1px solid #23252a18;border-radius:50%;color:#75818a;flex:none}
+.booking-favourite{display:grid;place-items:center;width:25px;height:25px;padding:0;border:0;background:transparent;color:#75818a;flex:none}
+.booking-favourite.on{color:#e7193c}
+.booking-favourite.on svg{fill:#e7193c20}
+.booking-space-title{gap:4px}
+.booking-preset-note{display:flex;align-items:center;gap:10px;border-left:2px solid #b91432;background:#fff;padding:13px 12px;margin:0 0 15px}
+.booking-preset-note>span{color:#b91432}
+.booking-preset-note>div{flex:1}
+.booking-preset-note strong{font-size:11px;font-weight:400}
+.booking-preset-note p{font-size:9px;line-height:1.7;color:#586979;margin:6px 0 0}
+.booking-preset-note>button{font-size:20px;border:0;background:transparent;color:#75818a;padding:0 3px}
+.foundry-booking .booking-space.preferred{border-left:2px solid #b91432;padding-left:10px;background:#fff50}
+.booking-shortcut-sheet{max-height:85%;overflow-y:auto}
+.booking-shortcut-sheet>h2{font:400 29px/1.15 var(--display);margin:13px 0}
+.booking-shortcut-sheet>.eyebrow{font-size:7px;color:#b91432;margin-top:10px}
+.booking-shortcut-item{display:flex;align-items:center;gap:15px;text-align:left;width:100%;padding:17px 0;border:0;border-top:1px solid #23252a18;color:#23252a;background:transparent;font-family:var(--body)}
+.booking-shortcut-item>span{flex:1}
+.booking-shortcut-item strong{display:block;font-size:13px;font-weight:400}
+.booking-shortcut-item small{display:block;font-size:10px;color:#586979;margin-top:6px}
+.booking-shortcut-item em{display:block;font-size:9px;color:#75818a;font-style:normal;margin-top:7px}
+.booking-shortcut-item>b{font-size:10px;font-weight:400;color:#b91432}
+.booking-shortcut-empty{text-align:center;padding:25px 12px 29px}
+.booking-shortcut-empty>span{color:#b91432}
+.booking-shortcut-empty h3{font:400 23px/1.2 var(--display);margin:16px 0 12px}
+.booking-shortcut-empty p{font-size:11px;color:#586979;line-height:1.8}
+.booking-shortcut-settings{display:block;border-top:1px solid #23252a18;padding:17px 0 5px;font-size:10px;color:#b91432}
+.booking-settings-heading{display:flex;align-items:center;justify-content:space-between;margin-top:20px;gap:15px}
+.booking-settings-heading .eyebrow{font-size:7px;color:#b91432}
+.booking-settings-heading h2{font:400 28px/1.15 var(--display);margin:9px 0}
+.booking-settings-heading>a{font-size:10px;white-space:nowrap;color:#b91432}
+.booking-settings-copy{font-size:10px;line-height:1.8;color:#586979;margin:5px 0 17px}
+.booking-settings-list{margin-bottom:28px;border-top:1px solid #23252a18}
+.booking-settings-list>label{display:flex;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid #23252a18}
+.booking-settings-list>label>span{flex:1;font-size:11px;line-height:1.6}
+.booking-settings-list select{width:155px;max-width:53%;border:1px solid #23252a18;border-radius:4px;background:#fff;color:#23252a;padding:9px 6px;font:400 10px var(--body)}
+.booking-settings-expand{display:flex;align-items:center;justify-content:space-between;gap:15px;width:100%;border:0;border-bottom:1px solid #23252a18;background:transparent;padding:18px 0;font:400 11px var(--body);color:#586979;text-align:left}
+.booking-settings-expand>span{font-size:16px}
+.booking-settings-favourites{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 0;border-bottom:1px solid #23252a18;font-size:11px}
+.booking-settings-favourites>span:last-child{font-size:10px;color:#b91432}
+
+
+/* The same live session can be browsed as a court layout or as a price list. */
+.booking-results-switch{display:flex;gap:4px;align-items:center;background:#23252a08;border-radius:22px;padding:3px;width:183px;margin:0 0 16px}
+.booking-results-switch>button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:20px;padding:9px 10px;background:transparent;color:#586979;font:400 10px var(--body)}
+.booking-results-switch>button.on{background:#23252a;color:#fff}
+.court-layout-inline{border:1px solid #23252a18;border-radius:7px;background:#fff;padding:15px 13px 14px;margin-bottom:18px}
+.court-layout-inline .court-layout-venues{margin:0 0 12px}
+.court-layout-inline .court-layout-venues>button{font-size:8px}
+.court-layout-inline .court-layout-diagram{background:#efefee40;padding:12px}
+.court-layout-inline .court-layout-selection{align-items:center;padding:13px 0}
+.inline-layout-court-title{display:flex;align-items:center;gap:8px}
+.inline-layout-court-title>h3{margin:5px 0!important}
+.inline-layout-court-title>.booking-favourite{margin-top:1px}
+.court-layout-inline>.v-cta{height:41px;min-height:41px;background:#b91432;color:#fff;font-size:10px}
+.court-layout-inline>.v-cta:disabled{background:#75818a;opacity:.5}
+.profile-settings-pane .booking-settings-heading{margin-top:23px}
+
+.court-layout-inline .layout-court{min-height:80px;padding:6px 4px}
+.court-layout-inline .layout-court-drawing{height:31px}
+.court-layout-inline .layout-court-drawing svg{height:31px;width:28px}
+.court-layout-inline .court-layout-venues>button{padding:7px 5px}
+
+.inline-layout-review{display:flex;flex-direction:column;align-items:flex-end;gap:10px;max-width:105px}
+.inline-layout-review>strong{font:400 9px/1.6 var(--body);text-align:right}
