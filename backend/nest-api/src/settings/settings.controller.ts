@@ -1,9 +1,15 @@
 import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsBoolean, IsInt, IsOptional, Max, Min } from 'class-validator';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { SettingsService } from './settings.service';
+
+class UpdateSettingsDto {
+  @IsOptional() @IsInt() @Min(0) @Max(1440) reminderMinutes?: number;
+  @IsOptional() @IsBoolean() autoWaitlistCancel?: boolean;
+}
 
 @ApiTags('settings')
 @ApiBearerAuth('jwt')
@@ -22,7 +28,7 @@ export class SettingsController {
   @Patch()
   update(
     @Req() req: Request,
-    @Body() body: { reminderMinutes?: number; autoWaitlistCancel?: boolean },
+    @Body() body: UpdateSettingsDto,
   ) {
     return this.svc.update((req.user as AuthedUser).id, body);
   }

@@ -1,9 +1,16 @@
 import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { FavouritesService } from './favourites.service';
+
+class AddFavouriteDto {
+  @IsString() @IsNotEmpty() @MaxLength(50) classTemplateId: string;
+  @IsString() @IsNotEmpty() @MaxLength(200) className: string;
+  @IsOptional() @IsString() @MaxLength(100) instructorName?: string;
+}
 
 @ApiTags('favourites')
 @ApiBearerAuth('jwt')
@@ -22,7 +29,7 @@ export class FavouritesController {
   @Post()
   add(
     @Req() req: Request,
-    @Body() body: { classTemplateId: string; className: string; instructorName?: string },
+    @Body() body: AddFavouriteDto,
   ) {
     return this.svc.add((req.user as AuthedUser).id, body);
   }

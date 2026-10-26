@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto, LogoutDto, RefreshDto, RequestOtpDto, VerifyOtpDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RateLimit } from '../common/rate-limit';
 import { AuthedUser } from './jwt.strategy';
 
 @ApiTags('auth')
@@ -12,6 +13,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @ApiOperation({ summary: 'Login with email + password (PGM VerifyMemberCredentials)' })
+  @RateLimit({ limit: 10, windowMs: 60_000, by: 'ip' })
   @Post('login')
   @HttpCode(200)
   login(@Body() dto: LoginDto) {
@@ -19,6 +21,7 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Request OTP via email (PGM SendOneTimeCode)' })
+  @RateLimit({ limit: 5, windowMs: 10 * 60_000, by: 'ip' })
   @Post('request-otp')
   @HttpCode(200)
   requestOtp(@Body() dto: RequestOtpDto) {
@@ -26,6 +29,7 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Verify OTP and exchange for JWT (PGM VerifyOneTimeCode)' })
+  @RateLimit({ limit: 10, windowMs: 10 * 60_000, by: 'ip' })
   @Post('verify-otp')
   @HttpCode(200)
   verifyOtp(@Body() dto: VerifyOtpDto) {
@@ -33,6 +37,7 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Refresh access token + rotate refresh token' })
+  @RateLimit({ limit: 30, windowMs: 60_000, by: 'ip' })
   @Post('refresh')
   @HttpCode(200)
   refresh(@Body() dto: RefreshDto) {

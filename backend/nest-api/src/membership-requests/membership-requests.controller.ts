@@ -1,9 +1,16 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsDateString, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { MembershipRequestsService } from './membership-requests.service';
+
+class FreezeRequestDto {
+  @IsDateString() startDate: string;
+  @IsDateString() endDate: string;
+  @IsString() @IsNotEmpty() @MaxLength(500) reason: string;
+}
 
 @ApiTags('membership')
 @ApiBearerAuth('jwt')
@@ -16,7 +23,7 @@ export class MembershipRequestsController {
   @Post('freeze-request')
   freeze(
     @Req() req: Request,
-    @Body() body: { startDate: string; endDate: string; reason: string },
+    @Body() body: FreezeRequestDto,
   ) {
     return this.svc.createFreeze((req.user as AuthedUser).id, body);
   }

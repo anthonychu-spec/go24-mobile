@@ -61,7 +61,12 @@ services:
       ADYEN_ENVIRONMENT: ${ADYEN_ENVIRONMENT:-LIVE}
       ADYEN_CLIENT_KEY: ${ADYEN_CLIENT_KEY}
       ADYEN_HMAC_KEY: ${ADYEN_HMAC_KEY}
-      BROADCAST_SECRET: ${BROADCAST_SECRET}
+      # Shared secrets for inbound webhooks (header x-webhook-secret); unset = webhook refused
+      PGM_WEBHOOK_SECRET: ${PGM_WEBHOOK_SECRET}
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET}
+      SUPREMA_WEBHOOK_SECRET: ${SUPREMA_WEBHOOK_SECRET}
+      # Browser origins allowed by CORS (comma-separated); native apps need none
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       # Crons that call PGM or send push stay off until explicitly enabled
       BACKGROUND_JOBS_ENABLED: ${BACKGROUND_JOBS_ENABLED:-false}
     depends_on:

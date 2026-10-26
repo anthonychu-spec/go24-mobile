@@ -1,15 +1,20 @@
-import { Body, Controller, Get, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { assertWebhookSecret } from '../common/webhook-secret';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { SignupService } from './signup.service';
-import { SignupCompleteDto, SignupSessionDto } from './dto/signup.dto';
+import { FaceRetryDto, SignupCompleteDto, SignupSessionDto } from './dto/signup.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 
 @ApiTags('signup')
 @Controller()
 export class SignupController {
-  constructor(private readonly svc: SignupService) {}
+  constructor(
+    private readonly svc: SignupService,
+    private readonly cfg: ConfigService,
+  ) {}
 
   // ── Public routes (no JWT guard) ──────────────────────────────────────────
 
@@ -39,10 +44,11 @@ export class SignupController {
     return this.svc.completeSignup(dto);
   }
 
-  @ApiOperation({ summary: 'Suprema face enrollment webhook callback (public)' })
+  @ApiOperation({ summary: 'Suprema face enrollment webhook callback (x-webhook-secret = SUPREMA_WEBHOOK_SECRET)' })
   @Post('webhooks/suprema/enroll')
   @HttpCode(200)
-  supremaWebhook(@Body() body: any) {
+  supremaWebhook(@Body() body: any, @Headers('x-webhook-secret') secret: string) {
+    assertWebhookSecret('Suprema', this.cfg.get<string>('SUPREMA_WEBHOOK_SECRET'), secret);
     return this.svc.handleSupremaWebhook(body);
   }
 
@@ -53,7 +59,7 @@ export class SignupController {
   @UseGuards(JwtAuthGuard)
   @Post('me/face/retry')
   @HttpCode(200)
-  retryFace(@Req() req: Request, @Body() body: { facePhotoB64: string }) {
+  retryFace(@Req() req: Request, @Body() body: FaceRetryDto) {
     const user = req.user as AuthedUser;
     return this.svc.retryFaceEnrollment(user.id, user.pgmId, body.facePhotoB64);
   }

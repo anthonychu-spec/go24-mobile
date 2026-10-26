@@ -1,26 +1,12 @@
-import {
-  Body, Controller, Get, HttpCode, Post, Query, Req, UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
 import type { Request } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, IsNull, Or, Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { ReferralService } from './referral.service';
 import { Banner } from './entities/banner.entity';
-
-class CreateBannerDto {
-  @IsString() secret: string;
-  @IsString() imageUrl: string;
-  @IsString() @IsOptional() title?: string;
-  @IsString() @IsOptional() linkUrl?: string;
-  @IsOptional() clubIds?: string[];
-  @IsNumber() @IsOptional() displayOrder?: number;
-  @IsString() @IsOptional() startAt?: string;
-  @IsString() @IsOptional() endAt?: string;
-}
 
 @ApiTags('referral & banners')
 @Controller()
@@ -40,11 +26,8 @@ export class ReferralController {
     return this.svc.getMyReferral((req.user as AuthedUser).id);
   }
 
-  @ApiOperation({ summary: 'Admin: list all referrals' })
-  @Get('referral/list')
-  listReferrals(@Query('secret') secret: string) {
-    return this.svc.listReferrals(secret);
-  }
+  // Admin listing / banner creation used BROADCAST_SECRET (in a query string, even).
+  // Removed; they move to the staff admin page.
 
   // ── Banners ───────────────────────────────────────────────────────────────
 
@@ -63,25 +46,5 @@ export class ReferralController {
       if (club && b.clubIds && !b.clubIds.includes(club)) return false;
       return true;
     });
-  }
-
-  @ApiOperation({ summary: 'Admin: create promotion banner (requires secret)' })
-  @Post('banners')
-  @HttpCode(200)
-  async createBanner(@Body() dto: CreateBannerDto) {
-    const secret = process.env.BROADCAST_SECRET ?? '';
-    if (!secret || dto.secret !== secret) return { error: 'Unauthorized' };
-
-    const banner = this.bannerRepo.create({
-      imageUrl: dto.imageUrl,
-      title: dto.title ?? null,
-      linkUrl: dto.linkUrl ?? null,
-      clubIds: dto.clubIds ?? null,
-      displayOrder: dto.displayOrder ?? 0,
-      startAt: dto.startAt ? new Date(dto.startAt) : null,
-      endAt: dto.endAt ? new Date(dto.endAt) : null,
-      active: true,
-    });
-    return this.bannerRepo.save(banner);
   }
 }

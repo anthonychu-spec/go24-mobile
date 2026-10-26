@@ -1,7 +1,9 @@
 import {
-  Body, Controller, Get, HttpCode, Param,
+  Body, Controller, Get, Headers, HttpCode, Param,
   Patch, Post, Query, Req, UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { assertWebhookSecret } from '../common/webhook-secret';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString } from 'class-validator';
 import type { Request } from 'express';
@@ -21,17 +23,13 @@ class CheckinFailedDto {
   @IsString() @IsOptional() timestamp?: string;
 }
 
-class BroadcastDto {
-  @IsString() secret: string;          // BROADCAST_SECRET env var
-  @IsString() title: string;
-  @IsString() body: string;
-  @IsString() @IsOptional() club?: string;  // optional: target specific branch
-}
-
 @ApiTags('notifications')
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly svc: NotificationsService) {}
+  constructor(
+    private readonly svc: NotificationsService,
+    private readonly cfg: ConfigService,
+  ) {}
 
   @ApiOperation({ summary: 'Register device push token' })
   @ApiBearerAuth('jwt')
@@ -83,22 +81,11 @@ export class NotificationsController {
     return this.svc.markAllRead(user.id);
   }
 
-  @ApiOperation({ summary: '🚨 Broadcast urgent announcement to all members (requires BROADCAST_SECRET)' })
-  @Post('broadcast')
-  @HttpCode(200)
-  async broadcast(@Body() dto: BroadcastDto) {
-    return this.svc.broadcast({
-      title: dto.title,
-      body: dto.body,
-      club: dto.club,
-      secret: dto.secret,
-    });
-  }
-
-  @ApiOperation({ summary: 'n8n webhook: member failed to enter gym' })
+  @ApiOperation({ summary: 'n8n webhook: member failed to enter gym (x-webhook-secret = N8N_WEBHOOK_SECRET)' })
   @Post('webhook/checkin-failed')
   @HttpCode(200)
-  async checkinFailed(@Body() dto: CheckinFailedDto) {
+  async checkinFailed(@Body() dto: CheckinFailedDto, @Headers('x-webhook-secret') secret: string) {
+    assertWebhookSecret('n8n checkin-failed', this.cfg.get<string>('N8N_WEBHOOK_SECRET'), secret);
     await this.svc.handleCheckinFailed({
       memberNumber: dto.memberNumber,
       reason: dto.reason,

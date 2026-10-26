@@ -9,6 +9,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { BookDto } from './dto/book.dto';
 import { BookingsService } from './booking.service';
+import { assertWebhookSecret } from '../common/webhook-secret';
+import { RateLimit } from '../common/rate-limit';
 
 @ApiTags('bookings')
 @ApiBearerAuth('jwt')
@@ -19,6 +21,7 @@ export class BookingsController {
 
   @ApiOperation({ summary: 'Book a class (idempotent)' })
   @ApiHeader({ name: 'Idempotency-Key', required: true, description: 'UUID v4 — prevents double-booking on retry' })
+  @RateLimit({ limit: 20, windowMs: 60_000, by: 'user' })
   @Post()
   @HttpCode(200)
   async book(
@@ -39,6 +42,7 @@ export class BookingsController {
 
   @ApiOperation({ summary: 'Cancel a booking (idempotent)' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @RateLimit({ limit: 20, windowMs: 60_000, by: 'user' })
   @Delete(':id')
   @HttpCode(204)
   async cancel(
@@ -82,10 +86,7 @@ export class PgmWebhookController {
   @Post('booking-cancelled')
   @HttpCode(200)
   async bookingCancelled(@Body() body: any, @Headers('x-webhook-secret') secret: string) {
-    if (this.secret && secret !== this.secret) {
-      this.logger.warn('PGM webhook rejected: bad secret');
-      throw new BadRequestException('Invalid webhook secret');
-    }
+    assertWebhookSecret('PGM', this.secret, secret);
     const bookingId = body?.bookingId ?? body?.BookingId ?? body?.id;
     if (!bookingId) {
       this.logger.warn('PGM cancel webhook: missing bookingId', body);
@@ -99,10 +100,7 @@ export class PgmWebhookController {
   @Post('booking-promoted')
   @HttpCode(200)
   async bookingPromoted(@Body() body: any, @Headers('x-webhook-secret') secret: string) {
-    if (this.secret && secret !== this.secret) {
-      this.logger.warn('PGM webhook rejected: bad secret');
-      throw new BadRequestException('Invalid webhook secret');
-    }
+    assertWebhookSecret('PGM', this.secret, secret);
     const bookingId = body?.bookingId ?? body?.BookingId ?? body?.id;
     if (!bookingId) {
       this.logger.warn('PGM promoted webhook: missing bookingId', body);

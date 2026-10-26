@@ -59,9 +59,4 @@ export class ReferralService {
     referral.completedAt = new Date();
     await this.repo.save(referral);
   }
-
-  async listReferrals(adminSecret: string): Promise<Referral[]> {
-    if (adminSecret !== (process.env.BROADCAST_SECRET ?? '')) throw new Error('Unauthorized');
-    return this.repo.find({ order: { createdAt: 'DESC' }, take: 200 });
-  }
 }

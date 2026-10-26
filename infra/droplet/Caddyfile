@@ -19,6 +19,10 @@
     # Rate limit by IP (basic — full per-user rate limit done in Nest)
     # Caddy 2.x doesn't ship rate_limit by default; using upstream for now
 
+    # Internal-only endpoints: API docs and Prometheus metrics are never served publicly
+    @internal path /api-docs /api-docs/* /api-docs-json /v1/metrics /v1/metrics/*
+    respond @internal 404
+
     # API routes → NestJS
     reverse_proxy api:3000 {
         # Forward real client IP for rate limiting + audit log
