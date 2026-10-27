@@ -63,8 +63,10 @@ jobs:
           ssh deploy@$DROPLET_HOST "bash -s -- $SHA" << 'EOF'
             set -euo pipefail
             SHA="$1"
-            COMPOSE="docker compose -f infra/droplet/docker-compose.prod.yml"
+            # --env-file: Compose would otherwise look for .env in infra/droplet/
+            COMPOSE="docker compose --env-file /opt/go24/.env -f infra/droplet/docker-compose.prod.yml"
             cd /opt/go24
+            test -f /opt/go24/.env || { echo "✗ /opt/go24/.env missing"; exit 1; }
 
             echo "→ checkout $SHA"
             git fetch origin

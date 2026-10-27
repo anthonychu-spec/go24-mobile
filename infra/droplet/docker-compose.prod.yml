@@ -1,7 +1,10 @@
 name: go24
 
 # Production / staging stack on Droplet
-# Run from /opt/go24 on droplet:  docker compose -f infra/droplet/docker-compose.prod.yml up -d --build
+# Run from /opt/go24 on droplet:
+#   docker compose --env-file /opt/go24/.env -f infra/droplet/docker-compose.prod.yml up -d --build
+# --env-file is required: Compose looks for .env next to this file (infra/droplet/), not in
+# /opt/go24, so without it ${POSTGRES_PASSWORD}, ${API_DOMAIN} etc. below come out empty.
 
 services:
   postgres:
@@ -43,34 +46,18 @@ services:
     build:
       context: ../../
       dockerfile: infra/droplet/Dockerfile.api
+    # Every app variable (JWT_SECRET, PGM_*, ADYEN_*, webhook secrets, CORS_ORIGINS,
+    # BACKGROUND_JOBS_ENABLED, API_BASE_URL, …) comes straight from /opt/go24/.env, so a
+    # variable the code reads never has to be listed here too. Path is relative to this file.
+    # Unset BACKGROUND_JOBS_ENABLED = crons off; unset webhook secret = webhook refused.
+    env_file:
+      - ../../.env
+    # Fixed or composed values; these win over the same names in .env
     environment:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-go24}
-      GYM_DATA_URL: ${GYM_DATA_URL}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: 15m
-      JWT_REFRESH_EXPIRES_IN: 30d
-      PGM_API_BASE: ${PGM_API_BASE}
-      PGM_CLIENT_ID: ${PGM_CLIENT_ID}
-      PGM_CLIENT_SECRET: ${PGM_CLIENT_SECRET}
-      PGM_OTP_DESTINATION: ${PGM_OTP_DESTINATION:-Email}
-      ADYEN_API_KEY: ${ADYEN_API_KEY}
-      ADYEN_MERCHANT_ACCOUNT: ${ADYEN_MERCHANT_ACCOUNT}
-      ADYEN_ENVIRONMENT: ${ADYEN_ENVIRONMENT:-LIVE}
-      ADYEN_CLIENT_KEY: ${ADYEN_CLIENT_KEY}
-      ADYEN_HMAC_KEY: ${ADYEN_HMAC_KEY}
-      # Shared secrets for inbound webhooks (header x-webhook-secret); unset = webhook refused
-      PGM_WEBHOOK_SECRET: ${PGM_WEBHOOK_SECRET}
-      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET}
-      SUPREMA_WEBHOOK_SECRET: ${SUPREMA_WEBHOOK_SECRET}
-      # Browser origins allowed by CORS (comma-separated); native apps need none
-      CORS_ORIGINS: ${CORS_ORIGINS:-}
-      # Expo push access token (only needed if push security is on in the Expo projects)
-      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
-      # Crons that call PGM or send push stay off until explicitly enabled
-      BACKGROUND_JOBS_ENABLED: ${BACKGROUND_JOBS_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy
