@@ -110,6 +110,31 @@ describe('AuthService OTP', () => {
   });
 });
 
+describe('AuthService.verifyMemberCode (account-deletion page)', () => {
+  it('returns the member id for a matching code without signing in', async () => {
+    const token = await otpToken(7);
+    pgm.verifyOneTimeCode.mockResolvedValueOnce({ codeMatches: true, memberId: 7 });
+    await expect(svc.verifyMemberCode(token, '1234')).resolves.toBe(7);
+    expect(sessionRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('does not require an active membership, so lapsed members can delete too', async () => {
+    const token = await otpToken(7);
+    pgm.verifyOneTimeCode.mockResolvedValueOnce({ codeMatches: true, memberId: 7 });
+    await svc.verifyMemberCode(token, '1234');
+    expect(pgm.getMemberStatus).not.toHaveBeenCalled();
+  });
+
+  it('rejects a wrong code, a code of another member and a malformed token', async () => {
+    const token = await otpToken(7);
+    pgm.verifyOneTimeCode.mockResolvedValueOnce({ codeMatches: false });
+    await expect(svc.verifyMemberCode(token, '1234')).rejects.toMatchObject({ code: 'INVALID_OTP' });
+    pgm.verifyOneTimeCode.mockResolvedValueOnce({ codeMatches: true, memberId: 8 });
+    await expect(svc.verifyMemberCode(token, '1234')).rejects.toMatchObject({ code: 'INVALID_OTP' });
+    await expect(svc.verifyMemberCode('', '1234')).rejects.toMatchObject({ code: 'INVALID_OTP' });
+  });
+});
+
 describe('AuthService.refresh', () => {
   const claimed = { raw: [{ id: 'old-session', user_id: 'user-1', device_fingerprint: null, device_platform: null, brand: 'lab' }] };
 
@@ -123,6 +148,13 @@ describe('AuthService.refresh', () => {
   it('refuses and revokes every session when the local user is not active', async () => {
     claimExecute.mockResolvedValueOnce(claimed);
     userRepo.findOne.mockResolvedValueOnce({ id: 'user-1', status: 'inactive', pgmMemberId: 7 });
+    await expect(svc.refresh('rt')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(sessionRepo.update).toHaveBeenCalledWith({ userId: 'user-1' }, { revoked: true });
+  });
+
+  it('refuses a deleted account and revokes what is left', async () => {
+    claimExecute.mockResolvedValueOnce(claimed);
+    userRepo.findOne.mockResolvedValueOnce({ id: 'user-1', status: 'deleted', pgmMemberId: null });
     await expect(svc.refresh('rt')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(sessionRepo.update).toHaveBeenCalledWith({ userId: 'user-1' }, { revoked: true });
   });

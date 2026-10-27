@@ -21,6 +21,8 @@ import type { BrandId } from '../brand/brand.constants';
 /** errorCode markers that tell ReconcileJob what to check in PGM */
 export const WAITLIST_DECLINED = 'WAITLIST_DECLINED';
 export const CANCEL_UNKNOWN = 'CANCEL_UNKNOWN';
+/** Booking of a deleted account: no PGM member id any more, so it can't be reconciled */
+export const ACCOUNT_DELETED = 'ACCOUNT_DELETED';
 
 export interface BookInput {
   userId: string;

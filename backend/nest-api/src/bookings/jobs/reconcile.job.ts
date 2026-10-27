@@ -8,7 +8,7 @@ import { Booking } from '../entities/booking.entity';
 import { OutboxEvent } from '../entities/outbox-event.entity';
 import { BookingRepository } from '../repositories/booking.repo';
 import { IdempotencyRepository } from '../repositories/idempotency.repo';
-import { CANCEL_UNKNOWN, WAITLIST_DECLINED } from '../booking.service';
+import { ACCOUNT_DELETED, CANCEL_UNKNOWN, WAITLIST_DECLINED } from '../booking.service';
 import { backgroundJobsEnabled } from '../../config/background-jobs';
 
 /**
@@ -54,6 +54,7 @@ export class ReconcileJob {
   /** Decide pending / pending_verify from the member's PGM bookings for that class. */
   async settle(booking: Booking): Promise<void> {
     if (!booking.pgmMemberId) {
+      if (booking.errorCode === ACCOUNT_DELETED) return; // de-identified on account deletion
       this.logger.error(`Booking ${booking.id} has no PGM member id — needs manual review`);
       return;
     }

@@ -94,15 +94,25 @@ export class AuthService {
     deviceFingerprint?: string;
     brand?: BrandId;
   }): Promise<IssueTokenResult> {
-    const memberId = this.verifyMemberIdToken(input.memberIdToken);
-    const r = await this.pgm.verifyOneTimeCode(memberId, input.code);
-    if (!r.codeMatches) throw new AppError('INVALID_OTP');
-    // PGM echoes the member the code belongs to; it must be the one we sent it to
-    if (r.memberId && r.memberId !== memberId) throw new AppError('INVALID_OTP', 'member mismatch');
+    const memberId = await this.verifyMemberCode(input.memberIdToken, input.code);
     await this.ensureMemberActive(memberId);
 
     const user = await this.upsertUser({ pgmMemberId: memberId, status: 'active' });
     return this.issueTokens(user, input.brand ?? DEFAULT_BRAND, input.deviceFingerprint);
+  }
+
+  /**
+   * Checks a PGM one-time code against the token from requestOtp and returns the
+   * PGM member id. Signs nobody in and doesn't look at membership status, so the
+   * account-deletion page can use it for lapsed members too.
+   */
+  async verifyMemberCode(memberIdToken: string, code: string): Promise<number> {
+    const memberId = this.verifyMemberIdToken(memberIdToken);
+    const r = await this.pgm.verifyOneTimeCode(memberId, code);
+    if (!r.codeMatches) throw new AppError('INVALID_OTP');
+    // PGM echoes the member the code belongs to; it must be the one we sent it to
+    if (r.memberId && r.memberId !== memberId) throw new AppError('INVALID_OTP', 'member mismatch');
+    return memberId;
   }
 
   /** A correct password or code is not enough: the PGM member must still be active. */
@@ -144,7 +154,7 @@ export class AuthService {
     }
 
     const user = await this.userRepo.findOne({ where: { id: claimed.user_id } });
-    if (!user || user.status !== 'active') {
+    if (!user || user.status !== 'active' || user.pgmMemberId === null) {
       await this.revokeAllSessions(claimed.user_id);
       throw new UnauthorizedException('account not active');
     }
@@ -228,6 +238,7 @@ export class AuthService {
     deviceFingerprint?: string,
     devicePlatform?: string,
   ): Promise<IssueTokenResult> {
+    if (user.pgmMemberId === null) throw new UnauthorizedException('account deleted');
     const refreshToken = randomBytes(64).toString('hex');
 
     const expiresAt = new Date();

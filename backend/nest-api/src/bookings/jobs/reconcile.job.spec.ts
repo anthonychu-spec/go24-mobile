@@ -1,5 +1,5 @@
 import { ReconcileJob } from './reconcile.job';
-import { CANCEL_UNKNOWN, WAITLIST_DECLINED } from '../booking.service';
+import { ACCOUNT_DELETED, CANCEL_UNKNOWN, WAITLIST_DECLINED } from '../booking.service';
 import { TempFailError } from '../errors/index';
 import type { Booking } from '../entities/booking.entity';
 
@@ -37,6 +37,12 @@ afterAll(() => {
 });
 
 describe('ReconcileJob.settle', () => {
+  it('leaves bookings of a deleted account alone (no PGM member id to ask about)', async () => {
+    await job.settle(booking({ pgmMemberId: null, errorCode: ACCOUNT_DELETED }));
+    expect(pgm.findMemberBookingsForClass).not.toHaveBeenCalled();
+    expect(bookingRepo.transition).not.toHaveBeenCalled();
+  });
+
   it('confirms when PGM holds exactly one active booking for the class', async () => {
     pgm.findMemberBookingsForClass.mockResolvedValueOnce([{ bookingId: 900, isStandby: false, isCancelled: false }]);
     await job.settle(booking());

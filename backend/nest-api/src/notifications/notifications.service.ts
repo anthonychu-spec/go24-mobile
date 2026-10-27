@@ -210,6 +210,7 @@ export class NotificationsService {
 
     const users = await this.userRepo.find({ where: { status: 'active' } });
     for (const user of users) {
+      if (user.pgmMemberId === null) continue;
       try {
         const visits = await this.fetchLastMonthVisits(user.pgmMemberId, lastMonth);
         if (visits === 0) continue;

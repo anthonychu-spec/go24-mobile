@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 
 export type UserRole = 'member' | 'trainer' | 'admin';
-export type UserStatus = 'active' | 'inactive' | 'frozen';
+export type UserStatus = 'active' | 'inactive' | 'frozen' | 'deleted';
 
 @Entity('users')
 @Index('uq_users_pgm_member_id', ['pgmMemberId'], { unique: true })
@@ -17,8 +17,9 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'int', name: 'pgm_member_id' })
-  pgmMemberId!: number;
+  /** Null once the account is deleted (the row stays, without identifiers) */
+  @Column({ type: 'int', name: 'pgm_member_id', nullable: true })
+  pgmMemberId!: number | null;
 
   @Column({ type: 'varchar', length: 150, nullable: true })
   email!: string | null;
@@ -40,6 +41,9 @@ export class User {
 
   @Column({ type: 'timestamptz', name: 'last_pgm_sync_at', nullable: true })
   lastPgmSyncAt!: Date | null;
+
+  @Column({ type: 'timestamptz', name: 'deleted_at', nullable: true })
+  deletedAt!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;

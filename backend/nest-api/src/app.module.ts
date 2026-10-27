@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { DevtoolsModule } from '@nestjs/devtools-integration';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AccountModule } from './account/account.module';
 import { AuthModule } from './auth/auth.module';
 import { BrandModule } from './brand/brand.module';
 import { ConfigModule } from './config/config.module';
@@ -31,6 +32,7 @@ import { MilestonesModule } from './milestones/milestones.module';
     ScheduleModule.forRoot(),
     BrandModule,
     AuthModule,
+    AccountModule,
     HealthModule,
     BookingModule,
     BookingsModule,

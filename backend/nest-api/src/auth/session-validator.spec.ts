@@ -35,6 +35,14 @@ describe('SessionValidator', () => {
     await expect(validator.isValid('s1', 'u1')).resolves.toBe(false);
   });
 
+  it('rejects once the account is deleted (sessions gone, user marked deleted)', async () => {
+    sessions.findOne.mockResolvedValueOnce(null);
+    await expect(validator.isValid('s1', 'u1')).resolves.toBe(false);
+    sessions.findOne.mockResolvedValueOnce({ ...live, id: 's2' });
+    users.findOne.mockResolvedValueOnce({ id: 'u1', status: 'deleted' });
+    await expect(validator.isValid('s2', 'u1')).resolves.toBe(false);
+  });
+
   it('caches the answer, and forget() drops it', async () => {
     sessions.findOne.mockResolvedValue(live);
     users.findOne.mockResolvedValue({ id: 'u1', status: 'active' });
