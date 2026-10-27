@@ -10,7 +10,7 @@
     "web": "expo start --web --port 8081",
     "lint": "echo 'eslint tbd'",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'jest tbd' && exit 0"
+    "test": "jest"
   },
   "dependencies": {
     "@adyen/react-native": "^2.13.0",
@@ -53,9 +53,22 @@
     "react-native-webview": "14.0.1"
   },
   "devDependencies": {
+    "@types/jest": "30.0.0",
     "@types/react": "~19.3.0",
+    "jest": "~30.5.2",
+    "jest-expo": "~58.0.12",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@brand$": "<rootDir>/brands/lab/index.ts"
+    },
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist"
+    ]
+  }
 }
