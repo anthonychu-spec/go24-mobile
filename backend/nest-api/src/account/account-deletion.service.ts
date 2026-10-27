@@ -17,6 +17,7 @@ import { PaymentMethod } from '../payments/entities/payment-method.entity';
 import { PtLog } from '../pt/entities/pt-log.entity';
 import { Referral } from '../referral/entities/referral.entity';
 import { UserSettings } from '../settings/entities/user-settings.entity';
+import { CoachingEnquiry } from '../coaching/coaching-enquiry.entity';
 import { FaceEnrollment } from '../signup/entities/face-enrollment.entity';
 
 /** booking_events.actor written in place of the member's user id */
@@ -28,7 +29,7 @@ const OUTBOX_PERSONAL_KEYS = ['userId', 'pgmMemberId', 'pgmId', 'email', 'phone'
 /** Rows owned by the member that are deleted outright */
 const OWNED_TABLES = [
   Session, DeviceToken, Notification, UserSettings, UserFavourite, IdempotencyKey,
-  MemberMilestone, MembershipRequest, PaymentMethod, FaceEnrollment,
+  MemberMilestone, MembershipRequest, PaymentMethod, FaceEnrollment, CoachingEnquiry,
 ] as const;
 
 export interface DeletionResult {
@@ -42,7 +43,8 @@ export interface DeletionResult {
  *
  * - Deleted: sessions (which ends every access token), push tokens, inbox,
  *   settings, favourites, idempotency records, milestones, freeze requests,
- *   saved-card references, face-enrolment photo, referrals the member made.
+ *   saved-card references, face-enrolment photo, coaching enquiries, referrals
+ *   the member made.
  * - De-identified, rows kept: bookings (no PGM member id; the PGM booking id
  *   stays, a confirmed booking must have one and PGM keeps the member anyway),
  *   booking_events (actor), outbox payloads, PT logs (signature and notes),

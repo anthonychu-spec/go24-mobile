@@ -154,6 +154,9 @@ EXPO_ACCESS_TOKEN=
 #DAY_PASS_PRICE_HKD=150
 #SUPREMA_API_URL=
 #SUPREMA_API_KEY=
+# Coaching enquiry notify (decision B4); stored either way
+#COACHING_NOTIFY_ENABLED=true
+#COACHING_NOTIFY_WEBHOOK_URL=
 ENV
   chmod 600 /opt/go24/.env
   echo "→ Generated /opt/go24/.env with random secrets (API_DOMAIN, PGM_*, ADYEN_* to fill)"

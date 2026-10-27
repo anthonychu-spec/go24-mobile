@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AccountModule } from './account/account.module';
 import { AuthModule } from './auth/auth.module';
 import { BrandModule } from './brand/brand.module';
+import { CoachingModule } from './coaching/coaching.module';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -33,6 +34,7 @@ import { MilestonesModule } from './milestones/milestones.module';
     BrandModule,
     AuthModule,
     AccountModule,
+    CoachingModule,
     HealthModule,
     BookingModule,
     BookingsModule,
