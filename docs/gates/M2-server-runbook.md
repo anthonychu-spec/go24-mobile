@@ -12,7 +12,7 @@
 |---|---|---|
 | P1 | **先將 `feat/backend-week1` 合入 `main`**（之前要將 GO24 prototype commit `ef48202` 搬走，見 `STATE.md`） | `origin/main` 嘅 `deploy.yml` 仲係**舊版：push `main` 就自動 deploy**，health check 失敗都照報成功；`main` 亦冇 migration、冇 webhook secret 修正。一喺 GitHub 設咗 `DROPLET_HOST`／`DROPLET_SSH_KEY`，下一個 push 到 `main` 就會將舊 code 推上新機。 |
 | P2 | 合入 `main` 之後，`main` 上嘅 CI（`ci.yml`）要綠 | 新 `deploy.yml` 要求個 SHA 有一次成功 CI。CI 只喺 push／PR 到 `main`、`dev` 先行，`feat/*` branch 嘅 commit 冇 CI 記錄，deploy 唔到。 |
-| P3 | §5 **I1、I2 已修（2026-10-26，未 commit）**：commit 埋入 `feat/backend-week1` 再合入 `main` | 修正前就算 `.env` 寫齊，container 都收唔到部分變數。 |
+| P3 | §5 **I1、I2 已修，commit 咗（`59080fb`，`feat/backend-week1`）**：隨 P1 合入 `main` | 修正前就算 `.env` 寫齊，container 都收唔到部分變數。 |
 | P4 | 決定 B8（換唔換 PGM／Adyen key）同 §1 嘅 domain | `.env` 要用。 |
 
 ---
@@ -131,7 +131,7 @@ ls -la /opt/go24/.env           # -rw------- deploy
 
 ### 2.4 `.env`（`/opt/go24/.env`，`chmod 600`，owner `deploy`，**唔入 git**）
 
-由 code 實際讀取嘅變數整理（`grep process.env` ＋ `ConfigService.get`，2026-10-26，branch `feat/backend-week1` `ed068b7`）。
+由 code 實際讀取嘅變數整理（`grep process.env` ＋ `ConfigService.get`，2026-10-26，branch `feat/backend-week1`；最後對照 `0dade9c`，加咗 `COACHING_NOTIFY_*`）。
 
 點樣傳入（I1、I2 修正後）：
 - `docker-compose.prod.yml` 嘅 `api` 用 `env_file: ../../.env`，**成份 `/opt/go24/.env` 原封不動入 container**；`environment:` 只剩 `NODE_ENV`、`PORT`、`DATABASE_URL`、`REDIS_URL`（固定或組合值，會蓋過 `.env` 同名嘅值）。之後 code 加新變數，只要寫入 `.env`，唔使改 compose。
@@ -176,6 +176,8 @@ ls -la /opt/go24/.env           # -rw------- deploy
 | `CORS_ORIGINS` | ✗ | ✏️ | — | Native app 唔使。**留空**；N4 網頁刪帳戶頁如果由瀏覽器直接 call API，先加嗰個 origin |
 | `EXPO_ACCESS_TOKEN` | 視乎 | 🆕（Expo 帳戶，G1） | — | 只有 Expo project 開咗「Enhanced security for push」先要 |
 | `BACKGROUND_JOBS_ENABLED` | ✗ | ✏️ **`false`** | — | 第一次開機一定 `false`；G9 批咗先改 `true`（cron 會寫入真 PGM） |
+| `COACHING_NOTIFY_ENABLED` | ✗ | ✏️ **`false`**（唔設＝關） | — | Coaching 諮詢只係存入 DB；`true` 先會通知前台。等 B4 決定送去邊 |
+| `COACHING_NOTIFY_WEBHOOK_URL` | ✗ | ✏️ | — | B4 決定後填（例如 n8n webhook）；要同 `COACHING_NOTIFY_ENABLED=true` 一齊先生效 |
 | `GYM_DATA_URL` | ✗ | **唔好還原** | — | 舊值指向舊 compose 入面 `postgres` 嘅 `gym_data` DB——新機冇呢個 DB。留空＝上堂歷史返空（`activity.module.ts`）。等 B6 |
 
 #### C. API 讀，以前 compose 冇傳入（I2 修正後經 `env_file` 傳入）
@@ -193,6 +195,7 @@ ls -la /opt/go24/.env           # -rw------- deploy
 
 - `BROADCAST_SECRET`：舊 container 有，route 已刪（`c0226d7`）。
 - `REDIS_URL`：compose 自己組；code 冇用。
+- `TEST_DATABASE_URL`：只係 CI／本機 schema test 用（test 會 **drop 成個 public schema**），伺服器一定唔好設。
 - `.env.example` 入面嘅 `N8N_WEBHOOK_WHATSAPP`、`N8N_WEBHOOK_FACE_*`、`PGM_DEFAULT_CLUB_ID`、`EXPO_PUBLIC_*`：API code 冇讀（`EXPO_PUBLIC_*` 係 app build 用）。
 
 #### 點樣安全咁填
@@ -218,7 +221,8 @@ $COMPOSE up -d postgres redis
 $COMPOSE ps                                         # postgres healthy
 $COMPOSE build api
 $COMPOSE run --rm --no-deps api node dist/database/migrate.js
-#  → 應該見 "Applied migrations: Baseline1761400000000, ReferralsAndBannerFix…, BrandLayer…"
+#  → 應該見 "Applied migrations: Baseline1761400000000, ReferralsAndBannerFix1761400000001, BrandLayer1761500000000,
+#     AccountDeletion1761600000000, VisitGoal1761700000000, CoachingEnquiries1761800000000"
 $COMPOSE up -d api caddy
 ```
 
@@ -373,12 +377,12 @@ docker rm -f go24-restore-test && rm -f /tmp/restore-test.dump
 
 | # | 位置 | 問題 | 建議修正 | 嚴重 |
 |---|---|---|---|---|
-| I1 | `docker-compose.prod.yml` ＋ `deploy.yml` ＋ `setup.sh` | Compose v2 預設喺 **project directory（＝第一個 `-f` 檔所在，即 `infra/droplet/`）** 搵 `.env`，`setup.sh` 將 `.env` 放喺 `/opt/go24/`。變數可能全部讀唔到（`${JWT_SECRET}` 變空）。舊機點樣 work 未知（可能人手放咗第二份） | **已修（未 commit）**：`deploy.yml` 用 `docker compose --env-file /opt/go24/.env -f …`，並喺開始前檢查 `.env` 存在；compose 檔頭註解同 `setup.sh` 提示都改用同一條命令。本機冇 Docker，**未用 `docker compose config` 實測**，開機時第一步做 | 高 → 已修 |
-| I2 | `docker-compose.prod.yml` `api.environment` | 漏咗 code 有讀嘅 `API_BASE_URL`、`APP_BASE_URL`、`STAFF_NOTIFICATION_WEBHOOK_URL`、`DAY_PASS_PRICE_HKD`、`SUPREMA_API_URL`、`SUPREMA_API_KEY`（之後仲有 `SENTRY_DSN`）。逐個列，每加一個變數都要改兩個地方 | **已修（未 commit）**：`api` 用 `env_file: ../../.env`；`environment:` 只留 `NODE_ENV`、`PORT`、`DATABASE_URL`、`REDIS_URL`。`setup.sh` 生嘅 `.env` 模板已列齊 code 讀嘅全部變數（已對比：code 讀而模板冇嘅只有 compose 提供嘅 3 個）。行為改變：`ADYEN_ENVIRONMENT` 唔再有 compose 預設 `LIVE`，改為模板明寫（code 預設 `TEST`）；`BACKGROUND_JOBS_ENABLED` 唔設＝關 | 高 → 已修 |
+| I1 | `docker-compose.prod.yml` ＋ `deploy.yml` ＋ `setup.sh` | Compose v2 預設喺 **project directory（＝第一個 `-f` 檔所在，即 `infra/droplet/`）** 搵 `.env`，`setup.sh` 將 `.env` 放喺 `/opt/go24/`。變數可能全部讀唔到（`${JWT_SECRET}` 變空）。舊機點樣 work 未知（可能人手放咗第二份） | **已修（commit `59080fb`）**：`deploy.yml` 用 `docker compose --env-file /opt/go24/.env -f …`，並喺開始前檢查 `.env` 存在；compose 檔頭註解同 `setup.sh` 提示都改用同一條命令。本機冇 Docker，**未用 `docker compose config` 實測**，開機時第一步做 | 高 → 已修 |
+| I2 | `docker-compose.prod.yml` `api.environment` | 漏咗 code 有讀嘅 `API_BASE_URL`、`APP_BASE_URL`、`STAFF_NOTIFICATION_WEBHOOK_URL`、`DAY_PASS_PRICE_HKD`、`SUPREMA_API_URL`、`SUPREMA_API_KEY`（之後仲有 `SENTRY_DSN`）。逐個列，每加一個變數都要改兩個地方 | **已修（commit `59080fb`）**：`api` 用 `env_file: ../../.env`；`environment:` 只留 `NODE_ENV`、`PORT`、`DATABASE_URL`、`REDIS_URL`。`setup.sh` 生嘅 `.env` 模板已列齊 code 讀嘅全部變數（已對比：code 讀而模板冇嘅只有 compose 提供嘅 3 個）。行為改變：`ADYEN_ENVIRONMENT` 唔再有 compose 預設 `LIVE`，改為模板明寫（code 預設 `TEST`）；`BACKGROUND_JOBS_ENABLED` 唔設＝關 | 高 → 已修 |
 | I3 | `payments/adyen.client.ts`、`app.module.ts` | `ADYEN_API_KEY`／`ADYEN_MERCHANT_ACCOUNT` 冇設就 throw，`PaymentsModule` 一定載入 → v1 唔用付款都要將 live Adyen key 放上 production 機 | v1 用 feature flag／env 唔載入 `PaymentsModule`＋`SignupModule`，或者 Adyen client 改為 lazy（用時先檢查）。咁 B8 嘅 Adyen key 可以等付款第二期先處理 | 中 |
 | I4 | `setup.sh` 第 9 步 | 備份 cron 寫 `/var/log` 冇權、`set -u` 冇變數 → 從來冇行（舊機證實）；而且只係本機備份 | 換成 §3.2 嘅 `backup.sh`（root、讀 `.env`、上 Spaces）；`setup.sh` 唔再生舊腳本 | 高 |
 | I5 | `setup.sh` 第 10 步、開頭註解 | 寫死 `main`＋`git reset --hard origin/main`；`curl … | sudo bash` 喺 private repo 用唔到 | 改為 clone 唔 reset（之後由 `deploy.yml` 揀 SHA）；註解改「scp 上機、睇完先行」；private repo 用 deploy key（§2.3） | 中 |
-| I6 | `setup.sh` 第 11 步 | 生嘅 `.env` 只有 Postgres／Redis／JWT／PGM 幾個；`API_DOMAIN` 預設 `api-staging.go24.fitness`（錯 domain，舊機係 `go24fitness.com`）；冇 `BACKGROUND_JOBS_ENABLED=false`、webhook secrets、Adyen | **已隨 I2 修（未 commit）**：模板對齊 §2.4；隨機生成三個 webhook secret；`API_DOMAIN=` 留空要人手填；明寫 `BACKGROUND_JOBS_ENABLED=false`；可選項目註解掉 | 中 → 已修 |
+| I6 | `setup.sh` 第 11 步 | 生嘅 `.env` 只有 Postgres／Redis／JWT／PGM 幾個；`API_DOMAIN` 預設 `api-staging.go24.fitness`（錯 domain，舊機係 `go24fitness.com`）；冇 `BACKGROUND_JOBS_ENABLED=false`、webhook secrets、Adyen | **已隨 I2 修（commit `59080fb`）**：模板對齊 §2.4；隨機生成三個 webhook secret；`API_DOMAIN=` 留空要人手填；明寫 `BACKGROUND_JOBS_ENABLED=false`；可選項目註解掉 | 中 → 已修 |
 | I7 | `docker-compose.prod.yml` `redis` | Code 冇用 Redis（rate limit 喺 memory），但 api `depends_on` redis healthy，仲要 `REDIS_PASSWORD`、佔 RAM | v1 刪走 `redis` service、`REDIS_URL`、`redis_data` volume、`depends_on.redis`；要多 instance 先加返 | 低 |
 | I8 | `deploy.yml` | (a) `ssh-keyscan` 每次信第一次見到嘅 host key；(b) compose 冇 `--env-file`（I1）；(c) migration 前冇備份；(d) rollback 唔倒 migration（要寫明）；(e) 冇用 GitHub Environment 做批准 | (a) 用 `DROPLET_KNOWN_HOSTS` secret；(b) 同 I1；(c) migration 前 `bash /opt/go24-ops/backup.sh`（deploy user 要權，或者改 `sudo` 指定命令）；(e) `environment: production`＋required reviewer | 中 |
 | I9 | `Caddyfile` | `header_up X-Forwarded-For {remote_host}`：開 Cloudflare 橙雲後 `remote_host` 係 Cloudflare IP，per-IP rate limit 會將全部人當一個 IP | DNS only 就冇事；轉橙雲時加 Caddy `trusted_proxies`（Cloudflare IP 段）＋用 `CF-Connecting-IP`。Caddy 本身已經自動加 `X-Forwarded-*`，自訂 `header_up` 可以刪 | 低（而家） |
@@ -386,9 +390,9 @@ docker rm -f go24-restore-test && rm -f /tmp/restore-test.dump
 | I11 | `docker-compose.prod.yml` | `JWT_EXPIRES_IN`、`JWT_REFRESH_EXPIRES_IN` 傳入但 code 冇讀（寫死 `15m`） | **已隨 I2 刪走（未 commit）**；要改有效期就改 code | 低 → 已修 |
 | I12 | `backend/nest-api`、`.env.example` | 有 `SENTRY_DSN` 但冇 Sentry SDK | 見 §4.2 | 中（上線前） |
 | I13 | `health/health.controller.ts` | Health 唔查 DB；Caddy／compose／uptime 全部靠佢 | 加 `SELECT 1`（失敗回 503）；保持輕量，唔查 PGM | 中 |
-| I14 | `deploy.sh`（repo 根目錄） | `git add -A`＋commit＋**push `main`**；SSH `root@api-staging.go24fitness.com`（已毀）、`StrictHostKeyChecking=no`；寫死另一部電腦嘅 Obsidian 路徑 | **刪除**（`deploy.yml` 已取代）；`STATE.md` OPEN FAILURES 已記 | 中 |
+| I14 | `deploy.sh`（repo 根目錄） | `git add -A`＋commit＋**push `main`**；SSH `root@api-staging.go24fitness.com`（已毀）、`StrictHostKeyChecking=no`；寫死另一部電腦嘅 Obsidian 路徑 | **已刪（2026-10-26）**：`deploy.yml` 係唯一 deploy 路徑 | 中 → 已修 |
 | I15 | `.github/workflows/deploy.yml` on `origin/main` | `main` 仲係舊版自動 deploy（push 就 deploy、health 失敗報成功） | P1：合入 `feat/backend-week1` 先設 secrets | **高** |
-| I16 | `docs/deploy.md`、`docs/cloudflare.md` | 舊：`s-4vcpu-8gb`、`api.go24-dev.fitness`、`cp .env.example .env`、`git clone` 入已存在嘅目錄、「auto-deploy from main」 | 改為指向本手冊，或者標「已過時」 | 低 |
+| I16 | `docs/deploy.md`、`docs/cloudflare.md` | 舊：`s-4vcpu-8gb`、`api.go24-dev.fitness`、`cp .env.example .env`、`git clone` 入已存在嘅目錄、「auto-deploy from main」 | `docs/deploy.md` **已改（2026-10-26）**做指向本手冊同手動 `deploy.yml`；`docs/cloudflare.md` 仍舊 | 低 |
 | I17 | `signup.service.ts`、`referral.service.ts`、`apps/member-app/src/api/client.ts`（main） | 預設 URL 指向已毀 `api-staging.go24fitness.com`／`go24.app` | 設 env（§2.4 C）；app 用 `EXPO_PUBLIC_API_URL`（lab branch 已改） | 低 |
 | I18 | `setup.sh` 第 6 步 | sudoers 直接 append `/etc/sudoers`（冇 `visudo -c`，重行會重複）；`deploy` 喺 docker group＝等同 root，`NOPASSWD /usr/bin/docker` 多餘；`systemctl restart go24` 呢個 service 唔存在 | 改寫入 `/etc/sudoers.d/go24`＋`visudo -cf`；刪多餘規則；如需備份權限，只准 `/opt/go24-ops/backup.sh` | 低 |
 | I19 | `docker-compose.prod.yml` `caddy` | Caddy 冇 healthcheck；`depends_on: api` 唔等 healthy | 加 `condition: service_healthy`（api 已有 healthcheck） | 低 |
