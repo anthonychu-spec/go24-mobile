@@ -10,6 +10,14 @@ export const brand: BrandConfig = {
   apiBase: null,
   easProjectId: null,
   appearance: 'dark',
+  layout: 'member',
+  shape: { card: 0, button: 0 },
+  club: {
+    name: 'THE LAB BY ONYX · CENTRAL',
+    area: 'CENTRAL, HONG KONG',
+    address: ['Basement, Haleson Building', '1 Jubilee Street, Central, Hong Kong'],
+    hours: ['Mon–Fri 06:30–21:30', 'Sat, Sun & public holidays 08:00–18:00'],
+  },
   splashBackground: '#131313',
   colors: {
     bg: '#131313',          // --bg

@@ -71,6 +71,15 @@ export interface BrandFonts {
   display: string;
 }
 
+export interface ClubInfo {
+  /** e.g. 'THE LAB BY ONYX · CENTRAL' */
+  name: string;
+  /** Short label for headers, e.g. 'CENTRAL, HONG KONG' */
+  area: string;
+  address: string[];
+  hours: string[];
+}
+
 export interface BrandConfig {
   id: BrandId;
   /** Store / home-screen name */
@@ -84,6 +93,14 @@ export interface BrandConfig {
   /** Expo project id (push + EAS Update); null until the group Expo account exists (gate G1). */
   easProjectId: string | null;
   appearance: 'light' | 'dark';
+  /**
+   * Screen set. `classic` = the original GO24 screens; `member` = Home / Book / Passport / Profile
+   * (LAB prototype layout). Foundry moves to `member` with its own content in phase 5.
+   */
+  layout: 'classic' | 'member';
+  /** Corner radii for the member layout (LAB is square) */
+  shape: { card: number; button: number };
+  club: ClubInfo | null;
   /** Splash screen and Android adaptive-icon background */
   splashBackground: string;
   colors: BrandColors;
@@ -109,12 +126,42 @@ export interface BrandConfig {
   features: FeatureFlags;
 }
 
+/** A class programme the brand runs; PGM class names are matched against `match` (case-insensitive). */
+export interface Programme {
+  match: string;
+  name: string;
+  /** Training pillar shown as the tag and used by the Book filters, e.g. 'LOAD' */
+  pillar: string;
+  description: string;
+  image: number;
+}
+
+/** Editorial content for the member layout (copy and photos the API doesn't provide). */
+export interface MemberContent {
+  home: {
+    title: string;
+    hero: { image: number; badge: string; badgeRight: string; eyebrow: string; title: string; body: string };
+  };
+  book: { eyebrow: string; title: string; banner: { image: number; eyebrow: string; title: string } };
+  /** Book filters + Home protocol cards, in order */
+  pillars: { key: string; label: string; image: number }[];
+  programmes: Programme[];
+  passport: { eyebrow: string; title: string };
+  profile: { eyebrow: string; title: string; image: number };
+  clubImage: number;
+  firstVisit: string[];
+}
+
 export interface BrandModule {
   brand: BrandConfig;
   /** Passed to expo-font useFonts(); keys are the names in brand.fonts */
   fonts: Record<string, number>;
   /** Wordmark image for dark backgrounds, or null to render brand.wordmark */
   logo: number | null;
+  /** Small mark for headers and the member card */
+  mark: number | null;
+  /** Required when brand.layout is 'member' */
+  content: MemberContent | null;
 }
 
 export const allFeatures = (on: boolean): FeatureFlags =>

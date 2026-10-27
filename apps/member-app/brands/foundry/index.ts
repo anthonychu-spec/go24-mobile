@@ -8,6 +8,8 @@ import { brand } from './brand';
 const mod: BrandModule = {
   brand,
   fonts: { Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold },
+  content: null,
   logo: require('./assets/logo.png'),
+  mark: null,
 };
 export default mod;

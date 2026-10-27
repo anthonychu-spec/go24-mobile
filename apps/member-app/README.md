@@ -26,6 +26,12 @@ PowerShell: `$env:APP_BRAND='lab'; npx expo start --web`. Restart Metro after ch
 
 `EXPO_PUBLIC_API_URL` is the API root including `/v1`. Without it the app uses `brand.apiBase`, then `http://localhost:3000/v1`.
 
+No server yet? `EXPO_PUBLIC_API_MOCK=1` answers every request inside the app (`src/api/mock`): any email with a 6+ character password signs in, two weeks of LAB classes, one booking tomorrow, past visits. State resets on reload.
+
+## Screens
+
+`brand.layout` picks the screen set. `member` (THE LAB): Home / Book / Passport / Profile tabs with the member pass in the middle (`src/screens/member`, built from `src/ui/kit.tsx`), copy and photos from `brands/<brand>/content.ts`. `classic` (GO24, Foundry until phase 5): the original GO24 screens.
+
 ## Builds
 
 `eas.json` has `<brand>-development` / `-preview` / `-production` profiles; each sets `APP_BRAND` and an EAS Update channel of the same name. `runtimeVersion` uses the `fingerprint` policy. When publishing an update, set `APP_BRAND` to match the channel.

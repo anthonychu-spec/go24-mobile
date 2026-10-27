@@ -100,7 +100,7 @@ export default function LoginScreen() {
             <View style={s.handle} />
 
             <Text style={s.title}>Welcome back</Text>
-            <Text style={s.subtitle}>Sign in to your {brand.name} account</Text>
+            <Text style={s.subtitle}>Sign in with your member email</Text>
 
             <View style={s.fields}>
               {/* Email */}
@@ -235,8 +235,9 @@ const s = StyleSheet.create({
   line3: { width: 100, top: H * 0.24, left: 80,  transform: [{ rotate: '-20deg' }] },
 
   // ── Brand ──
-  brandArea: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.lg, justifyContent: 'center' },
-  logoImg: { width: 150, height: 132, marginBottom: spacing.xl },
+  // Top-aligned so the copy stays above the sign-in panel on short screens
+  brandArea: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing['2xl'], justifyContent: 'flex-start' },
+  logoImg: { width: 118, height: 104, marginBottom: spacing.lg },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xl },
   logoBox: {
     width: 56, height: 56, borderRadius: radius.lg,

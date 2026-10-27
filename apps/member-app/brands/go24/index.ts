@@ -9,6 +9,8 @@ import { brand } from './brand';
 const mod: BrandModule = {
   brand,
   fonts: { Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Inter_900Black },
+  content: null,
   logo: null,
+  mark: null,
 };
 export default mod;

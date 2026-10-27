@@ -9,6 +9,9 @@ export const brand: BrandConfig = {
   apiBase: null,
   easProjectId: null,
   appearance: 'light',
+  layout: 'classic',
+  shape: { card: 16, button: 999 },
+  club: null,
   splashBackground: '#0A0A0A',
   colors: {
     bg: '#F4F4F8',

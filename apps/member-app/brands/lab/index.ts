@@ -5,10 +5,13 @@ import { Montserrat_600SemiBold } from '@expo-google-fonts/montserrat/600SemiBol
 import { Montserrat_700Bold } from '@expo-google-fonts/montserrat/700Bold';
 import type { BrandModule } from '../types';
 import { brand } from './brand';
+import { content } from './content';
 
 const mod: BrandModule = {
   brand,
   fonts: { BebasNeue_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold },
   logo: require('./assets/logo.png'),
+  mark: require('./assets/mark.png'),
+  content,
 };
 export default mod;
