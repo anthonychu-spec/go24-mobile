@@ -24,6 +24,7 @@ export const zhHK = {
     classNotFound: '此課堂已不能預約',
     cancelTooLate: '已過網上取消時限，請聯絡前台',
     tryAgainShortly: '系統繁忙，請稍後再試',
+    featureOff: '此功能暫未在 App 提供，請向前台查詢',
   },
   appStatus: {
     updateTitle: '需要更新',

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { tokenStorage } from '../auth/storage';
 import { brand } from '../brand';
+import { isFeatureOff } from './errors';
 import { MOCK_API, mockAdapter } from './mock';
 
 const LOCAL_API = 'http://localhost:3000/v1';
@@ -30,11 +31,20 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+const featureOffListeners = new Set<() => void>();
+
+/** Called when a route answers with the feature guard's 404 (the brand has that feature off) */
+export function onFeatureOff(listener: () => void): () => void {
+  featureOffListeners.add(listener);
+  return () => { featureOffListeners.delete(listener); };
+}
+
 let refreshing: Promise<string> | null = null;
 
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
+    if (isFeatureOff(error)) featureOffListeners.forEach((l) => l());
     const original = error.config;
     if (error.response?.status !== 401 || original._retry) throw error;
     original._retry = true;

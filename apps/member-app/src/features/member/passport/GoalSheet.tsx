@@ -5,13 +5,13 @@ import { apiErrorCode, apiErrorMessage } from '../../../api/errors';
 import { brand } from '../../../brand';
 import { colors } from '../../../theme';
 import { Btn, Message, Sheet, T } from '../../../ui/kit';
-import { clampGoal, GOAL_MAX, GOAL_MIN } from './stats';
+import { clampGoal, DEFAULT_GOAL, GOAL_MAX, GOAL_MIN } from './stats';
 
 /** Monthly visit goal stepper. Remount (key) per open so it starts from the current goal. */
 export function GoalSheet({ visible, goal, onClose, onSaved }: {
-  visible: boolean; goal: number; onClose: () => void; onSaved: (goal: number) => void;
+  visible: boolean; goal: number | null; onClose: () => void; onSaved: (goal: number) => void;
 }) {
-  const [value, setValue] = useState(() => clampGoal(goal));
+  const [value, setValue] = useState(() => clampGoal(goal ?? DEFAULT_GOAL));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const step = (d: number) => setValue((v) => clampGoal(v + d));
@@ -21,11 +21,11 @@ export function GoalSheet({ visible, goal, onClose, onSaved }: {
     setError(null);
     try {
       const next = await meApi.updateSettings({ visitGoal: value });
-      // visitGoal is planned (backend N6); a server that drops unknown fields must not look saved
+      // An older server drops unknown fields; that must not look saved
       if (next?.visitGoal !== value) throw new Error('visitGoal not stored');
       onSaved(value);
     } catch (err) {
-      setError(apiErrorCode(err) === 'NETWORK' ? apiErrorMessage(err) : "Your goal couldn't be saved yet. Please try again later.");
+      setError(apiErrorCode(err) === 'UNKNOWN' ? "Your goal couldn't be saved. Please try again later." : apiErrorMessage(err));
     } finally {
       setBusy(false);
     }

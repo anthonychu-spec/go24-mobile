@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { appConfigApi, type AppConfig } from '../api/appConfig';
+import { onFeatureOff } from '../api/client';
 import { brand, type Feature } from '../brand';
 
 const CACHE_KEY = `app_config:${brand.id}`;
@@ -72,7 +73,9 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
     void refresh();
 
     const sub = AppState.addEventListener('change', (s) => { if (s === 'active') void refresh(); });
-    return () => sub.remove();
+    // A route that 404s from the feature guard means our flags are stale: reload them so the UI hides it
+    const stopFeatureOff = onFeatureOff(() => void refresh());
+    return () => { sub.remove(); stopFeatureOff(); };
   }, [refresh]);
 
   const appVersion = Constants.expoConfig?.version;

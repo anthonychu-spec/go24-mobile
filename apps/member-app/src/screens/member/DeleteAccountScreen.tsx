@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { meApi } from '../../api/member';
+import { accountDeletionPageUrl, meApi } from '../../api/member';
 import { apiErrorMessage } from '../../api/errors';
 import { brand } from '../../brand';
 import { useAuth } from '../../auth/context';
@@ -36,7 +36,6 @@ export default function DeleteAccountScreen() {
     setSending(true);
     setError(null);
     try {
-      // Planned endpoint POST /v1/me/account/deletion (the mock API accepts it)
       await meApi.deleteAccount();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -107,6 +106,14 @@ export default function DeleteAccountScreen() {
 
       <Btn label="Delete my account" kind="danger" icon="trash" full onPress={remove} loading={sending} disabled={!confirmed} style={{ marginTop: 14 }} />
       <Btn label="Keep my account" kind="ghost" full onPress={leave} disabled={sending} style={{ marginTop: 10 }} />
+
+      {/* Same deletion without the app (email + one-time code); also the link the store listings use */}
+      <Pressable onPress={() => void Linking.openURL(accountDeletionPageUrl)} accessibilityRole="link" hitSlop={8} style={s.webLink}>
+        <T v="small" color={colors.textMuted}>
+          {"Can't use the app? "}
+          <T v="small" color={colors.link}>Delete your account on the web ↗</T>
+        </T>
+      </Pressable>
     </FullPage>
   );
 }
@@ -118,6 +125,7 @@ const s = StyleSheet.create({
   bullet: { width: 5, height: 5, marginTop: 8, backgroundColor: colors.textMuted },
   keep: { borderLeftWidth: 3, borderLeftColor: colors.cta, borderTopWidth: 0, paddingTop: 2, paddingLeft: 14 },
   keepHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  webLink: { marginTop: 22, alignSelf: 'center' },
   input: {
     marginTop: 8, minHeight: 46, paddingHorizontal: 13, paddingVertical: 12,
     borderWidth: 1, borderColor: colors.border, borderRadius: brand.shape.button, backgroundColor: colors.card,

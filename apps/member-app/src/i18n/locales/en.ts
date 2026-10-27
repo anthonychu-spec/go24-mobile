@@ -107,6 +107,7 @@ export const en = {
     classNotFound: 'This session is no longer available.',
     cancelTooLate: 'It is too late to cancel this session online. Please contact the club team.',
     tryAgainShortly: 'The system is busy. Please try again shortly.',
+    featureOff: "This isn't available in the app. Please ask the club team.",
   },
   appStatus: {
     updateTitle: 'Update required',

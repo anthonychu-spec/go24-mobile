@@ -10,7 +10,7 @@ import { GoalSheet } from '../../features/member/passport/GoalSheet';
 import { HistoryTab } from '../../features/member/passport/HistoryTab';
 import { MetricGrid } from '../../features/member/passport/MetricGrid';
 import { Overview } from '../../features/member/passport/Overview';
-import { DEFAULT_GOAL, readActivity } from '../../features/member/passport/stats';
+import { readActivity } from '../../features/member/passport/stats';
 import { useAsync } from '../../hooks/useAsync';
 import { colors } from '../../theme';
 import { Icon } from '../../ui/Icon';
@@ -30,8 +30,8 @@ export default function PassportScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; booking?: string }>();
   const { upcoming, bookings, loading, error, refresh } = useMemberData();
+  const passport = useAsync(meApi.passportVisits);
   const activity = useAsync(activityApi.get);
-  const settings = useAsync(meApi.settings);
 
   // Tab follows the route param; picking a tab writes it back so a repeat link still switches
   const [tab, setTab] = useState<Tab>(() => asTab(params.tab) ?? 'overview');
@@ -75,21 +75,22 @@ export default function PassportScreen() {
     router.setParams({ booking: undefined });
   }, [params.booking, loading, bookings, openBooking, refresh, router]);
 
-  // Saved goal wins until settings load again
+  // Saved goal wins until the visits load again
   const [savedGoal, setSavedGoal] = useState<number | null>(null);
-  useEffect(() => { setSavedGoal(null); }, [settings.data]);
-  const goal = savedGoal ?? settings.data?.visitGoal ?? DEFAULT_GOAL;
-  const goalKnown = savedGoal != null || !!settings.data || !!settings.error;
+  useEffect(() => { setSavedGoal(null); }, [passport.data]);
+  const goal = savedGoal ?? passport.data?.visitGoal ?? null;
 
   // Decision B6: visit data may be missing; show "—", never 0
-  const unavailable = !!activity.error || !!activity.data?.errors?.length;
-  const stats = useMemo(() => readActivity(unavailable ? null : activity.data), [unavailable, activity.data]);
+  const visits = passport.data?.visitsThisMonth ?? null;
+  const visitsUnavailable = !passport.loading && visits == null;
+  const historyUnavailable = !!activity.error || !!activity.data?.errors?.length;
+  const stats = useMemo(() => readActivity(historyUnavailable ? null : activity.data), [historyUnavailable, activity.data]);
   const upcomingKnown = !loading && !(error && !bookings.length);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refresh(), activity.reload(), settings.reload()]);
+    await Promise.all([refresh(), passport.reload(), activity.reload()]);
     setRefreshing(false);
   };
   const explore = () => router.push('/book');
@@ -99,20 +100,20 @@ export default function PassportScreen() {
       <PageHead eyebrow={content.passport.eyebrow} title={content.passport.title}
         right={<Icon name="passport" size={28} color={colors.textSecond} />} />
 
-      <MetricGrid style={!unavailable && s.gridGap} items={[
-        { label: 'VISITS THIS MONTH', value: stats.visitsThisMonth },
+      <MetricGrid style={!visitsUnavailable && s.gridGap} items={[
+        { label: 'VISITS THIS MONTH', value: visits },
         { label: 'UPCOMING', value: upcomingKnown ? upcoming.length : null },
-        { label: 'VISIT GOAL', value: goalKnown ? goal : null },
+        { label: 'VISIT GOAL', value: goal },
       ]} />
-      {unavailable ? <View style={s.gridGap}><Note>{"Visit history isn't available yet."}</Note></View> : null}
+      {visitsUnavailable ? <View style={s.gridGap}><Note>{"Visits aren't available yet."}</Note></View> : null}
 
       <Segmented items={TABS} value={tab} onChange={pickTab} spread={false} />
       {tab === 'overview' ? (
-        <Overview stats={stats} goal={goal} onEditGoal={openGoal} />
+        <Overview stats={stats} visits={visits} weeks={passport.data?.weeksInARow ?? null} goal={goal} onEditGoal={openGoal} />
       ) : tab === 'bookings' ? (
         <BookingsTab upcoming={upcoming} loading={loading} error={error} onOpen={openBooking} onExplore={explore} />
       ) : (
-        <HistoryTab history={stats.history} unavailable={unavailable} onExplore={explore} />
+        <HistoryTab history={stats.history} unavailable={historyUnavailable} onExplore={explore} />
       )}
 
       <BookingSheet key={`booking-${seq}`} booking={detail} visible={detailOpen} onClose={() => setDetailOpen(false)} />

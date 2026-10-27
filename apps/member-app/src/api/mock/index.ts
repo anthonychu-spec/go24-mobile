@@ -1,7 +1,9 @@
 import { AxiosError, AxiosHeaders, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios';
 import { brand } from '../../brand';
 import { addDays, hkDateKey, hkInstant } from '../../lib/hkTime';
+import type { Feature } from '../../../brands/types';
 import type { ActivityItem, BookingStatus, GymClass, MyBooking, Settings } from '../member';
+import { VISIT_GOAL_MAX, VISIT_GOAL_MIN } from '../rules';
 
 // In-memory stand-in for the API, for working on screens before the server exists (gate G5).
 // On with EXPO_PUBLIC_API_MOCK=1. Any email + a 6+ character password signs in. State resets on reload.
@@ -44,7 +46,8 @@ function buildClasses(): Map<number, GymClass> {
 
 const classes = buildClasses();
 let bookings: MyBooking[] = [];
-let settings: Settings = { reminderMinutes: 60, autoWaitlistCancel: false, visitGoal: 12 };
+const DEFAULT_SETTINGS: Settings = { reminderMinutes: 60, autoWaitlistCancel: false, visitGoal: null };
+let settings: Settings = { ...DEFAULT_SETTINGS };
 let seq = 1;
 
 function addBooking(cls: GymClass, status: BookingStatus, waitlistPosition: number | null = null): MyBooking {
@@ -74,26 +77,50 @@ const history: ActivityItem[] = Array.from({ length: 9 }, (_, i) => {
 });
 
 const active = (b: MyBooking) => b.status === 'confirmed' || b.status === 'waitlist' || b.status === 'pending';
+let deleted = false;
+
+/** Monday (HK) of a 'YYYY-MM-DD' key, as a key */
+const weekOf = (key: string) => addDays(key, -((new Date(`${key}T00:00:00Z`).getUTCDay() + 6) % 7));
+
+/** Same rule as backend passport.service weeksInARow: this week counts once visited, else start last week */
+function weeksInARow(): number {
+  const weeks = new Set(history.map((h) => weekOf(hkDateKey(h.at))));
+  let week = weekOf(hkDateKey());
+  if (!weeks.has(week)) week = addDays(week, -7);
+  let run = 0;
+  for (; weeks.has(week); week = addDays(week, -7)) run++;
+  return run;
+}
 
 class MockError extends Error {
   constructor(readonly status: number, readonly body: object) { super(`mock ${status}`); }
 }
-const fail = (status: number, code: string, message = code) => { throw new MockError(status, { code, message }); };
-// Nest's plain BadRequestException body: message only, no code (what POST/DELETE /bookings send today)
-const badRequest = (message: string) => { throw new MockError(400, { statusCode: 400, message, error: 'Bad Request' }); };
+/** AppError / coded HttpException body */
+const fail = (status: number, code: string, message = code): never => { throw new MockError(status, { code, message }); };
+/** Nest's plain exception bodies (no code) */
+const plain = (status: number, message: string | string[], error: string): never => {
+  throw new MockError(status, { statusCode: status, message, error });
+};
 
 type Handler = (m: RegExpMatchArray, body: any, config: InternalAxiosRequestConfig) => unknown;
-const routes: [string, RegExp, Handler][] = [
+/** public: no sign-in needed; feature: the brand feature guard (404 with no code when off) */
+type Route = [string, RegExp, Handler, { public?: true; feature?: Feature }?];
+
+const routes: Route[] = [
   ['POST', /^\/auth\/login$/, (_m, body) => {
     if (!body?.email || String(body.password ?? '').length < 6) fail(401, 'INVALID_CREDENTIALS');
+    deleted = false; // signing in again makes a fresh app account
     return { accessToken: 'mock-access', refreshToken: 'mock-refresh', user: { ...user, email: body.email } };
-  }],
-  ['POST', /^\/auth\/refresh$/, () => ({ accessToken: 'mock-access', refreshToken: 'mock-refresh' })],
-  ['POST', /^\/auth\/logout$/, () => null],
+  }, { public: true }],
+  ['POST', /^\/auth\/refresh$/, () => {
+    if (deleted) plain(401, 'account deleted', 'Unauthorized');
+    return { accessToken: 'mock-access', refreshToken: 'mock-refresh' };
+  }, { public: true }],
+  ['POST', /^\/auth\/logout$/, () => null, { public: true }],
   ['GET', /^\/auth\/me$/, () => user],
   ['GET', /^\/app-config$/, () => ({
     brand: brand.id, name: brand.name, minAppVersion: null, maintenanceMessage: null, features: brand.features,
-  })],
+  }), { public: true }],
   ['POST', /^\/notifications\/device$/, () => ({ ok: true })],
 
   ['GET', /^\/booking\/classes\/week$/, (_m, _b, config) => {
@@ -106,19 +133,19 @@ const routes: [string, RegExp, Handler][] = [
       (out[key] ??= []).push({ ...c });
     }
     return out;
-  }],
-  ['GET', /^\/booking\/classes\/(\d+)$/, (m) => classes.get(Number(m[1])) ?? fail(404, 'CLASS_NOT_FOUND')],
+  }, { feature: 'classes' }],
+  ['GET', /^\/booking\/classes\/(\d+)$/, (m) => classes.get(Number(m[1])) ?? fail(404, 'CLASS_NOT_FOUND'), { feature: 'classes' }],
 
-  ['GET', /^\/bookings$/, () => bookings.filter((b) => b.status !== 'failed').map((b) => ({ ...b }))],
+  ['GET', /^\/bookings$/, () => bookings.filter((b) => b.status !== 'failed').map((b) => ({ ...b })), { feature: 'classes' }],
   ['POST', /^\/bookings$/, (_m, body) => {
     const cls = classes.get(Number(body?.classId)) ?? fail(404, 'CLASS_NOT_FOUND');
     if (new Date(cls.startTime).getTime() > Date.now() + 168 * 3600_000) {
-      badRequest('Class is outside the 168-hour booking window');
+      fail(400, 'OUTSIDE_BOOKING_WINDOW', 'Class is outside the 168-hour booking window');
     }
     if (bookings.some((b) => b.classId === cls.id && active(b))) fail(409, 'DUPLICATE_BOOKING');
     const day = hkDateKey(cls.startTime);
     if (bookings.some((b) => active(b) && b.startTime && hkDateKey(b.startTime) === day)) {
-      badRequest('Daily limit reached — you can only book 1 class per day');
+      fail(400, 'DAILY_LIMIT', 'Daily limit reached — you can only book 1 class per day');
     }
     if (cls.participantsCount >= cls.maxParticipants) {
       if (!body?.acceptWaitlist || cls.standbyListLimit === 0) fail(409, 'BOOKING_FULL');
@@ -129,16 +156,16 @@ const routes: [string, RegExp, Handler][] = [
     cls.participantsCount += 1;
     const b = addBooking(cls, 'confirmed');
     return { success: true, bookingId: b.id, status: 'confirmed' };
-  }],
+  }, { feature: 'classes' }],
   ['DELETE', /^\/bookings\/(.+)$/, (m) => {
-    const b = bookings.find((x) => x.id === m[1] && active(x)) ?? badRequest('Booking not found');
+    const b = bookings.find((x) => x.id === m[1] && active(x)) ?? plain(400, 'Booking not found', 'Bad Request');
     if (b.status === 'confirmed') {
       const cls = classes.get(b.classId);
       if (cls) cls.participantsCount -= 1;
     }
     b.status = 'cancelled';
     return null;
-  }],
+  }, { feature: 'classes' }],
 
   ['GET', /^\/me\/dashboard$/, () => ({
     user: { name: `${member.firstName} ${member.lastName}`, email: user.email, memberCode: user.memberCode },
@@ -154,10 +181,27 @@ const routes: [string, RegExp, Handler][] = [
     },
   })],
   ['GET', /^\/me\/settings$/, () => settings],
-  ['PATCH', /^\/me\/settings$/, (_m, body) => (settings = { ...settings, ...body })],
+  ['PATCH', /^\/me\/settings$/, (_m, body) => {
+    const goal = body?.visitGoal;
+    if (goal !== undefined && goal !== null && !(Number.isInteger(goal) && goal >= VISIT_GOAL_MIN && goal <= VISIT_GOAL_MAX)) {
+      plain(400, [`visitGoal must be between ${VISIT_GOAL_MIN} and ${VISIT_GOAL_MAX}`], 'Bad Request');
+    }
+    return (settings = { ...settings, ...body });
+  }],
+  ['GET', /^\/me\/passport\/visits$/, () => {
+    const month = hkDateKey().slice(0, 7);
+    return {
+      month,
+      visitsThisMonth: history.filter((h) => hkDateKey(h.at).slice(0, 7) === month).length,
+      weeksInARow: weeksInARow(),
+      visitGoal: settings.visitGoal,
+    };
+  }],
   ['POST', /^\/me\/account\/deletion$/, () => {
     bookings = [];
-    return null;
+    settings = { ...DEFAULT_SETTINGS };
+    deleted = true;
+    return { status: 'deleted' };
   }],
   ['GET', /^\/activity$/, () => ({
     summary: {
@@ -166,6 +210,15 @@ const routes: [string, RegExp, Handler][] = [
     },
     items: history,
   })],
+  ['GET', /^\/checkin\/qr$/, () => {
+    const expiresAt = new Date(Date.now() + 30_000).toISOString();
+    return { payload: `${user.id}|128|${expiresAt}|mock`, userId: user.id, pgmId: 128, expiresAt };
+  }, { feature: 'member_qr' }],
+  ['POST', /^\/coaching\/enquiries$/, () => ({
+    id: `mock-enquiry-${seq++}`, status: 'received',
+    message: 'Enquiry received. No coach has contacted you yet — the team will get back to you.',
+  }), { feature: 'coaching_enquiry' }],
+  ['GET', /^\/coaching\/enquiries$/, () => [], { feature: 'coaching_enquiry' }],
 ];
 
 export const mockAdapter: AxiosAdapter = async (config) => {
@@ -176,10 +229,15 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   const respond = (status: number, data: unknown) =>
     ({ data, status, statusText: String(status), headers: new AxiosHeaders(), config, request: {} });
 
-  for (const [m, pattern, handler] of routes) {
+  for (const [m, pattern, handler, opts] of routes) {
     const match = method === m ? url.match(pattern) : null;
     if (!match) continue;
     try {
+      // Same order as the server: the global feature guard, then the JWT guard
+      if (opts?.feature && !brand.features[opts.feature]) plain(404, 'Not Found', 'Not Found');
+      if (!opts?.public && (deleted || !String(config.headers?.Authorization ?? '').startsWith('Bearer '))) {
+        plain(401, 'Unauthorized', 'Unauthorized');
+      }
       const data = handler(match, body, config);
       return respond(data == null ? 204 : 200, data ?? '');
     } catch (err) {

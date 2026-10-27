@@ -1,13 +1,15 @@
-import type { Activity, ActivityItem } from '../../../api/member';
+import { VISIT_GOAL_MAX, VISIT_GOAL_MIN, type Activity, type ActivityItem } from '../../../api/member';
 import { brandContent } from '../../../brand';
 import { dayParts, hkDateKey, hkTime } from '../../../lib/hkTime';
 import { programmeFor } from '../programmes';
 
-// Passport numbers from GET /activity. null = not available (decision B6), never shown as 0.
+// Visit numbers come from GET /me/passport/visits; class history, pillar balance and
+// milestones from GET /activity. null = not available (decision B6), never shown as 0.
 
+/** Where the goal stepper starts when the member hasn't set one */
 export const DEFAULT_GOAL = 12;
-export const GOAL_MIN = 4;
-export const GOAL_MAX = 40;
+export const GOAL_MIN = VISIT_GOAL_MIN;
+export const GOAL_MAX = VISIT_GOAL_MAX;
 export const clampGoal = (n: number) => Math.min(GOAL_MAX, Math.max(GOAL_MIN, Math.round(n)));
 
 /** Completed-class milestones (prototype copy) */
@@ -18,7 +20,6 @@ export const MILESTONES = [
 ];
 
 export interface PassportStats {
-  visitsThisMonth: number | null;
   classesTotal: number | null;
   /** Completed classes, newest first */
   history: ActivityItem[] | null;
@@ -33,9 +34,7 @@ export function readActivity(activity: Activity | null): PassportStats {
       .filter((i) => i.type === 'class')
       .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     : null;
-  const month = activity?.summary.thisMonth;
   return {
-    visitsThisMonth: month ? month.checkins ?? month.classes : null,
     classesTotal: activity ? activity.summary.classesTotal : null,
     history,
     pillars: brandContent!.pillars.map((p) => ({

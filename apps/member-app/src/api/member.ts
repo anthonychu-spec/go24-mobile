@@ -1,8 +1,8 @@
 import { randomUUID } from 'expo-crypto';
-import { apiClient } from './client';
+import { brand } from '../brand';
+import { API_BASE, apiClient } from './client';
 
-// Typed calls for the member layout. Shapes follow backend/nest-api on feat/backend-week1;
-// fields marked "planned" are in docs/backend-plan.md but not built yet (the mock API has them).
+// Typed calls for the member layout. Shapes follow backend/nest-api on feat/backend-week1 (0dade9c).
 
 export interface GymClass {
   id: number;
@@ -68,8 +68,21 @@ export interface Profile {
 export interface Settings {
   reminderMinutes: number;
   autoWaitlistCancel: boolean;
-  /** Planned (backend N6): monthly visit goal */
-  visitGoal?: number;
+  /** Visits per month the member aims for, 1–31; null = not set */
+  visitGoal: number | null;
+}
+
+export { VISIT_GOAL_MAX, VISIT_GOAL_MIN } from './rules';
+
+/** GET /me/passport/visits. Counts are null when PGM couldn't be read — show "—", never 0. */
+export interface PassportVisits {
+  /** YYYY-MM, Hong Kong */
+  month: string;
+  /** Visits to this brand's clubs this month */
+  visitsThisMonth: number | null;
+  /** Consecutive Mon–Sun weeks with a visit */
+  weeksInARow: number | null;
+  visitGoal: number | null;
 }
 
 export interface ActivityItem {
@@ -116,9 +129,13 @@ export const meApi = {
   profile: () => apiClient.get<Profile>('/me/profile').then((r) => r.data),
   settings: () => apiClient.get<Settings>('/me/settings').then((r) => r.data),
   updateSettings: (patch: Partial<Settings>) => apiClient.patch<Settings>('/me/settings', patch).then((r) => r.data),
-  /** Planned (backend N4): deletes the app account in every brand; the PGM membership is untouched */
-  deleteAccount: () => apiClient.post('/me/account/deletion').then(() => undefined),
+  /** Deletes the app account in every brand app; the PGM membership is untouched */
+  deleteAccount: () => apiClient.post<{ status: 'deleted' }>('/me/account/deletion').then((r) => r.data),
+  passportVisits: () => apiClient.get<PassportVisits>('/me/passport/visits').then((r) => r.data),
 };
+
+/** Public page that deletes an account without the app (email + PGM code); store listings link here */
+export const accountDeletionPageUrl = `${API_BASE}/account-deletion?brand=${brand.id}`;
 
 export const activityApi = {
   get: () => apiClient.get<Activity>('/activity').then((r) => r.data),
