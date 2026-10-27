@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BookingsService, CANCEL_UNKNOWN, WAITLIST_DECLINED } from './booking.service';
+import { BookingsService, CANCEL_UNKNOWN, WAITLIST_DECLINED, hkDate } from './booking.service';
 import { BookingRepository } from './repositories/booking.repo';
 import { IdempotencyRepository } from './repositories/idempotency.repo';
 import { OutboxEvent } from './entities/outbox-event.entity';
@@ -287,5 +287,33 @@ describe('BookingsService brand whitelist', () => {
     const svc = await buildSvc();
     const list = (await svc.listMine(BASE_INPUT.userId, 'lab')) as Array<{ id: string }>;
     expect(list.map(b => b.id)).toEqual(['lab-1']);
+  });
+});
+
+describe('BookingsService coded errors', () => {
+  it('outside the 168h window → OUTSIDE_BOOKING_WINDOW, before claiming the key', async () => {
+    mockPgm.getClass.mockResolvedValueOnce({ id: 100, name: 'HIIT', clubId: 45, startTime: new Date(Date.now() + 200 * 3600_000).toISOString() });
+    const svc = await buildSvc();
+    await expect(svc.book(BASE_INPUT)).rejects.toMatchObject({ response: { code: 'OUTSIDE_BOOKING_WINDOW' } });
+    expect(mockIdempotencyRepo.tryClaim).not.toHaveBeenCalled();
+  });
+
+  it('second class the same day → DAILY_LIMIT, and the idempotency key is settled', async () => {
+    mockIdempotencyRepo.tryClaim.mockResolvedValueOnce({ kind: 'claimed' });
+    mockBookingRepo.create.mockRejectedValueOnce({ driverError: { code: '23505', constraint: 'idx_one_booking_per_day' } });
+    const svc = await buildSvc();
+    await expect(svc.book(BASE_INPUT)).rejects.toMatchObject({ response: { code: 'DAILY_LIMIT' } });
+    expect(mockIdempotencyRepo.complete).toHaveBeenCalledWith(
+      BASE_INPUT.userId, BASE_INPUT.idempotencyKey, expect.objectContaining({ error: 'DAILY_LIMIT' }), 'terminal',
+    );
+  });
+});
+
+describe('hkDate', () => {
+  it('uses the Hong Kong calendar day, not UTC', () => {
+    // 06:30 HKT on 2 Nov is 22:30 UTC on 1 Nov
+    expect(hkDate('2026-11-02T06:30:00+08:00')).toBe('2026-11-02');
+    expect(hkDate('2026-11-01T22:30:00Z')).toBe('2026-11-02');
+    expect(hkDate('2026-11-02T15:59:00Z')).toBe('2026-11-02');
   });
 });

@@ -6,9 +6,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthedUser } from '../auth/jwt.strategy';
 import { SettingsService } from './settings.service';
 
-class UpdateSettingsDto {
+export class UpdateSettingsDto {
   @IsOptional() @IsInt() @Min(0) @Max(1440) reminderMinutes?: number;
   @IsOptional() @IsBoolean() autoWaitlistCancel?: boolean;
+  /** Monthly visit goal for Passport, 1–31 (null clears it) */
+  @IsOptional() @IsInt() @Min(1) @Max(31) visitGoal?: number | null;
 }
 
 @ApiTags('settings')
@@ -24,7 +26,7 @@ export class SettingsController {
     return this.svc.get((req.user as AuthedUser).id);
   }
 
-  @ApiOperation({ summary: 'Update settings (reminderMinutes, autoWaitlistCancel)' })
+  @ApiOperation({ summary: 'Update settings (reminderMinutes, autoWaitlistCancel, visitGoal)' })
   @Patch()
   update(
     @Req() req: Request,

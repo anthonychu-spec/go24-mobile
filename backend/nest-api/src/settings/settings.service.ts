@@ -17,12 +17,13 @@ export class SettingsService {
     defaults.userId             = userId;
     defaults.reminderMinutes    = 60;
     defaults.autoWaitlistCancel = false;
+    defaults.visitGoal          = null;
     return defaults;
   }
 
   async update(
     userId: string,
-    patch: Partial<Pick<UserSettings, 'reminderMinutes' | 'autoWaitlistCancel'>>,
+    patch: Partial<Pick<UserSettings, 'reminderMinutes' | 'autoWaitlistCancel' | 'visitGoal'>>,
   ): Promise<UserSettings> {
     await this.repo.upsert({ userId, ...patch }, ['userId']);
     return this.get(userId);

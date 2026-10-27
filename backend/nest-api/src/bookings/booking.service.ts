@@ -9,7 +9,8 @@ import { OutboxEvent } from './entities/outbox-event.entity';
 import { BookingRepository } from './repositories/booking.repo';
 import { IdempotencyRepository } from './repositories/idempotency.repo';
 import {
-  BookingFullError, ClassNotFoundError, DuplicateBookingError, InProgressError,
+  BookingFullError, ClassNotFoundError, DailyLimitError, DuplicateBookingError, InProgressError,
+  OutsideBookingWindowError,
   isTempFail, mapPgmError,
 } from './errors/index';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -17,6 +18,12 @@ import { SettingsService } from '../settings/settings.service';
 import { backgroundJobsEnabled } from '../config/background-jobs';
 import { BrandService } from '../brand/brand.service';
 import type { BrandId } from '../brand/brand.constants';
+
+/** YYYY-MM-DD of an instant in Hong Kong (the clubs' calendar day) */
+export function hkDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Hong_Kong', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date(iso));
+}
 
 /** errorCode markers that tell ReconcileJob what to check in PGM */
 export const WAITLIST_DECLINED = 'WAITLIST_DECLINED';
@@ -63,11 +70,12 @@ export class BookingsService {
     if (!(await this.brands.ownsClub(input.brand, cls.clubId))) throw new ClassNotFoundError();
     const startMs = new Date(cls.startTime).getTime();
     if (startMs > Date.now() + BookingsService.BOOKING_WINDOW_MS) {
-      throw new BadRequestException('Class is outside the 168-hour booking window');
+      throw new OutsideBookingWindowError();
     }
 
-    // 0b. Class date for daily limit (DB unique index enforces 1-per-day)
-    const classDate = new Date(cls.startTime).toISOString().slice(0, 10);
+    // 0b. Class date for daily limit (DB unique index enforces 1-per-day) — the Hong Kong
+    // calendar day, not UTC: a 06:30 HKT class is still the previous day in UTC
+    const classDate = hkDate(cls.startTime);
 
     // 1. Atomic idempotency claim
     const claim = await this.idempotencyRepo.tryClaim(
@@ -98,7 +106,11 @@ export class BookingsService {
       });
     } catch (err: any) {
       if (err?.driverError?.code === '23505' && err?.driverError?.constraint === 'idx_one_booking_per_day') {
-        throw new BadRequestException('Daily limit reached — you can only book 1 class per day');
+        // Settle the idempotency key, or a retry with it would get 409 IN_PROGRESS until it expires
+        await this.idempotencyRepo.complete(
+          input.userId, input.idempotencyKey, { success: false, error: 'DAILY_LIMIT' } as any, 'terminal',
+        );
+        throw new DailyLimitError();
       }
       throw err;
     }

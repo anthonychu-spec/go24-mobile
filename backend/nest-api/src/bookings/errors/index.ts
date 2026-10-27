@@ -4,6 +4,20 @@ export class BookingFullError extends ConflictException {
   constructor() { super({ code: 'BOOKING_FULL', message: '呢堂滿晒，可加入候補' }); }
 }
 
+/** Member already holds a booking that day (DB index idx_one_booking_per_day) */
+export class DailyLimitError extends HttpException {
+  constructor() {
+    super({ code: 'DAILY_LIMIT', message: 'Daily limit reached — you can only book 1 class per day' }, HttpStatus.BAD_REQUEST);
+  }
+}
+
+/** Class starts more than 168 hours from now */
+export class OutsideBookingWindowError extends HttpException {
+  constructor() {
+    super({ code: 'OUTSIDE_BOOKING_WINDOW', message: 'Class is outside the 168-hour booking window' }, HttpStatus.BAD_REQUEST);
+  }
+}
+
 export class DuplicateBookingError extends ConflictException {
   constructor() { super({ code: 'DUPLICATE_BOOKING', message: '你已 book 咗呢堂' }); }
 }

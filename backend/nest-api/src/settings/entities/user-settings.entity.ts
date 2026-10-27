@@ -11,6 +11,10 @@ export class UserSettings {
   @Column({ type: 'boolean', name: 'auto_waitlist_cancel', default: false })
   autoWaitlistCancel!: boolean;
 
+  /** Visits per month the member aims for (Passport); null = not set */
+  @Column({ type: 'int', name: 'visit_goal', nullable: true })
+  visitGoal!: number | null;
+
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt!: Date;
 }
