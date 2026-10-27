@@ -100,6 +100,13 @@ export const en = {
     rateLimited: 'Too many attempts. Please wait a moment and try again.',
     networkError: 'Connection error. Please try again.',
     unknown: 'Something went wrong. Please try again.',
+    bookingFull: 'This session is full. You can join the waitlist.',
+    duplicateBooking: 'You are already booked into this session.',
+    dailyLimit: 'You can book one class per day.',
+    outsideWindow: 'Bookings open 7 days before the session.',
+    classNotFound: 'This session is no longer available.',
+    cancelTooLate: 'It is too late to cancel this session online. Please contact the club team.',
+    tryAgainShortly: 'The system is busy. Please try again shortly.',
   },
   appStatus: {
     updateTitle: 'Update required',

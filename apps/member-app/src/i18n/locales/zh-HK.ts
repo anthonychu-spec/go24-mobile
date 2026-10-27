@@ -17,6 +17,13 @@ export const zhHK = {
     rateLimited: '嘗試次數過多，請稍候再試',
     networkError: '網絡連線錯誤，請重試',
     unknown: '發生錯誤，請重試',
+    bookingFull: '此課堂已滿，可加入候補',
+    duplicateBooking: '你已預約此課堂',
+    dailyLimit: '每日只可預約一堂',
+    outsideWindow: '課堂開始前 7 日開放預約',
+    classNotFound: '此課堂已不能預約',
+    cancelTooLate: '已過網上取消時限，請聯絡前台',
+    tryAgainShortly: '系統繁忙，請稍後再試',
   },
   appStatus: {
     updateTitle: '需要更新',

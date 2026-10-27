@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { tokenStorage } from '../auth/storage';
 import { brand } from '../brand';
+import { MOCK_API, mockAdapter } from './mock';
 
 const LOCAL_API = 'http://localhost:3000/v1';
 
@@ -8,7 +9,7 @@ function resolveApiBase(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.trim();
   const base = fromEnv || brand.apiBase;
   if (base) return base.replace(/\/+$/, '');
-  console.warn(`[api] no EXPO_PUBLIC_API_URL or brand.apiBase for "${brand.id}"; using ${LOCAL_API}`);
+  if (!MOCK_API) console.warn(`[api] no EXPO_PUBLIC_API_URL or brand.apiBase for "${brand.id}"; using ${LOCAL_API}`);
   return LOCAL_API;
 }
 
@@ -18,7 +19,10 @@ export const API_BASE = resolveApiBase();
 /** Sent on every request; the backend picks the brand from it until the token carries one. */
 export const BRAND_HEADERS = { 'X-App-Brand': brand.id } as const;
 
-export const apiClient = axios.create({ baseURL: API_BASE, timeout: 30000, headers: BRAND_HEADERS });
+/** EXPO_PUBLIC_API_MOCK=1 answers every request in-app (src/api/mock) */
+export const API_ADAPTER = MOCK_API ? mockAdapter : undefined;
+
+export const apiClient = axios.create({ baseURL: API_BASE, timeout: 30000, headers: BRAND_HEADERS, adapter: API_ADAPTER });
 
 apiClient.interceptors.request.use(async (config) => {
   const token = await tokenStorage.getAccess();
@@ -42,7 +46,7 @@ apiClient.interceptors.response.use(
           const { data } = await axios.post(
             `${API_BASE}/auth/refresh`,
             { refreshToken: refresh },
-            { headers: BRAND_HEADERS, timeout: 30000 },
+            { headers: BRAND_HEADERS, timeout: 30000, adapter: API_ADAPTER },
           );
           await tokenStorage.setTokens(data.accessToken, data.refreshToken);
           return data.accessToken;
