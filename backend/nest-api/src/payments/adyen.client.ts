@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHmac } from 'node:crypto';
 import axios, { AxiosInstance } from 'axios';
 
 @Injectable()
@@ -88,7 +89,6 @@ export class AdyenClient {
     const hmacKey = this.cfg.get<string>('ADYEN_HMAC_KEY');
     if (!hmacKey) return false;
     try {
-      const { createHmac } = require('node:crypto');
       const expected = createHmac('sha256', Buffer.from(hmacKey, 'hex'))
         .update(payload)
         .digest('base64');

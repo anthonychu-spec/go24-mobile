@@ -1,12 +1,16 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Pool } from 'pg';
 import { Booking } from '../bookings/entities/booking.entity';
 import { User } from '../auth/entities/user.entity';
 import { PgmClient } from '../pgm-adapter/pgm.client';
 import { PgmBookingAdapter } from '../booking/pgm-booking.adapter';
 import { GYM_DATA_POOL } from './activity.constants';
+
+/** The part of a pg Pool used here (pg ships without type declarations in this repo) */
+interface GymDataPool {
+  query(text: string, params?: unknown[]): Promise<{ rows: any[] }>;
+}
 
 export type ActivityType = 'class' | 'pt' | 'checkin';
 
@@ -49,7 +53,7 @@ export class ActivityService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly pgm: PgmClient,
     private readonly pgmBooking: PgmBookingAdapter,
-    @Inject(GYM_DATA_POOL) private readonly gymPool: Pool | null,
+    @Inject(GYM_DATA_POOL) private readonly gymPool: GymDataPool | null,
   ) {}
 
   async getActivity(pgmMemberId: number, userId: string): Promise<{

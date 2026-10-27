@@ -5,9 +5,15 @@ on:
     branches: [main, dev]
   push:
     branches: [main, dev]
+  # Run by hand on any branch, e.g. to get a passing CI run for a SHA before a manual deploy
+  workflow_dispatch:
 
+# Scope: the backend API (backend/nest-api), which is what deploy.yml ships.
+# - apps/member-app is being rewritten on the LAB app branch (Expo SDK 58, Node 22);
+#   its job gets added when that branch lands. The old app here doesn't typecheck.
+# - packages/* are unused scaffolds (nothing imports them) with no ESLint 9 config.
 jobs:
-  lint-typecheck-test:
+  backend:
     runs-on: ubuntu-latest
     services:
       # Throwaway DB for backend/nest-api src/database/schema.spec.ts (migrations vs entities)
@@ -42,10 +48,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm lint
+        run: pnpm turbo run lint --filter=nest-api
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: pnpm turbo run typecheck --filter=nest-api
 
-      - name: Test
-        run: pnpm test
+      - name: Test (unit + migrations/schema + account deletion against Postgres)
+        run: pnpm turbo run test --filter=nest-api

@@ -19,7 +19,8 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**"],
+      "passThroughEnv": ["TEST_DATABASE_URL"]
     },
     "clean": {
       "cache": false

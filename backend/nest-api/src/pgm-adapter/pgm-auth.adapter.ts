@@ -129,5 +129,5 @@ function isSafeEmailForOData(email: string): boolean {
   if (email.length === 0 || email.length > 254) return false;
   // No control chars, no whitespace, no backslash, no embedded quote-runs.
   // Allow the standard email-safe charset only.
-  return /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email);
+  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
 }

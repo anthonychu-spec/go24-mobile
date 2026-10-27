@@ -56,7 +56,7 @@ export class PgmClient {
 
     axiosRetry(this.axios, {
       retries: 2,
-      retryDelay: axiosRetry.exponentialDelay,
+      retryDelay: (retryCount, error) => axiosRetry.exponentialDelay(retryCount, error),
       retryCondition: shouldRetryPgmRequest,
     });
 

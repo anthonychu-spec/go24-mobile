@@ -60,8 +60,8 @@ export function normalizePgmError(err: unknown): AppError {
 
     const status = err.response.status;
     const data = (err.response.data ?? {}) as Record<string, unknown>;
-    const code = String(data.errorCode ?? data.code ?? '');
-    const msg = String(data.message ?? data.error ?? err.message ?? '');
+    const code = text(data.errorCode ?? data.code);
+    const msg = text(data.message ?? data.error) || err.message || '';
 
     if (code) {
       if (/full|capacity/i.test(code)) return new AppError('BOOKING_FULL');
@@ -83,6 +83,11 @@ export function normalizePgmError(err: unknown): AppError {
   }
 
   return new AppError('UNKNOWN', err instanceof Error ? err.message : String(err));
+}
+
+/** A PGM error field as text; an unexpected object becomes '' rather than "[object Object]" */
+function text(v: unknown): string {
+  return typeof v === 'string' || typeof v === 'number' ? String(v) : '';
 }
 
 function axios_isAxiosError(err: unknown): err is AxiosError {

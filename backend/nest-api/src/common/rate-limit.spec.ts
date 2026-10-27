@@ -2,13 +2,14 @@ import { HttpException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RateLimitGuard, RateLimitOptions, resetRateLimits } from './rate-limit';
 
-class Ctl { handler() {} }
+class Ctl {}
+const handler = function handler() {};
 
 function ctx(opts: RateLimitOptions | undefined, req: Record<string, unknown>) {
   const reflector = { get: () => opts } as unknown as Reflector;
   const res = { setHeader: jest.fn() };
   const context = {
-    getHandler: () => Ctl.prototype.handler,
+    getHandler: () => handler,
     getClass: () => Ctl,
     switchToHttp: () => ({ getRequest: () => req, getResponse: () => res }),
   } as any;

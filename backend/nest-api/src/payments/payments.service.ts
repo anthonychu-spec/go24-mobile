@@ -7,6 +7,7 @@ import { PaymentMethod } from './entities/payment-method.entity';
 import { Charge } from './entities/charge.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PgmClient } from '../pgm-adapter/pgm.client';
+import PDFDocument from 'pdfkit';
 
 @Injectable()
 export class PaymentsService {
@@ -200,16 +201,7 @@ export class PaymentsService {
     };
   }
 
-  // ── Pay outstanding (enhanced — records charge) ───────────────────────────
-
-  async payOutstanding(userId: string, pgmId: number): Promise<{
-    success: boolean; pspReference?: string; resultCode: string; amountCharged: number;
-  }> {
-    // Fetch live amount from backend — never trust client
-    // (PgmClient not injected here — amount passed from DashboardService)
-    // This method is called from DashboardController which fetches PGM invoices
-    throw new BadRequestException('Use DashboardService.payOutstanding()');
-  }
+  // Paying outstanding PGM invoices lives in DashboardService.payOutstanding().
 
   // ── Getters ───────────────────────────────────────────────────────────────
 
@@ -265,8 +257,6 @@ export class PaymentsService {
     const charge = await this.chargeRepo.findOne({ where: { id: chargeId, userId } });
     if (!charge) throw new NotFoundException('Invoice not found');
 
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const PDFDocument = require('pdfkit') as any;
 
     return new Promise<Buffer>((resolve, reject) => {
       const doc    = new PDFDocument({ size: 'A4', margin: 50 });

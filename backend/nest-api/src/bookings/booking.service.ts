@@ -342,8 +342,8 @@ export class BookingsService {
       const delayMs = fireAt.getTime() - Date.now();
       if (delayMs <= 0) return; // already too close / past
 
-      setTimeout(async () => {
-        await this.notifications.sendDirectPush(
+      setTimeout(() => {
+        void this.notifications.sendDirectPush(
           userId,
           '🏋️ Class starting soon',
           `${className} starts in ${s.reminderMinutes} minutes. See you there!`,
@@ -383,8 +383,8 @@ export class BookingsService {
             // Just remind — don't cancel
             await this.notifications.sendDirectPush(
               booking.userId,
-              '⏰ You\'re confirmed!',
-              `You\'re confirmed for ${cls.name ?? `Class #${booking.classId}`} starting soon. Cancel if you can\'t make it.`,
+              "⏰ You're confirmed!",
+              `You're confirmed for ${cls.name ?? `Class #${booking.classId}`} starting soon. Cancel if you can't make it.`,
               { type: 'waitlist_reminder', classId: booking.classId },
             ).catch(() => {});
           }
