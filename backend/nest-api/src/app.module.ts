@@ -7,6 +7,7 @@ import { AccountModule } from './account/account.module';
 import { AuthModule } from './auth/auth.module';
 import { BrandModule } from './brand/brand.module';
 import { CoachingModule } from './coaching/coaching.module';
+import { PassportModule } from './passport/passport.module';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -35,6 +36,7 @@ import { MilestonesModule } from './milestones/milestones.module';
     AuthModule,
     AccountModule,
     CoachingModule,
+    PassportModule,
     HealthModule,
     BookingModule,
     BookingsModule,
